@@ -202,8 +202,6 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
 
     with open("solve_log_vectorized.txt", "a") as f:
         solve_time = problem.solver_stats.solve_time
-        f.write("Max tokens 5, num Allwed tokens 5 \n" )
-        f.write("Corpus size: \n" )
         f.write(f"Solve time: {solve_time:.4f} seconds\n" if solve_time is not None else "Solve time: N/A\n")
         f.write(f"Peak memory usage: {usage.ru_maxrss / 1024:.2f} MB\n")
         f.write("-" * 40 + "\n")  # separator
