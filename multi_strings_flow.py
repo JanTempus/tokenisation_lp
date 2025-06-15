@@ -69,35 +69,11 @@ def find_corresponding_token(fixedString: tokenInstance,tokenSet )->tokenInstanc
         
     return tokenIndex
 
-
-
-
-def SolveLPVectorized(edgesList: list[list[tokenInstance]] , 
-            edgeListWeight:list[int] , 
-            tokens: list[tokenInstance], 
-            freeEdgesList: list[list[tokenInstance]], 
-            totalVertices:int, 
-            numAllowedTokens:int)->tuple[list[list[tokenInstance]],list[list[tokenInstance]],list[possibleToken]]:
-
-    numStrings=len(edgesList)
-    
-    if(numStrings != len(freeEdgesList) ):
-        raise ValueError
-    
-    totalNumEdges=sum([len(edges) for edges in edgesList ] )
-    totalNumFreeEdges=sum(len(edges) for edges in freeEdgesList )
-    A= sp.lil_matrix((totalVertices, totalNumEdges))
-    B= sp.lil_matrix((totalVertices,totalNumFreeEdges))
-
-
-
-
 def SolveLPVec(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
             tokens: list[tokenInstance], 
             freeEdgesList: list[list[tokenInstance]], 
-            numVerticesList:list[int], 
-            numAllowedTokens:int)->tuple[list[list[tokenInstance]],list[list[tokenInstance]],list[possibleToken]]:
+            numVerticesList:list[int]):
     
     numStrings=len(edgesList)
     
@@ -154,14 +130,10 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
         MMatrices.append(M)
 
 
-        #Create the demand vector for the ith string
         b=np.zeros(numVertices,dtype=int)
         b[0]=1
-        b[numVertices-1]=-1 # print(f"{BigwVector.shape = }" )
-    # print(f"{BigbVector.shape = }" )
-    # print(f"{BigAConstraint.shape= }")
-    # print(f"{BigBConstraint.shape= }")
-    # print(f"{BigMConstraint.shape= }")
+        b[numVertices-1]=-1 
+
 
         bVectors.append(b)
 
@@ -182,30 +154,21 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
     BigBConstraint=BigBConstraint.tocsr()
     BigMConstraint=BigMConstraint.tocsr()
 
-
+    numAllowedTokens = cp.Parameter(nonneg=True)
     f=cp.Variable(edgeCount,nonneg=True )
     g=cp.Variable(freeEdgeCount,nonneg=True)
     t=cp.Variable(numTokens,nonneg=True)
 
     constraints=[BigAConstraint@f+ BigBConstraint@g==BigbVector,
                  f <= BigMConstraint @ t,
-                 cp.sum(t)==numAllowedTokens  ]
+                 cp.sum(t)==numAllowedTokens]   
 
 
     objective=cp.Minimize(BigNonFreewVector.T@f +BigFreewVector.T@g)
 
     problem = cp.Problem(objective, constraints)
-    problem.solve(verbose=True)
-    #print("Optimal value:", problem.value)
 
-    usage = resource.getrusage(resource.RUSAGE_SELF)
-
-    with open("solve_log_vectorized.txt", "a") as f:
-        solve_time = problem.solver_stats.solve_time
-        f.write(f"Solve time: {solve_time:.4f} seconds\n" if solve_time is not None else "Solve time: N/A\n")
-        f.write(f"Peak memory usage: {usage.ru_maxrss / 1024:.2f} MB\n")
-        f.write("-" * 40 + "\n")  # separator
-
+    return problem
 
 
 
@@ -289,6 +252,93 @@ def SolveLP(edgesList: list[list[tokenInstance]] ,
     #print("Optimal value:", problem.value)
 
 
+"""
+This function takes in the free edges, the non free edges and tokens we include in the free edges. 
+tl;dr moves chosen tokens from nonFree to Free edges list depending on whether we have "selected" this edge.
+Only moves edges from non free to free.
+For every tokenInstance in edgesList it checks whether it is contained in accepted tokens, and if it is appends it to free edges,
+otherwise it puts it back in the nonFreeEdgesList.
+"""
+def extendFreeEdges(edgesList: list[list[tokenInstance]] , 
+            Acceptedtokens: list[tokenInstance], 
+            freeEdgesList: list[list[tokenInstance]]
+            )->tuple[list[tokenInstance],list[tokenInstance]]:
+    
+
+    numStrings=len(edgesList)
+
+    newFreeEdgestList=[]
+    newNonFreeEdgesList=[]
+    for i in range(numStrings):
+        edges=edgesList[i]
+        newFreeEdges=freeEdgesList[i]
+        newNonFreeEdges=[]
+        for edge in edges:
+            if edge in Acceptedtokens:
+                newFreeEdges.append(edge)
+            else:
+                newNonFreeEdges.append(edge)
+        
+        newFreeEdgestList.append(newFreeEdges)
+        newNonFreeEdges.append(newNonFreeEdges)
+
+
+
+    return newFreeEdgestList,newNonFreeEdgesList
+    
+def shortestPath(edgeListWeight:list[int] , 
+            edgesList: list[list[tokenInstance]], 
+            numVerticesList:list[int])->int:
+    numStrings=len(edgesList)
+    
+
+    AMatrices=[]
+    bVectors=[]
+    weightVectors=[]
+
+
+    edgeCount=0
+    for i in range(numStrings):
+        edges=edgesList[i]
+        
+        numEdges=len(edges)
+        edgeCount+=numEdges
+
+        numVertices=numVerticesList[i]
+
+        #Create the flow preservation matrix for the non free edges for the ith string
+        A= sp.lil_matrix((numVertices, numEdges))
+        for idx, edge in enumerate(edges):
+            A[edge.start, idx]=1
+            A[edge.end,idx]=-1
+       
+        AMatrices.append(A)
+        
+        b=np.zeros(numVertices,dtype=int)
+        b[0]=1
+        b[numVertices-1]=-1 
+
+        bVectors.append(b)
+
+        weights=np.full(numEdges,edgeListWeight[i])
+        weightVectors.append(weights)
+    
+
+    BigAConstraint=sp.block_diag(AMatrices)
+    BigbVector=np.hstack(bVectors)
+    BigweightVector=np.hstack(weightVectors)
+    BigAConstraint=BigAConstraint.tocsr()
+
+    f=cp.Variable(edgeCount,nonneg=True )
+
+    constraints=[BigAConstraint@f == BigbVector]   
+
+
+    objective=cp.Minimize(BigweightVector.T@f)
+
+    problem = cp.Problem(objective, constraints)
+    problem.solve(verbose=True)
+    return problem.value
 
 
 
@@ -304,7 +354,8 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     for i in range(numStrings):
 
         stringLen=len(inputStringList[i])
-
+        if(maxTokenLength==-1):
+            maxTokenLength=stringLen
         maxTokenLength=min(stringLen,maxTokenLength)
         edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
         tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
@@ -315,10 +366,19 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     tokens=tokensList[0]
     for i in range(1,numStrings):
         tokens=list(set(tokens+tokensList[i] ))
-    SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices, numAllowedTokens)
-    # SolveLP(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices, numAllowedTokens)
+    
+    
+    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
+
+
+
+    numAllowedTokensParam = lpProblem.parameters()[0]
+    numAllowedTokensParam.value = numAllowedTokens
+    lpProblem.solve(verbose=True)
+
+    
 
 # inputStrings=["One day, a little girl named Lily found a needle in her room. She knew it was difficult to play with it because it was sharp.", " Lily wanted to share the needle with her mom, so she could sew a button on her shirt."]
-# inputStrings=["hello", "world"]
+#inputStrings=["hello", "world"]
 
-# CreateInstanceAndSolve(inputStrings,[1,1],2,3)
+# CreateInstanceAndSolve(inputStrings,[1,1],5,3)
