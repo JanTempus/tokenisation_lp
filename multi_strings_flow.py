@@ -3,7 +3,6 @@ import numpy as np
 import scipy.sparse as sp
 import resource
 
-
 class tokenInstance:
     token: str
     start: int
@@ -26,6 +25,7 @@ class possibleToken:
 
     def __eq__(self, other):
         if not isinstance(other,possibleToken):
+
             return False
         return self.token==other.token
     
@@ -374,7 +374,7 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
 
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(verbose=True)
+    lpProblem.solve(solver=cp.GLPK,verbose=True)
 
     
 
