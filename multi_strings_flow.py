@@ -15,6 +15,22 @@ class tokenInstance:
         self.end=end
         self.lpValue=float(-1)
 
+    def __eq__(self, other):
+        if isinstance(other, (possibleToken, tokenInstance)):
+            return self.token == other.token
+        elif isinstance(other, str):
+            return self.token == other
+        return False
+
+    def __hash__(self):
+        return hash(self.token)
+
+    def __str__(self):
+        return f"{self.start,self.end,self.token}"
+
+    def __repr__(self):
+        return self.__str__()
+
 class possibleToken:
     token:str
     lpValue:float
@@ -24,13 +40,21 @@ class possibleToken:
         self.lpValue=float(-1)
 
     def __eq__(self, other):
-        if not isinstance(other,possibleToken):
+        if isinstance(other, (possibleToken, tokenInstance)):
+            return self.token == other.token
+        elif isinstance(other, str):
+            return self.token == other
+        return False
 
-            return False
-        return self.token==other.token
-    
     def __hash__(self):
         return hash(self.token)
+    
+    def __str__(self):
+        return f"{self.token}"
+
+    def __repr__(self):
+        return self.__str__()
+
 
 def get_all_nonFree_substrings_upto_len_t(inputString: str, maxTokenLength: int) -> list[tokenInstance]:
     substrings = []
@@ -278,13 +302,12 @@ def extendFreeEdges(edgesList: list[list[tokenInstance]] ,
                 newFreeEdges.append(edge)
             else:
                 newNonFreeEdges.append(edge)
-        
+
+
         newFreeEdgestList.append(newFreeEdges)
-        newNonFreeEdges.append(newNonFreeEdges)
+        newNonFreeEdgesList.append(newNonFreeEdges)
 
-
-
-    return newFreeEdgestList,newNonFreeEdgesList
+    return newNonFreeEdgesList, newFreeEdgestList
     
 def shortestPath(edgeListWeight:list[int] , 
             edgesList: list[list[tokenInstance]], 
@@ -367,18 +390,20 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     for i in range(1,numStrings):
         tokens=list(set(tokens+tokensList[i] ))
     
+
+# lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
+
+
+
+    # numAllowedTokensParam = lpProblem.parameters()[0]
+    # numAllowedTokensParam.value = numAllowedTokens
+    # lpProblem.solve(solver=cp.GLPK,verbose=True)
+
     
-    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
 
 
-
-    numAllowedTokensParam = lpProblem.parameters()[0]
-    numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.GLPK,verbose=True)
-
-    
 
 # inputStrings=["One day, a little girl named Lily found a needle in her room. She knew it was difficult to play with it because it was sharp.", " Lily wanted to share the needle with her mom, so she could sew a button on her shirt."]
-#inputStrings=["hello", "world"]
+inputStrings=["hello", "world"]
 
-# CreateInstanceAndSolve(inputStrings,[1,1],5,3)
+CreateInstanceAndSolve(inputStrings,[1,1],5,3)
