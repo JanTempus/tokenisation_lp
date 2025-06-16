@@ -17,4 +17,4 @@ if __name__ == "__main__":
     #parser.add_argument("arg2", type=int, help="Second integer argument for CreateInstanceAndSolve")
     args = parser.parse_args()
 
-msf.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,20,args.arg1)
+msf.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,5,args.arg1)

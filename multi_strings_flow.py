@@ -397,7 +397,7 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve()
+    lpProblem.solve(solver=cp.SCS, max_iters=5000, verbose=True)
     lpVariables=lpProblem.variables()
     
     # fVar=lpVariables[0].value
