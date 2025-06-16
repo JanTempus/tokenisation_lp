@@ -1,2 +1,4 @@
+.gitignore
 __pycache__
 pythia-70m-deduped
+strings_with_frequency.npz

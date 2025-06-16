@@ -26,7 +26,7 @@ class tokenInstance:
         return hash(self.token)
 
     def __str__(self):
-        return f"{self.start,self.end,self.token}"
+        return f"{self.start,self.end,self.token,self.lpValue}"
 
     def __repr__(self):
         return self.__str__()
@@ -50,7 +50,7 @@ class possibleToken:
         return hash(self.token)
     
     def __str__(self):
-        return f"{self.token}"
+        return f"{self.token, self.lpValue}"
 
     def __repr__(self):
         return self.__str__()
@@ -68,6 +68,8 @@ def get_all_nonFree_substrings_upto_len_t(inputString: str, maxTokenLength: int)
 def get_tokens_upto_len_t(inputString: str, maxTokenLength: int) -> list[possibleToken]:
     substrings = []
     n = len(inputString)
+    # print(f"{n=} " )
+    # print(f"{maxTokenLength=}")
     maxTokenLength=min(n,maxTokenLength)
     for length in range(2, maxTokenLength + 1):
         for i in range(n - length + 1):
@@ -174,18 +176,22 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
     BigFreewVector=np.hstack(freewVectors)
     BigNonFreewVector=np.hstack(nonfreewVectors)
 
+    tokensCap=np.ones(numTokens,dtype=float)
+
     BigAConstraint=BigAConstraint.tocsr()
     BigBConstraint=BigBConstraint.tocsr()
     BigMConstraint=BigMConstraint.tocsr()
 
-    numAllowedTokens = cp.Parameter(nonneg=True)
+    
     f=cp.Variable(edgeCount,nonneg=True )
     g=cp.Variable(freeEdgeCount,nonneg=True)
     t=cp.Variable(numTokens,nonneg=True)
+    numAllowedTokens = cp.Parameter(nonneg=True)
 
     constraints=[BigAConstraint@f+ BigBConstraint@g==BigbVector,
                  f <= BigMConstraint @ t,
-                 cp.sum(t)==numAllowedTokens]   
+                 cp.sum(t)<=numAllowedTokens,
+                 t <=tokensCap]   
 
 
     objective=cp.Minimize(BigNonFreewVector.T@f +BigFreewVector.T@g)
@@ -377,33 +383,39 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     for i in range(numStrings):
 
         stringLen=len(inputStringList[i])
-        if(maxTokenLength==-1):
-            maxTokenLength=stringLen
-        maxTokenLength=min(stringLen,maxTokenLength)
         edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
         tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
         freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
         numVertices.append(stringLen+1)
+
 
     
     tokens=tokensList[0]
     for i in range(1,numStrings):
         tokens=list(set(tokens+tokensList[i] ))
     
+    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
+    numAllowedTokensParam = lpProblem.parameters()[0]
+    numAllowedTokensParam.value = numAllowedTokens
+    lpProblem.solve()
+    lpVariables=lpProblem.variables()
+    
+    # fVar=lpVariables[0].value
+    # gVar=lpVariables[1].value
+    tVar=lpVariables[2].value
+    for i in range(len(tokens)):
+        tokens[i].lpValue=tVar[i]
 
-# lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
-
-
-
-    # numAllowedTokensParam = lpProblem.parameters()[0]
-    # numAllowedTokensParam.value = numAllowedTokens
-    # lpProblem.solve(solver=cp.GLPK,verbose=True)
+    length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
+    sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
+    print(length_sorted_tokens[0])
+    print(sorted_tokens[0:numAllowedTokens+2])
 
     
 
 
 
-# inputStrings=["One day, a little girl named Lily found a needle in her room. She knew it was difficult to play with it because it was sharp.", " Lily wanted to share the needle with her mom, so she could sew a button on her shirt."]
-inputStrings=["hello", "world"]
+#inputStrings=["One day, a little girl named Lily found a needle in her room. She knew it was difficult to play with it because it was sharp.", " Lily wanted to share the needle with her mom, so she could sew a button on her shirt."]
+#inputStrings=["world","hello"]
 
-CreateInstanceAndSolve(inputStrings,[1,1],5,3)
+#CreateInstanceAndSolve(inputStrings,[1,1],5,10)
