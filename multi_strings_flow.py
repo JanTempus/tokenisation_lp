@@ -109,6 +109,7 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
     numTokens=len(tokens)
 
 
+    print("started working on the LP")
     edgeCount=0
     freeEdgeCount=0
     for i in range(numStrings):
@@ -163,7 +164,7 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
         nonfreewVectors.append(wnonFree)
         freewVectors.append(wFree)
     
-
+    print("Finished setting up lp matrices")
     BigAConstraint=sp.block_diag(AMatrices)
     BigBConstraint=sp.block_diag(BMatrices)
     BigMConstraint=sp.vstack(MMatrices)
