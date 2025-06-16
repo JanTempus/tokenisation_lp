@@ -68,8 +68,6 @@ def get_all_nonFree_substrings_upto_len_t(inputString: str, maxTokenLength: int)
 def get_tokens_upto_len_t(inputString: str, maxTokenLength: int) -> list[possibleToken]:
     substrings = []
     n = len(inputString)
-    # print(f"{n=} " )
-    # print(f"{maxTokenLength=}")
     maxTokenLength=min(n,maxTokenLength)
     for length in range(2, maxTokenLength + 1):
         for i in range(n - length + 1):
@@ -381,7 +379,7 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     freeEdgesList=[]
     numVertices=[]
     for i in range(numStrings):
-
+        print(i,numStrings)
         stringLen=len(inputStringList[i])
         edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
         tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
@@ -397,7 +395,7 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.SCS, max_iters=5000, verbose=True)
+    lpProblem.solve(solver=cp.GLOP, max_iters=5000, verbose=True)
     lpVariables=lpProblem.variables()
     
     # fVar=lpVariables[0].value
