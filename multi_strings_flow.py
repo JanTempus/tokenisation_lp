@@ -116,6 +116,7 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
     edgeCount=0
     freeEdgeCount=0
     for i in range(numStrings):
+        print(i,numStrings)
         edges=edgesList[i]
         freeEdges=freeEdgesList[i]
         tokens=tokens
@@ -379,14 +380,13 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     freeEdgesList=[]
     numVertices=[]
     for i in range(numStrings):
-        print(i,numStrings)
         stringLen=len(inputStringList[i])
         edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
         tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
         freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
         numVertices.append(stringLen+1)
 
-
+    print("Finished prepping data")
     
     tokens=tokensList[0]
     for i in range(1,numStrings):
