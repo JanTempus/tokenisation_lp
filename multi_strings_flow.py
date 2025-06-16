@@ -14,14 +14,12 @@ class tokenInstance:
         self.start=start
         self.end=end
         self.lpValue=float(-1)
-
+    
     def __eq__(self, other):
-        if isinstance(other, (possibleToken, tokenInstance)):
-            return self.token == other.token
-        elif isinstance(other, str):
-            return self.token == other
-        return False
-
+        if not isinstance(other,possibleToken):
+            return False
+        return self.token==other.token
+    
     def __hash__(self):
         return hash(self.token)
 
@@ -40,11 +38,9 @@ class possibleToken:
         self.lpValue=float(-1)
 
     def __eq__(self, other):
-        if isinstance(other, (possibleToken, tokenInstance)):
-            return self.token == other.token
-        elif isinstance(other, str):
-            return self.token == other
-        return False
+        if not isinstance(other,possibleToken):
+            return False
+        return self.token==other.token
 
     def __hash__(self):
         return hash(self.token)
@@ -390,6 +386,7 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     
     tokens=tokensList[0]
     for i in range(1,numStrings):
+        print("Token working on ",i, " out of ",numStrings)
         tokens=list(set(tokens+tokensList[i] ))
     
     lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
