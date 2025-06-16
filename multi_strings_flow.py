@@ -387,7 +387,8 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     tokens=tokensList[0]
     for i in range(1,numStrings):
         print("Token working on ",i, " out of ",numStrings)
-        tokens=list(set(tokens+tokensList[i] ))
+        tokens=tokens+tokensList[i]
+    tokens=list(set(tokens))
     
     lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
     numAllowedTokensParam = lpProblem.parameters()[0]
