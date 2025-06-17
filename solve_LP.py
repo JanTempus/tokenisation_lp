@@ -14,7 +14,7 @@ def solve(numAllowedTokens:int):
     with open("tokens.pkl", "rb") as g:
         tokens=pickle.load(g)
 
-    for numTokens in range(numAllowedTokens):
+    for numTokens in range(2, numAllowedTokens):
         numAllowedTokensParam = lpProblem.parameters()[0]
         numAllowedTokensParam.value = numTokens
         lpProblem.solve(solver=cp.GLOP)
@@ -25,17 +25,17 @@ def solve(numAllowedTokens:int):
         tVar=lpVariables[2].value
 
         allBoolean=True
-        for num in lpVariables[2].value:
+
+        print("Current working on: ", numTokens)
+        for num in tVar:
             if abs(num-0)>0.0001 :
-                allBoolean=False
+                print(num)
             elif abs(num-0)>0.0001:
-                allBoolean=False
+                 print(num)
+       
         if allBoolean:  
             print("For ", numTokens, " everything is integral " )
-        elif allBoolean:
-            print("For ", numTokens, " not everything is integral " )
-        else:
-            print("An issue arised")
+        
         # for i in range(len(tokens)):
         #     tokens[i].lpValue=tVar[i]
 
