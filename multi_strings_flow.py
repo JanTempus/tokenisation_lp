@@ -114,6 +114,8 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
     edgeCount=0
     freeEdgeCount=0
     for i in range(numStrings):
+        if(i%1000==0):
+            print(i,numStrings)
         edges=edgesList[i]
         freeEdges=freeEdgesList[i]
         tokens=tokens
