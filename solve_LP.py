@@ -27,8 +27,7 @@ def solve(numAllowedTokens:int):
 
     length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
     sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-    print(length_sorted_tokens[0])
-    print(sorted_tokens[0:numAllowedTokens+2])
+    print(sorted_tokens[0:(2*numAllowedTokens)])
 
 
 
