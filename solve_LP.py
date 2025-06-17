@@ -16,7 +16,7 @@ def solve(numAllowedTokens:int):
 
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.GLOP, max_iters=5000, verbose=True)
+    lpProblem.solve(solver=cp.GLOP)
     lpVariables=lpProblem.variables()
     
     # fVar=lpVariables[0].value
