@@ -2,6 +2,7 @@ import cvxpy as cp
 import numpy as np
 import scipy.sparse as sp
 import resource
+import pickle
 
 class tokenInstance:
     token: str
@@ -113,7 +114,6 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
     edgeCount=0
     freeEdgeCount=0
     for i in range(numStrings):
-        print(i,numStrings)
         edges=edgesList[i]
         freeEdges=freeEdgesList[i]
         tokens=tokens
@@ -367,7 +367,7 @@ def shortestPath(edgeListWeight:list[int] ,
 
 
 
-def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int], maxTokenLength: int, numAllowedTokens:int ):
+def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int], maxTokenLength: int ):
     
     numStrings=len(inputStringList)
  
@@ -383,30 +383,34 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
         freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
         numVertices.append(stringLen+1)
 
-    print("Finished prepping data")
+    print("Finished preparing data")
     
     tokens=tokensList[0]
-    for i in range(1,numStrings):
-        print("Token working on ",i, " out of ",numStrings)
-        tokens=tokens+tokensList[i]
-    tokens=list(set(tokens))
-    
-    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
-    numAllowedTokensParam = lpProblem.parameters()[0]
-    numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.GLOP, max_iters=5000, verbose=True)
-    lpVariables=lpProblem.variables()
-    
-    # fVar=lpVariables[0].value
-    # gVar=lpVariables[1].value
-    tVar=lpVariables[2].value
-    for i in range(len(tokens)):
-        tokens[i].lpValue=tVar[i]
 
-    length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
-    sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-    print(length_sorted_tokens[0])
-    print(sorted_tokens[0:numAllowedTokens+2])
+    tokens=list(set([item for sublist in tokensList for item in sublist] ))
+    
+    print("Finished preparing tokens")
+    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
+    with open("lp_problem.pkl", "wb") as f:
+        pickle.dump(lpProblem, f)
+
+    with open("tokens.pkl", "wb") as f:
+        pickle.dump(tokens, f)
+    # numAllowedTokensParam = lpProblem.parameters()[0]
+    # numAllowedTokensParam.value = numAllowedTokens
+    # lpProblem.solve(solver=cp.GLOP, max_iters=5000, verbose=True)
+    # lpVariables=lpProblem.variables()
+    
+    # # fVar=lpVariables[0].value
+    # # gVar=lpVariables[1].value
+    # tVar=lpVariables[2].value
+    # for i in range(len(tokens)):
+    #     tokens[i].lpValue=tVar[i]
+
+    # length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
+    # sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
+    # print(length_sorted_tokens[0])
+    # print(sorted_tokens[0:numAllowedTokens+2])
 
     
 
