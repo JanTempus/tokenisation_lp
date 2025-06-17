@@ -14,20 +14,35 @@ def solve(numAllowedTokens:int):
     with open("tokens.pkl", "rb") as g:
         tokens=pickle.load(g)
 
-    numAllowedTokensParam = lpProblem.parameters()[0]
-    numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.GLOP)
-    lpVariables=lpProblem.variables()
-    
-    # fVar=lpVariables[0].value
-    # gVar=lpVariables[1].value
-    tVar=lpVariables[2].value
-    for i in range(len(tokens)):
-        tokens[i].lpValue=tVar[i]
+    for numTokens in range(numAllowedTokens):
+        numAllowedTokensParam = lpProblem.parameters()[0]
+        numAllowedTokensParam.value = numTokens
+        lpProblem.solve(solver=cp.GLOP)
+        lpVariables=lpProblem.variables()
+        
+        # fVar=lpVariables[0].value
+        # gVar=lpVariables[1].value
+        tVar=lpVariables[2].value
 
-    length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
-    sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-    print(sorted_tokens[0:(2*numAllowedTokens)])
+        allBoolean=True
+        for num in lpVariables[2].value:
+            if abs(num-0)>0.0001 :
+                allBoolean=False
+            elif abs(num-0)>0.0001:
+                allBoolean=False
+        if allBoolean:  
+            print("For ", numTokens, " everything is integral " )
+        elif allBoolean:
+            print("For ", numTokens, " not everything is integral " )
+        else:
+            print("An issue arised")
+        # for i in range(len(tokens)):
+        #     tokens[i].lpValue=tVar[i]
+
+        
+        # length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
+        # sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
+        # print(sorted_tokens[0:(2*numAllowedTokens)])
 
 
 
