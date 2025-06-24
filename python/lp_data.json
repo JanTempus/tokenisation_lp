@@ -1,0 +1,284 @@
+{
+  "edges_list": [
+    [
+      {
+        "token": "wo",
+        "start": 0,
+        "end": 2,
+        "lp_value": -1.0
+      },
+      {
+        "token": "or",
+        "start": 1,
+        "end": 3,
+        "lp_value": -1.0
+      },
+      {
+        "token": "rl",
+        "start": 2,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "ld",
+        "start": 3,
+        "end": 5,
+        "lp_value": -1.0
+      },
+      {
+        "token": "wor",
+        "start": 0,
+        "end": 3,
+        "lp_value": -1.0
+      },
+      {
+        "token": "orl",
+        "start": 1,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "rld",
+        "start": 2,
+        "end": 5,
+        "lp_value": -1.0
+      },
+      {
+        "token": "worl",
+        "start": 0,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "orld",
+        "start": 1,
+        "end": 5,
+        "lp_value": -1.0
+      },
+      {
+        "token": "world",
+        "start": 0,
+        "end": 5,
+        "lp_value": -1.0
+      }
+    ],
+    [
+      {
+        "token": "he",
+        "start": 0,
+        "end": 2,
+        "lp_value": -1.0
+      },
+      {
+        "token": "el",
+        "start": 1,
+        "end": 3,
+        "lp_value": -1.0
+      },
+      {
+        "token": "ll",
+        "start": 2,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "lo",
+        "start": 3,
+        "end": 5,
+        "lp_value": -1.0
+      },
+      {
+        "token": "hel",
+        "start": 0,
+        "end": 3,
+        "lp_value": -1.0
+      },
+      {
+        "token": "ell",
+        "start": 1,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "llo",
+        "start": 2,
+        "end": 5,
+        "lp_value": -1.0
+      },
+      {
+        "token": "hell",
+        "start": 0,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "ello",
+        "start": 1,
+        "end": 5,
+        "lp_value": -1.0
+      },
+      {
+        "token": "hello",
+        "start": 0,
+        "end": 5,
+        "lp_value": -1.0
+      }
+    ]
+  ],
+  "edge_list_weight": [
+    1,
+    1
+  ],
+  "tokens": [
+    {
+      "token": "hel",
+      "lp_value": -1.0
+    },
+    {
+      "token": "ll",
+      "lp_value": -1.0
+    },
+    {
+      "token": "rld",
+      "lp_value": -1.0
+    },
+    {
+      "token": "ld",
+      "lp_value": -1.0
+    },
+    {
+      "token": "or",
+      "lp_value": -1.0
+    },
+    {
+      "token": "lo",
+      "lp_value": -1.0
+    },
+    {
+      "token": "world",
+      "lp_value": -1.0
+    },
+    {
+      "token": "wo",
+      "lp_value": -1.0
+    },
+    {
+      "token": "orld",
+      "lp_value": -1.0
+    },
+    {
+      "token": "ell",
+      "lp_value": -1.0
+    },
+    {
+      "token": "wor",
+      "lp_value": -1.0
+    },
+    {
+      "token": "llo",
+      "lp_value": -1.0
+    },
+    {
+      "token": "el",
+      "lp_value": -1.0
+    },
+    {
+      "token": "worl",
+      "lp_value": -1.0
+    },
+    {
+      "token": "orl",
+      "lp_value": -1.0
+    },
+    {
+      "token": "ello",
+      "lp_value": -1.0
+    },
+    {
+      "token": "rl",
+      "lp_value": -1.0
+    },
+    {
+      "token": "hell",
+      "lp_value": -1.0
+    },
+    {
+      "token": "hello",
+      "lp_value": -1.0
+    },
+    {
+      "token": "he",
+      "lp_value": -1.0
+    }
+  ],
+  "free_edges_list": [
+    [
+      {
+        "token": "w",
+        "start": 0,
+        "end": 1,
+        "lp_value": -1.0
+      },
+      {
+        "token": "o",
+        "start": 1,
+        "end": 2,
+        "lp_value": -1.0
+      },
+      {
+        "token": "r",
+        "start": 2,
+        "end": 3,
+        "lp_value": -1.0
+      },
+      {
+        "token": "l",
+        "start": 3,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "d",
+        "start": 4,
+        "end": 5,
+        "lp_value": -1.0
+      }
+    ],
+    [
+      {
+        "token": "h",
+        "start": 0,
+        "end": 1,
+        "lp_value": -1.0
+      },
+      {
+        "token": "e",
+        "start": 1,
+        "end": 2,
+        "lp_value": -1.0
+      },
+      {
+        "token": "l",
+        "start": 2,
+        "end": 3,
+        "lp_value": -1.0
+      },
+      {
+        "token": "l",
+        "start": 3,
+        "end": 4,
+        "lp_value": -1.0
+      },
+      {
+        "token": "o",
+        "start": 4,
+        "end": 5,
+        "lp_value": -1.0
+      }
+    ]
+  ],
+  "num_vertices_list": [
+    6,
+    6
+  ]
+}
