@@ -1,6 +1,7 @@
 use sprs::{TriMat,CsMat};
-use std::collections::HashMap;
 use pyo3::prelude::*;
+use rayon::prelude::*;
+use std::collections::HashMap;
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -38,20 +39,24 @@ impl PossibleToken {
     pub fn new(token: String, lp_value: f64) -> Self {
         PossibleToken { token, lp_value }
     }
-}
+}            
 
-use rayon::prelude::*;
+
+
+
 #[pyfunction]
 fn make_matrix_parallel(edges_list:Vec<Vec<TokenInstance>>, 
     edge_list_weight: Vec<usize>,
     tokens: Vec<PossibleToken>,
     free_edges_list: Vec<Vec<TokenInstance>>,
-    num_vertices_list: Vec<usize>)->PyResult<(CsMat<isize>,
-                                      CsMat<isize>,
-                                      CsMat<isize>,
-                                      Vec<isize>,
-                                      Vec<usize>,
-                                      Vec<usize>)> {
+    num_vertices_list: Vec<usize>)->PyResult<(
+                                            (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize),   // A
+                                            (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize),   // B
+                                            (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize),   // M
+                                            Vec<isize>,                                           // b_vec
+                                            Vec<isize>,                                           // non-free w
+                                            Vec<isize>,                                           // free w
+                                        )>{
 
     let num_strings = edges_list.len();
     assert_eq!(num_strings, free_edges_list.len());
@@ -141,9 +146,9 @@ fn make_matrix_parallel(edges_list:Vec<Vec<TokenInstance>>,
     let mut a_comb:TriMat<isize> = TriMat::new((total_vertices, total_edges));
     let mut b_comb:TriMat<isize> = TriMat::new((total_vertices, total_free_edges));
     let mut m_comb:TriMat<isize> = TriMat::new((total_edges, num_tokens));
-    let mut b_vec = vec![0 ; total_vertices];
-    let mut nonfree_w : Vec<usize>= Vec::with_capacity(total_edges);
-    let mut free_w : Vec<usize>= Vec::with_capacity(total_free_edges);
+    let mut b_vec = vec![0isize ; total_vertices];
+    let mut nonfree_w : Vec<isize>= Vec::with_capacity(total_edges);
+    let mut free_w : Vec<isize>= Vec::with_capacity(total_free_edges);
 
     for (a, b, m, bv, nw, fw) in results {
     // Merge A
@@ -167,114 +172,133 @@ fn make_matrix_parallel(edges_list:Vec<Vec<TokenInstance>>,
     }
 
     // Merge weights
-    nonfree_w.extend(nw.iter().map(|&x| x as usize));
-    free_w.extend(fw.iter().map(|&x| x as usize));
+    nonfree_w.extend(nw.iter().map(|&x| x as isize));
+    free_w.extend(fw.iter().map(|&x| x as isize));
     }
 
+    fn csr_components(mat: CsMat<isize>) -> (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize){
+        let data    = mat.data().to_vec();
+        let indices = mat.indices().to_vec();
+        let indptr = mat.indptr().as_slice().unwrap().to_vec();
+        (data, indices, indptr, mat.rows(), mat.cols())
+    }
+
+
     Ok((
-    a_comb.to_csr(),
-    b_comb.to_csr(),
-    m_comb.to_csr(),
+    csr_components(a_comb.to_csr()),
+    csr_components(b_comb.to_csr()),
+    csr_components(m_comb.to_csr()),
     b_vec,
     nonfree_w,
     free_w,
     ))
 }
     
-    
+#[allow(unsafe_op_in_unsafe_fn)]
 #[pyfunction]
 fn make_matrix(edges_list:Vec<Vec<TokenInstance>>, 
                edge_list_weight: Vec<usize>,
                tokens: Vec<PossibleToken>,
                free_edges_list: Vec<Vec<TokenInstance>>,
-               num_vertices_list: Vec<usize>)->PyResult<(CsMat<isize>,
-                            CsMat<isize>,
-                            CsMat<isize>,
-                            Vec<isize>,
-                            Vec<isize>,
-                            Vec<isize>)> {
+               num_vertices_list: Vec<usize>)->PyResult<(
+                (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize),   // A
+                (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize),   // B
+                (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize),   // M
+                Vec<isize>,                                           // b_vec
+                Vec<isize>,                                           // non-free w
+                Vec<isize>,                                           // free w
+             )> {
 
 
-let num_strings = edges_list.len();
-if num_strings != free_edges_list.len() {
-panic!("Mismatch between edges list and free edges list");
-}
+    let num_strings = edges_list.len();
+    if num_strings != free_edges_list.len() {
+    panic!("Mismatch between edges list and free edges list");
+    }
 
 
-let num_vertices:  usize = num_vertices_list.iter().sum();
-let num_edges:     usize = edges_list.iter().map(|edges| edges.len()).sum();
-let num_edges_free:usize = free_edges_list.iter().map(|edges| edges.len()).sum();
+    let num_vertices:  usize = num_vertices_list.iter().sum();
+    let num_edges:     usize = edges_list.iter().map(|edges| edges.len()).sum();
+    let num_edges_free:usize = free_edges_list.iter().map(|edges| edges.len()).sum();
 
-let num_tokens = tokens.len();
-
-
-let mut free_w_vectors:   Vec<isize> = Vec::new();
-let mut nonfree_w_vectors:Vec<isize> = Vec::new();
+    let num_tokens = tokens.len();
 
 
-let mut offset_edges:      usize = 0;
-let mut offset_edges_free: usize = 0;
-let mut offset_vertices:   usize = 0;
-
-let mut a:TriMat<isize> = TriMat::new((num_vertices, num_edges));
-let mut b:TriMat<isize> = TriMat::new((num_vertices, num_edges_free));
-let mut m:TriMat<isize> = TriMat::new((num_edges, num_tokens));
-
-let mut b_vec =vec![0; num_vertices];
-
-for i in 0..num_strings {
-
-let curr_edges = &edges_list[i];
-let curr_free_edges = &free_edges_list[i];
-let curr_num_edges = curr_edges.len();
-let curr_num_free_edges = curr_free_edges.len();
-let curr_num_vertices = num_vertices_list[i];
+    let mut free_w_vectors:   Vec<isize> = Vec::new();
+    let mut nonfree_w_vectors:Vec<isize> = Vec::new();
 
 
-for (idx, edge) in curr_edges.iter().enumerate() {
-a.add_triplet(edge.start+offset_vertices, idx+offset_edges, 1);
-a.add_triplet(edge.end+offset_vertices, idx+offset_edges ,-1);
-}
+    let mut offset_edges:      usize = 0;
+    let mut offset_edges_free: usize = 0;
+    let mut offset_vertices:   usize = 0;
 
-for (idx, edge) in curr_free_edges.iter().enumerate() {
-b.add_triplet(edge.start+offset_vertices, idx+offset_edges_free, 1);
-b.add_triplet(edge.end+offset_vertices  , idx+offset_edges_free, -1);
-}
+    let mut a:TriMat<isize> = TriMat::new((num_vertices, num_edges));
+    let mut b:TriMat<isize> = TriMat::new((num_vertices, num_edges_free));
+    let mut m:TriMat<isize> = TriMat::new((num_edges, num_tokens));
 
+    let mut b_vec =vec![0isize ; num_vertices];
 
-for (j, edge) in curr_edges.iter().enumerate() {
-let index = tokens
-.iter()
-.position(|t| t.token == edge.token)
-.expect(&format!("Token '{}' not found in tokens list", edge.token));
+    for i in 0..num_strings {
 
-m.add_triplet(j+offset_edges, index, 1);
-}
+        let curr_edges = &edges_list[i];
+        let curr_free_edges = &free_edges_list[i];
+        let curr_num_edges = curr_edges.len();
+        let curr_num_free_edges = curr_free_edges.len();
+        let curr_num_vertices = num_vertices_list[i];
 
 
-b_vec[offset_vertices]=1;
-b_vec[offset_vertices+curr_num_vertices-1]=-1;
-offset_edges_free += curr_num_free_edges;
-offset_edges      += curr_num_edges;
-offset_vertices   += curr_num_vertices;
+        for (idx, edge) in curr_edges.iter().enumerate() {
+            a.add_triplet(edge.start+offset_vertices, idx+offset_edges, 1);
+            a.add_triplet(edge.end+offset_vertices, idx+offset_edges ,-1);
+        }
+
+        for (idx, edge) in curr_free_edges.iter().enumerate() {
+            b.add_triplet(edge.start+offset_vertices, idx+offset_edges_free, 1);
+            b.add_triplet(edge.end+offset_vertices  , idx+offset_edges_free, -1);
+        }
 
 
-// // weights
-let w_nonfree = vec![edge_list_weight[i] as isize; curr_num_edges];
-let w_free = vec![edge_list_weight[i] as isize; curr_num_free_edges];
-nonfree_w_vectors.extend(w_nonfree);
-free_w_vectors.extend(w_free);
+        for (j, edge) in curr_edges.iter().enumerate() {
+            let index = tokens
+            .iter()
+            .position(|t| t.token == edge.token)
+            .expect(&format!("Token '{}' not found in tokens list", edge.token));
 
-}
-
-let a_csr=a.to_csr::<usize>();
-let b_csr=b.to_csr::<usize>();
-let m_csr=m.to_csr::<usize>();
-
-Ok((a_csr,b_csr,m_csr,b_vec,nonfree_w_vectors,free_w_vectors))
+            m.add_triplet(j+offset_edges, index, 1);
+        }
 
 
+    b_vec[offset_vertices]=1;
+    b_vec[offset_vertices+curr_num_vertices-1]=-1;
+    offset_edges_free += curr_num_free_edges;
+    offset_edges      += curr_num_edges;
+    offset_vertices   += curr_num_vertices;
+
+
+    // // weights
+    let w_nonfree = vec![edge_list_weight[i] as isize; curr_num_edges];
+    let w_free = vec![edge_list_weight[i] as isize; curr_num_free_edges];
+    nonfree_w_vectors.extend(w_nonfree);
+    free_w_vectors.extend(w_free);
+
+    }
+
+    let a_csr=a.to_csr();
+    let b_csr=b.to_csr();
+    let m_csr=m.to_csr();
+
+
+    fn csr_components(mat: CsMat<isize>) -> (Vec<isize>, Vec<usize>, Vec<usize>, usize, usize){
+        let data    = mat.data().to_vec();
+        let indices = mat.indices().to_vec();
+        let indptr = mat.indptr().as_slice().unwrap().to_vec();
+        (data, indices, indptr, mat.rows(), mat.cols())
+    }
+
+
+    Ok((csr_components(a_csr),csr_components(b_csr),csr_components(m_csr),b_vec,nonfree_w_vectors,free_w_vectors))
 }   
+
+
 
 
 

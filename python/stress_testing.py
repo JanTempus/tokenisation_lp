@@ -1,5 +1,6 @@
 from datasets import load_dataset
 import multi_strings_flow as msf
+import setup_and_solve as sas
 from collections import defaultdict
 import time
 import numpy as np
@@ -17,4 +18,8 @@ if __name__ == "__main__":
     #parser.add_argument("arg2", type=int, help="Second integer argument for CreateInstanceAndSolve")
     args = parser.parse_args()
 
+
 msf.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,args.arg1)
+print("Finished with python")
+sas.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,args.arg1)
+print("Finsihed with the rust" )

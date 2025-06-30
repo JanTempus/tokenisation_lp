@@ -4,6 +4,7 @@ import scipy.sparse as sp
 import resource
 import pickle
 import json
+import time
 
 class tokenInstance:
     token: str
@@ -126,7 +127,7 @@ def save_lp_data(
 
 def SolveLPVec(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
-            tokens: list[tokenInstance], 
+            tokens: list[possibleToken], 
             freeEdgesList: list[list[tokenInstance]], 
             numVerticesList:list[int]):
     
@@ -145,11 +146,10 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
 
 
     print("started working on the LP")
+    start = time.time()
     edgeCount=0
     freeEdgeCount=0
     for i in range(numStrings):
-        if(i%1000==0):
-            print(i,numStrings)
         edges=edgesList[i]
         freeEdges=freeEdgesList[i]
         tokens=tokens
@@ -199,8 +199,10 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
         wFree=np.full(numFreeEdges,edgeListWeight[i])
         nonfreewVectors.append(wnonFree)
         freewVectors.append(wFree)
-    
-    print("Finished setting up lp matrices")
+    end = time.time()
+
+    print(f"python settin up took {end - start:.4f} seconds")
+
     BigAConstraint=sp.block_diag(AMatrices)
     BigBConstraint=sp.block_diag(BMatrices)
     BigMConstraint=sp.vstack(MMatrices)
@@ -236,7 +238,7 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
 
 def SolveLP(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
-            tokens: list[tokenInstance], 
+            tokens: list[possibleToken], 
             freeEdgesList: list[list[tokenInstance]], 
             numVerticesList:list[int], 
             numAllowedTokens:int)->tuple[list[list[tokenInstance]],list[list[tokenInstance]],list[possibleToken]]:
@@ -322,7 +324,7 @@ For every tokenInstance in edgesList it checks whether it is contained in accept
 otherwise it puts it back in the nonFreeEdgesList.
 """
 def extendFreeEdges(edgesList: list[list[tokenInstance]] , 
-            Acceptedtokens: list[tokenInstance], 
+            Acceptedtokens: list[possibleToken], 
             freeEdgesList: list[list[tokenInstance]]
             )->tuple[list[tokenInstance],list[tokenInstance]]:
     
@@ -426,11 +428,14 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     tokens=list(set([item for sublist in tokensList for item in sublist] ))
     
 
-    save_lp_data(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices,"lp_data.json" )
+    # save_lp_data(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices,"lp_data.json" )
     print("Finished preparing tokens")
 
 
-    # lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
+    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
+
+   
+
     # with open("lp_problem.pkl", "wb") as f:
     #     pickle.dump(lpProblem, f)
 
@@ -457,6 +462,6 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
 
 
 #inputStrings=["One day, a little girl named Lily found a needle in her room. She knew it was difficult to play with it because it was sharp.", " Lily wanted to share the needle with her mom, so she could sew a button on her shirt."]
-inputStrings=["world","hello"]
+# inputStrings=["world","hello"]
 
-CreateInstanceAndSolve(inputStrings,[1,1],5)
+# CreateInstanceAndSolve(inputStrings,[1,1],5)
