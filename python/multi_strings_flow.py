@@ -249,8 +249,7 @@ def SolveLP_fast(edgesList: list[list[tokenInstance]] ,
     numTokens = len(tokens)
     token_index_map = {t.token: i for i, t in enumerate(tokens)}
 
-    print("started working on the LP fast")
-    start = time.time()
+  
 
     # Data holders for constructing big sparse matrices in COO format
     A_rows, A_cols, A_data = [], [], []
@@ -332,7 +331,6 @@ def SolveLP_fast(edgesList: list[list[tokenInstance]] ,
 
     end = time.time()
   
-    print(f"python fast setting up took {end - start:.4f} seconds")
 
     f=cp.Variable(A_col_offset,nonneg=True )
     g=cp.Variable(B_col_offset,nonneg=True)
@@ -560,7 +558,7 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     with open("tokens.pkl", "wb") as f:
         pickle.dump(tokens, f)
 
-        
+
     # numAllowedTokensParam = lpProblem.parameters()[0]
     # numAllowedTokensParam.value = numAllowedTokens
     # lpProblem.solve(solver=cp.GLOP, max_iters=5000, verbose=True)

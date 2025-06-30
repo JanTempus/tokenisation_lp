@@ -14,35 +14,35 @@ def solve(numAllowedTokens:int):
     with open("tokens.pkl", "rb") as g:
         tokens=pickle.load(g)
 
-    for numTokens in range(2, numAllowedTokens):
-        numAllowedTokensParam = lpProblem.parameters()[0]
-        numAllowedTokensParam.value = numTokens
-        lpProblem.solve(solver=cp.GLOP)
-        lpVariables=lpProblem.variables()
-        
-        # fVar=lpVariables[0].value
-        # gVar=lpVariables[1].value
-        tVar=lpVariables[2].value
 
-        allBoolean=True
+    print("We we now have the lp and tokens")
 
-        print("Current working on: ", numTokens)
-        for num in tVar:
-            if abs(num-0)>0.0001 :
+    numAllowedTokensParam = lpProblem.parameters()[0]
+    numAllowedTokensParam.value = numAllowedTokens
+    lpProblem.solve(solver=cp.GLOP)
+    lpVariables=lpProblem.variables()
+    
+    # fVar=lpVariables[0].value
+    # gVar=lpVariables[1].value
+    tVar=lpVariables[2].value
+
+
+    
+    for num in tVar:
+        if abs(num-0)>0.0001 :
+            print(num)
+        elif abs(num-1.0)>0.0001:
                 print(num)
-            elif abs(num-1.0)>0.0001:
-                 print(num)
-       
-        if allBoolean:  
-            print("For ", numTokens, " everything is integral " )
-        
-        for i in range(len(tokens)):
-            tokens[i].lpValue=tVar[i]
+    
+    # if allBoolean:  
+    #     print("For ", numTokens, " everything is integral " )
+    
+    for i in range(len(tokens)):
+        tokens[i].lpValue=tVar[i]
 
-        
-        length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
-        sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-        print(sorted_tokens[0:(2*numAllowedTokens)])
+
+    sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
+    print(sorted_tokens[0:(2*numAllowedTokens)])
 
 
 
