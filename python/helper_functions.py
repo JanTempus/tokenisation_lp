@@ -25,7 +25,7 @@ def get_all_free_substrings(inputString: str) -> list[tokenInstance]:
         substrings.append(tokenInstance(inputString[i:i+1], i, i+1) )
     return substrings
 
-def find_corresponding_token(fixedString: tokenInstance,tokenSet )->tokenInstance:
+def find_corresponding_token(fixedString,tokenSet )->tokenInstance:
     tokenIndex=-1
 
     for i in range(len(tokenSet)):
