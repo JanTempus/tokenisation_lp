@@ -20,7 +20,7 @@ def solve(numAllowedTokens:int):
   
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.HIGHS,verbose=True)
+    lpProblem.solve(solver=cp.GLOP,verbose=True,use_dual_simplex=True)
     lpVariables=lpProblem.variables()
    
 
