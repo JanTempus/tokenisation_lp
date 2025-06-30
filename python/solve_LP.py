@@ -6,6 +6,7 @@ import pickle
 from multi_strings_flow import possibleToken
 import argparse
 
+
 def solve(numAllowedTokens:int):
 
     with open("lp_problem.pkl", "rb") as f:
@@ -16,24 +17,18 @@ def solve(numAllowedTokens:int):
 
 
     print("We we now have the lp and tokens")
-
+  
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.GLOP)
+    lpProblem.solve(solver=cp.GLOP,verbose=True)
     lpVariables=lpProblem.variables()
+   
+
     
     # fVar=lpVariables[0].value
     # gVar=lpVariables[1].value
     tVar=lpVariables[2].value
 
-
-    
-    for num in tVar:
-        if abs(num-0)>0.0001 :
-            print(num)
-        elif abs(num-1.0)>0.0001:
-                print(num)
-    
     # if allBoolean:  
     #     print("For ", numTokens, " everything is integral " )
     
