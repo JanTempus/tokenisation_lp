@@ -550,16 +550,17 @@ def CreateInstanceAndSolve(inputStringList: list[str],inputStringFreq:list[int],
     print("Finished preparing tokens")
 
 
-    lpProblem = SolveLPVec(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
     lpProblem = SolveLP_fast(edgesList,inputStringFreq,tokens,freeEdgesList,numVertices)
 
    
 
-    # with open("lp_problem.pkl", "wb") as f:
-    #     pickle.dump(lpProblem, f)
+    with open("lp_problem.pkl", "wb") as f:
+        pickle.dump(lpProblem, f)
 
-    # with open("tokens.pkl", "wb") as f:
-    #     pickle.dump(tokens, f)
+    with open("tokens.pkl", "wb") as f:
+        pickle.dump(tokens, f)
+
+        
     # numAllowedTokensParam = lpProblem.parameters()[0]
     # numAllowedTokensParam.value = numAllowedTokens
     # lpProblem.solve(solver=cp.GLOP, max_iters=5000, verbose=True)

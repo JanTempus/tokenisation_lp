@@ -36,13 +36,13 @@ def solve(numAllowedTokens:int):
         if allBoolean:  
             print("For ", numTokens, " everything is integral " )
         
-        # for i in range(len(tokens)):
-        #     tokens[i].lpValue=tVar[i]
+        for i in range(len(tokens)):
+            tokens[i].lpValue=tVar[i]
 
         
-        # length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
-        # sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-        # print(sorted_tokens[0:(2*numAllowedTokens)])
+        length_sorted_tokens=sorted(tokens, key=lambda t: len(t.token), reverse=True)
+        sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
+        print(sorted_tokens[0:(2*numAllowedTokens)])
 
 
 

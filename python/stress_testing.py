@@ -20,6 +20,3 @@ if __name__ == "__main__":
 
 
 msf.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,args.arg1)
-print("Finished with python")
-sas.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,args.arg1)
-print("Finsihed with the rust" )
