@@ -5,6 +5,29 @@ import resource
 import pickle
 from multi_strings_flow import possibleToken
 import argparse
+import matplotlib.pyplot as plt
+from collections import Counter
+
+
+def save_lp_value_plot(tokens, filename, title):
+    lp_values = [t.lpValue for t in tokens]
+    counts = Counter(lp_values)
+    values = sorted(counts.keys())
+    frequencies = [counts[v] for v in values]
+
+    plt.figure(figsize=(6, 3))
+    plt.bar(values, frequencies, width=0.1, color='lightgreen', edgecolor='black')
+    plt.yscale('log')  # log-scale y-axis
+    plt.xlabel("lpValue", fontsize=10)
+    plt.ylabel("Log Frequency", fontsize=10)
+    plt.title(title, fontsize=12)
+    plt.yticks(fontsize=8)
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    plt.tight_layout(pad=1.0)
+
+    # 🔽 Save the plot to a file
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
 
 
 def solve(numAllowedTokens:int):
@@ -20,7 +43,7 @@ def solve(numAllowedTokens:int):
   
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
-    lpProblem.solve(solver=cp.GLOP,verbose=True,use_dual_simplex=True)
+    lpProblem.solve(solver=cp.GLOP,verbose=True)
     lpVariables=lpProblem.variables()
    
 
@@ -36,8 +59,10 @@ def solve(numAllowedTokens:int):
         tokens[i].lpValue=tVar[i]
 
 
-    sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-    print(sorted_tokens[0:(2*numAllowedTokens)])
+    #sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
+    filename="lp_value_distribution"+str(numAllowedTokens)+".png"
+    title="Log-Scaled LP Value Frequency Plot for "+str(numAllowedTokens)
+    save_lp_value_plot(tokens,filename,title)
 
 
 
