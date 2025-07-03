@@ -9,7 +9,7 @@ import pickle
 
 
 
-def count_total_and_single_occurrences(word_freqs):
+def count_total_and_single_occurrences(word_freqs, num_count):
     """
     Args:
         word_freqs (dict or defaultdict): A dictionary mapping items (e.g. words) to integer counts.
@@ -17,9 +17,9 @@ def count_total_and_single_occurrences(word_freqs):
     Returns:
         tuple: (total_number_of_elements, number_with_count_1)
     """
-    total_count = len(word_freqs)
-    single_occurrence_count = sum(1 for count in word_freqs.values() if count == 2)
-    return total_count, single_occurrence_count
+
+    single_occurrence_count = sum(1 for count in word_freqs.values() if count == num_count)
+    return single_occurrence_count
 
 dataset_path = "tinystories_data"
 
@@ -82,9 +82,11 @@ frequencies = list(word_freqs.values())
 
 
 
-total, single = count_total_and_single_occurrences(word_freqs)
-print("Total unique words:", total)            
-print("Words with count == 1:", single)        
+
+print("Total unique words:", len(word_freqs))   
+for i in range(1,5):
+    single = count_total_and_single_occurrences(word_freqs)         
+    print("Words with count == ", i,":", single)        
 
 # Step 2: Define bin size and bins
 # bin_size = 5
