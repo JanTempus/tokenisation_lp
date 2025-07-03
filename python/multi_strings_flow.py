@@ -4,7 +4,6 @@ import scipy.sparse as sp
 import resource
 import pickle
 import json
-import time
 
 class tokenInstance:
     token: str
@@ -147,7 +146,7 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
 
 
     print("started working on the LP")
-    start = time.time()
+
     edgeCount=0
     freeEdgeCount=0
     for i in range(numStrings):
@@ -200,9 +199,8 @@ def SolveLPVec(edgesList: list[list[tokenInstance]] ,
         wFree=np.full(numFreeEdges,edgeListWeight[i])
         nonfreewVectors.append(wnonFree)
         freewVectors.append(wFree)
-    end = time.time()
+  
 
-    print(f"python settin up took {end - start:.4f} seconds")
 
     BigAConstraint=sp.block_diag(AMatrices)
     BigBConstraint=sp.block_diag(BMatrices)
@@ -329,7 +327,7 @@ def SolveLP_fast(edgesList: list[list[tokenInstance]] ,
     BigNonFreewVector = np.hstack(BigNonFreewVector_parts)
     tokensCap = np.ones(numTokens, dtype=float)
 
-    end = time.time()
+    
   
 
     f=cp.Variable(A_col_offset,nonneg=True )

@@ -57,12 +57,14 @@ def solve(numAllowedTokens:int):
     
     for i in range(len(tokens)):
         tokens[i].lpValue=tVar[i]
+        if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
+            print(tokens[i].token)
 
 
     #sorted_tokens=sorted(tokens, key=lambda t: t.lpValue, reverse=True)
-    filename="lp_value_distribution"+str(numAllowedTokens)+".png"
-    title="Log-Scaled LP Value Frequency Plot for "+str(numAllowedTokens)
-    save_lp_value_plot(tokens,filename,title)
+    # filename="lp_value_distribution"+str(numAllowedTokens)+".png"
+    # title="Log-Scaled LP Value Frequency Plot for "+str(numAllowedTokens)
+    # save_lp_value_plot(tokens,filename,title)
 
 
 
