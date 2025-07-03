@@ -85,7 +85,7 @@ frequencies = list(word_freqs.values())
 
 print("Total unique words:", len(word_freqs))   
 for i in range(1,5):
-    single = count_total_and_single_occurrences(word_freqs)         
+    single = count_total_and_single_occurrences(word_freqs, i)         
     print("Words with count == ", i,":", single)        
 
 # Step 2: Define bin size and bins
