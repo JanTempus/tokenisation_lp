@@ -18,7 +18,7 @@ def count_total_and_single_occurrences(word_freqs):
         tuple: (total_number_of_elements, number_with_count_1)
     """
     total_count = len(word_freqs)
-    single_occurrence_count = sum(1 for count in word_freqs.values() if count == 1)
+    single_occurrence_count = sum(1 for count in word_freqs.values() if count == 2)
     return total_count, single_occurrence_count
 
 dataset_path = "tinystories_data"
