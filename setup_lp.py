@@ -5,7 +5,7 @@ import pickle
 from collections import defaultdict
 
 from datastructures import tokenInstance, possibleToken
-from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
+from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings, count_tokens_with_max_frequency
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -134,7 +134,7 @@ def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int
     freq_map = defaultdict(int)
     numStrings=len(tokensList)
     for i in range(numStrings):
-        for token in tokens[i]:
+        for token in tokensList[i]:
             freq_map[token.token] += stringFreq[i]
 
     # Update the count in each unique possibleToken
@@ -185,4 +185,12 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
 
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
 
+
+    k = 20
+    num_low_freq_tokens = count_tokens_with_max_frequency(tokens, k)
+    print(f"Number of tokens with frequency ≤ {k}: {num_low_freq_tokens}")
+    print(f"Total number of tokens is: {len(tokens) } ")
     
+inputStrings=["world","hello","hello"]
+
+create_instance(inputStrings,[1,1,1],5)

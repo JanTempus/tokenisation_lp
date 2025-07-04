@@ -57,3 +57,15 @@ def find_corresponding_token(fixedString,tokenSet )->tokenInstance:
     return tokenIndex
 
 
+def count_tokens_with_max_frequency(tokens: list[possibleToken], k: int) -> int:
+    """
+    Returns the number of tokens in `tokens` with `token_instance_count` ≤ k.
+
+    Args:
+        tokens (list[possibleToken]): List of token objects.
+        k (int): Maximum frequency threshold.
+
+    Returns:
+        int: Number of tokens with token_instance_count ≤ k.
+    """
+    return sum(1 for token in tokens if token.token_instance_count <= k)

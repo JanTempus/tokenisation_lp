@@ -24,13 +24,6 @@ class tokenInstance:
 
     def __repr__(self):
         return self.__str__()
-    def to_dict(self):
-        return {
-            "token": self.token,
-            "start": self.start,
-            "end": self.end,
-            "lp_value": self.lpValue
-        }
 
 class possibleToken:
     token:str
