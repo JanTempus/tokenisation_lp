@@ -186,7 +186,7 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
 
 
-    k = 1
+    k = 20
 
     tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
     remove_set = set(t.token for t in tokens_to_remove)
