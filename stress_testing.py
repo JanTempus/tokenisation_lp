@@ -1,5 +1,6 @@
 from datasets import load_dataset
 import multi_strings_flow as msf
+import setup_lp as sl
 from collections import defaultdict
 import time
 import numpy as np
@@ -18,4 +19,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-msf.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,args.arg1)
+#msf.CreateInstanceAndSolve(inputStrings,inputStringsfrequencies,args.arg1)
+sl.create_instance(inputStrings,inputStringsfrequencies,args.arg1)
