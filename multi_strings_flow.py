@@ -41,10 +41,12 @@ class tokenInstance:
 class possibleToken:
     token:str
     lpValue:float
+    token_instance_count:int
 
     def __init__(self,token):
         self.token=token
         self.lpValue=float(-1)
+        self.token_instance_count=0
 
     def __eq__(self, other):
         if not isinstance(other,possibleToken):

@@ -77,47 +77,8 @@ else:
 
 word_freqs={k: v for k, v in word_freqs.items() if len(k) > 1}
 
-print("removed all items which have only a length of 1")
-frequencies = list(word_freqs.values())
 
-
-
-
-print("Total unique words:", len(word_freqs))   
-for i in range(1,21):
-    single = count_total_and_single_occurrences(word_freqs, i)         
-    print("Words with count == ", i,":", single)        
-
-# Step 2: Define bin size and bins
-# bin_size = 5
-# max_freq = max(frequencies)
-# bins = np.arange(0, max_freq + bin_size, bin_size)  # e.g., [0, 5, 10, 15, ...]
-
-# # Step 3: Count how many terms fall into each bin
-# hist, bin_edges = np.histogram(frequencies, bins=bins)
-
-# # Step 4: Plot
-# plt.figure(figsize=(10, 6))
-# plt.bar(
-#     [f"{int(start)}–{int(end)}" for start, end in zip(bin_edges[:-1], bin_edges[1:])],
-#     hist,
-#     color="mediumseagreen",
-#     edgecolor="black"
-# )
-# plt.xlabel("Frequency Range (# of Occurrences)")
-# plt.ylabel("Number of Unique Terms")
-# plt.title("Distribution of Token Frequencies")
-# plt.grid(axis="y", linestyle="--", alpha=0.5)
-# plt.tight_layout()
-# plt.savefig("token_frequency_distribution.png", dpi=300, bbox_inches='tight')
-
-# # Optional: close the plot to free memory if in a loop or notebook
-# plt.close()
-
-# #sorted_word_freq=sorted(word, key=lambda t: t.lpValue, reverse=True)
-
-
-# # inputStrings=list(word_freqs.keys())
-# # inputStringsfrequencies=list(word_freqs.values())
+inputStrings=list(word_freqs.keys())
+inputStringsfrequencies=list(word_freqs.values())
 
 # # np.savez("strings_with_frequency.npz", inputStrings=np.array(inputStrings), inputStringsfrequencies=np.array(inputStringsfrequencies))
