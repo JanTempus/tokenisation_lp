@@ -5,7 +5,7 @@ import pickle
 from collections import defaultdict
 
 from datastructures import tokenInstance, possibleToken
-from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings, count_tokens_with_max_frequency
+from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -186,10 +186,20 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
 
 
-    k = 20
-    num_low_freq_tokens = count_tokens_with_max_frequency(tokens, k)
-    print(f"Number of tokens with frequency ≤ {k}: {num_low_freq_tokens}")
-    print(f"Total number of tokens is: {len(tokens) } ")
+    k = 1
+
+    tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
+    remove_set = set(t.token for t in tokens_to_remove)
+    edges_before=sum(len(sublist) for sublist in edgesList)
+    print(f"number of edges before: {edges_before}  ")
+    for sublist_idx, sublist in enumerate(edgesList):
+        # Filter sublist to only keep tokens NOT in remove_set
+        edgesList[sublist_idx] = [token for token in sublist if token.token not in remove_set]
+
+    edges_after=sum(len(sublist) for sublist in edgesList)
+
+    print(f"number of edges after: {edges_after}")
+   
     
 # inputStrings=["world","hello","hello"]
 
