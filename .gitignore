@@ -2,5 +2,4 @@
 __pycache__
 pythia-70m-deduped
 strings_with_frequency.npz
-rust/constructing_lp/target
-rust/matrix_construction/target
+tinystories_data
