@@ -201,6 +201,6 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     print(f"number of edges after: {edges_after}")
    
     
-inputStrings=["world","hello","hello"]
+# inputStrings=["world","hello","hello"]
 
-create_instance(inputStrings,[1,1,1],5)
+# create_instance(inputStrings,[1,1,1],5)
