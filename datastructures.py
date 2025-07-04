@@ -35,10 +35,12 @@ class tokenInstance:
 class possibleToken:
     token:str
     lpValue:float
+    token_instance_count:int
 
     def __init__(self,token):
         self.token=token
         self.lpValue=float(-1)
+        self.token_instance_count=0
 
     def __eq__(self, other):
         if not isinstance(other,possibleToken):
@@ -49,13 +51,8 @@ class possibleToken:
         return hash(self.token)
     
     def __str__(self):
-        return f"{self.token, self.lpValue}"
+        return f"{self.token, self.lpValue, self.token_instance_count}"
 
     def __repr__(self):
         return self.__str__()
-    def to_dict(self):
-        return {
-            "token": self.token,
-            "lp_value": self.lpValue
-        }
 
