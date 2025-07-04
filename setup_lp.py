@@ -158,20 +158,6 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     if all_tokens:  
         for i in range(numStrings):
             stringLen=len(inputStringList[i])
-            edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
-            tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
-            freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
-            numVertices.append(stringLen+1)
-
-        print("Finished preparing data")
-        
-        tokens=tokensList[0]
-
-        tokens=list(set([item for sublist in tokensList for item in sublist] ))
-
-    else:
-        for i in range(numStrings):
-            stringLen=len(inputStringList[i])
             edgesList.append(get_all_nonFree_substrings(inputStringList[i]) )
             tokensList.append(get_tokens(inputStringList[i]))
             freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
@@ -182,7 +168,21 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
         tokens=tokensList[0]
 
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
+       
 
+    else:
+        for i in range(numStrings):
+            stringLen=len(inputStringList[i])
+            edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
+            tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
+            freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
+            numVertices.append(stringLen+1)
+
+        print("Finished preparing data")
+        
+        tokens=tokensList[0]
+
+        tokens=list(set([item for sublist in tokensList for item in sublist] ))
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
 
 
@@ -201,6 +201,6 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     print(f"number of edges after: {edges_after}")
    
     
-# inputStrings=["world","hello","hello"]
+inputStrings=["world","hello","hello"]
 
-# create_instance(inputStrings,[1,1,1],5)
+create_instance(inputStrings,[1,1,1],5)
