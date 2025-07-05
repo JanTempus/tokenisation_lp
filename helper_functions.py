@@ -1,6 +1,6 @@
 from datastructures import tokenInstance, possibleToken
 from collections import defaultdict
-import json
+import json,pickle
 
 def get_all_nonFree_substrings_upto_len_t(inputString: str, maxTokenLength: int) -> list[tokenInstance]:
     substrings = []

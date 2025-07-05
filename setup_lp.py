@@ -325,7 +325,7 @@ def create_instance(inputStringList: list[str],
     start = time.time()
     lpProblem.solve(solver=cp.GLOP,verbose=True)
     end=time.time()
-    print(f"Took {end - start:.4f} seconds")
+    print(f"The first iteration took {end - start:.4f} seconds")
 
     lpVariables=lpProblem.variables()
    
@@ -338,10 +338,21 @@ def create_instance(inputStringList: list[str],
             chosenTokens.append(tokens[i])
 
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
+    chosen_set = set(chosenTokens)  
+    newTokens=[token for token in all_tokens if token not in chosen_set]
 
     now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
 
     print(f"Now the compression value is {now_compression}")
+
+    lpProblem=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
+
+    start = time.time()
+    lpProblem.solve(solver=cp.GLOP,verbose=True)
+    end=time.time()
+    print(f"With chosen tokens it took {end - start:.4f} seconds")
+
+
 
 
 
