@@ -220,7 +220,7 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     bucketed_counts = bucket_token_instance_counts(tokens)
 
     for bucket_start, count in bucketed_counts.items():
-        print(f"{bucket_start}-{bucket_start + 99}: {count} tokens")
+        print(f"{bucket_start}-{bucket_start + 9999}: {count} tokens")
 
     save_bucket_counts_pickle(bucketed_counts, "bucketed_counts.pkl")
     # k = 20
