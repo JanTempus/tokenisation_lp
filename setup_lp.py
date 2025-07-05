@@ -141,7 +141,20 @@ def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int
     for token in tokens:
         token.token_instance_count = freq_map[token.token]
 
+def print_top_tokens_by_instance_count(tokens: list[tokenInstance], top_n: int = 10):
+    """
+    Prints the top N tokens with the highest token_instance_count.
 
+    Args:
+        tokens (list[possibleToken]): List of token objects with updated counts.
+        top_n (int): Number of top tokens to display.
+    """
+    # Sort tokens by token_instance_count descending
+    sorted_tokens = sorted(tokens, key=lambda t: t.token_instance_count, reverse=True)
+
+    print(f"Top {top_n} tokens by instance count:")
+    for token in sorted_tokens[:top_n]:
+        print(f"{token.token}: {token.token_instance_count}")
 
 def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTokenLength: int ):
     
@@ -185,7 +198,7 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
 
-
+    print_top_tokens_by_instance_count(tokens)
     k = 20
 
     tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
