@@ -43,7 +43,7 @@ corpus=[]
 
 dataSetSize=len(TinyStories['train'])
 
-dataSetSize = int(dataSetSize)
+dataSetSize = int(dataSetSize/2)
 
 for i in range(dataSetSize):
     corpus.append(TinyStories['train'][i]['text'])
@@ -81,4 +81,4 @@ word_freqs={k: v for k, v in word_freqs.items() if len(k) > 1}
 inputStrings=list(word_freqs.keys())
 inputStringsfrequencies=list(word_freqs.values())
 
-# # np.savez("strings_with_frequency.npz", inputStrings=np.array(inputStrings), inputStringsfrequencies=np.array(inputStringsfrequencies))
+np.savez("strings_with_frequency.npz", inputStrings=np.array(inputStrings), inputStringsfrequencies=np.array(inputStringsfrequencies))
