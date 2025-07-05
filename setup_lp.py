@@ -141,20 +141,39 @@ def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int
     for token in tokens:
         token.token_instance_count = freq_map[token.token]
 
-def print_top_tokens_by_instance_count(tokens: list[tokenInstance], top_n: int = 10):
+def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
     """
-    Prints the top N tokens with the highest token_instance_count.
+    Saves bucket counts to a pickle file for efficient storage.
 
     Args:
-        tokens (list[possibleToken]): List of token objects with updated counts.
-        top_n (int): Number of top tokens to display.
+        bucket_counts (dict): Dictionary of bucket_start → token count.
+        filename (str): Output .pkl filename.
     """
-    # Sort tokens by token_instance_count descending
-    sorted_tokens = sorted(tokens, key=lambda t: t.token_instance_count, reverse=True)
+    with open(filename, 'wb') as f:
+        pickle.dump(bucket_counts, f)
 
-    print(f"Top {top_n} tokens by instance count:")
-    for token in sorted_tokens[:top_n]:
-        print(f"{token.token}: {token.token_instance_count}")
+
+def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int = 10000) -> dict:
+    """
+    Groups tokens into buckets based on token_instance_count and counts how many tokens fall into each bucket.
+
+    Args:
+        tokens (list[possibleToken]): List of token objects with token_instance_count.
+        bucket_size (int): Size of each bucket (default is 100).
+
+    Returns:
+        dict: Mapping from bucket_start -> count of tokens in that bucket.
+              For example, 200 → number of tokens with count in [200, 299]
+    """
+    bucket_counts = defaultdict(int)
+
+    for token in tokens:
+        bucket_start = (token.token_instance_count // bucket_size) * bucket_size
+        bucket_counts[bucket_start] += 1
+
+    # Sort the result by bucket start
+    return dict(sorted(bucket_counts.items()))
+
 
 def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTokenLength: int ):
     
@@ -198,20 +217,25 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
 
-    print_top_tokens_by_instance_count(tokens)
-    k = 20
+    bucketed_counts = bucket_token_instance_counts(tokens)
 
-    tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
-    remove_set = set(t.token for t in tokens_to_remove)
-    edges_before=sum(len(sublist) for sublist in edgesList)
-    print(f"number of edges before: {edges_before}  ")
-    for sublist_idx, sublist in enumerate(edgesList):
-        # Filter sublist to only keep tokens NOT in remove_set
-        edgesList[sublist_idx] = [token for token in sublist if token.token not in remove_set]
+    for bucket_start, count in bucketed_counts.items():
+        print(f"{bucket_start}-{bucket_start + 99}: {count} tokens")
 
-    edges_after=sum(len(sublist) for sublist in edgesList)
+    save_bucket_counts_pickle(bucketed_counts, "bucketed_counts.pkl")
+    # k = 20
 
-    print(f"number of edges after: {edges_after}")
+    # tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
+    # remove_set = set(t.token for t in tokens_to_remove)
+    # edges_before=sum(len(sublist) for sublist in edgesList)
+    # print(f"number of edges before: {edges_before}  ")
+    # for sublist_idx, sublist in enumerate(edgesList):
+    #     # Filter sublist to only keep tokens NOT in remove_set
+    #     edgesList[sublist_idx] = [token for token in sublist if token.token not in remove_set]
+
+    # edges_after=sum(len(sublist) for sublist in edgesList)
+
+    # print(f"number of edges after: {edges_after}")
    
     
 # inputStrings=["world","hello","hello"]

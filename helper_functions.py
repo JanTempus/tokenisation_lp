@@ -55,3 +55,19 @@ def find_corresponding_token(fixedString,tokenSet )->tokenInstance:
         raise ValueError("Corresponding token not in set. This not good" )
         
     return tokenIndex
+
+
+def print_top_tokens_by_instance_count(tokens: list[tokenInstance], top_n: int = 10):
+    """
+    Prints the top N tokens with the highest token_instance_count.
+
+    Args:
+        tokens (list[possibleToken]): List of token objects with updated counts.
+        top_n (int): Number of top tokens to display.
+    """
+    # Sort tokens by token_instance_count descending
+    sorted_tokens = sorted(tokens, key=lambda t: t.token_instance_count, reverse=True)
+
+    print(f"Top {top_n} tokens by instance count:")
+    for token in sorted_tokens[:top_n]:
+        print(f"{token.token}: {token.token_instance_count}")
