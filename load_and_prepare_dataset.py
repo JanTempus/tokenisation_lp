@@ -61,16 +61,15 @@ if os.path.exists(file_name):
         word_freqs = pickle.load(f)
 
 else:
+    print("Started working on pre tokenization")
     word_freqs = defaultdict(int)
-    print("Created the corpus")
-
+    
     for i, text in enumerate(corpus):
-        print(i, " out of ", dataSetSize)
         words_with_offsets = tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
         new_words = [word for word, offset in words_with_offsets]
         for word in new_words:
             word_freqs[word] += 1
-
+    print("Finished working on pre tokenization")
     with open(file_name, "wb") as f:
         pickle.dump(word_freqs, f)
     print("Saved word frequencies to disk.")
