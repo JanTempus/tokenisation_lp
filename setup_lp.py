@@ -121,6 +121,112 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
 
     return problem
 
+def compression(edgesList: list[list[tokenInstance]] , 
+            edgeListWeight:list[int] , 
+            numVerticesList:list[int]):
+    
+    numStrings = len(edgesList)
+
+    # Data holders for constructing big sparse matrices in COO format
+    A_rows, A_cols, A_data = [], [], []
+   
+    BigbVector_parts = []
+    BigNonFreewVector_parts = []
+
+    A_row_offset = 0
+    A_col_offset = 0
+
+    for i in range(numStrings):
+        edges = edgesList[i]
+        numEdges = len(edges)
+        numVertices = numVerticesList[i]
+
+        # Flow constraints (A) for non-free edges
+        for idx, edge in enumerate(edges):
+            A_rows.append(edge.start + A_row_offset)
+            A_cols.append(idx + A_col_offset)
+            A_data.append(1)
+
+            A_rows.append(edge.end + A_row_offset)
+            A_cols.append(idx + A_col_offset)
+            A_data.append(-1)
+
+        # b vector
+        b = np.zeros(numVertices, dtype=int)
+        b[0] = 1
+        b[numVertices - 1] = -1
+        BigbVector_parts.append(b)
+
+        # weights
+        wnonFree = np.full(numEdges, edgeListWeight[i])
+        BigNonFreewVector_parts.append(wnonFree)
+
+        # Update offsets
+        A_row_offset += numVertices
+        A_col_offset += numEdges
+    # Construct final sparse matrices
+    BigAConstraint = sp.coo_matrix((A_data, (A_rows, A_cols)), shape=(A_row_offset, A_col_offset)).tocsr()
+   
+    
+    BigbVector = np.hstack(BigbVector_parts)
+    BigNonFreewVector = np.hstack(BigNonFreewVector_parts)  
+
+    f=cp.Variable(A_col_offset,nonneg=True )
+
+    constraints=[BigAConstraint@f==BigbVector]   
+
+
+    objective=cp.Minimize(BigNonFreewVector.T@f)
+
+    problem = cp.Problem(objective, constraints)
+    start = time.time()
+    problem.solve(solver=cp.GLOP,verbose=True)
+    end=time.time()
+    print(f"Took {end - start:.4f} seconds")
+
+    return problem.value
+
+
+def extendFreeEdges(
+    edgesList: list[list['tokenInstance']], 
+    Acceptedtokens: list['possibleToken'], 
+    freeEdgesList: list[list['tokenInstance']]
+) -> tuple[list[list['tokenInstance']], list[list['tokenInstance']]]:
+    """
+    Moves accepted tokens from edgesList into freeEdgesList.
+    
+    Args:
+        edgesList: List of lists of tokenInstance objects (non-free edges).
+        Acceptedtokens: List of possibleToken objects to be moved to free list.
+        freeEdgesList: Existing list of lists of tokenInstance objects (free edges).
+        
+    Returns:
+        Tuple of two new lists:
+            - new_edgesList: with tokenInstances not in Acceptedtokens
+            - new_freeEdgesList: with tokenInstances moved to free list
+    """
+    # Convert accepted tokens to a set of strings for fast lookup
+    accepted_token_set = set(t.token for t in Acceptedtokens)
+
+    new_edgesList = []
+    new_freeEdgesList = []
+
+    for edge_row, free_row in zip(edgesList, freeEdgesList):
+        new_edge_row = []
+        new_free_row = list(free_row)  # copy existing free edges
+        
+        for token_instance in edge_row:
+            if token_instance.token in accepted_token_set:
+                new_free_row.append(token_instance)
+            else:
+                new_edge_row.append(token_instance)
+
+        new_edgesList.append(new_edge_row)
+        new_freeEdgesList.append(new_free_row)
+
+    return new_edgesList, new_freeEdgesList
+
+
 
 def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int], tokensList: list[list[possibleToken]]):
     """
@@ -141,17 +247,6 @@ def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int
     # Update the count in each unique possibleToken
     for token in tokens:
         token.token_instance_count = freq_map[token.token]
-
-def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
-    """
-    Saves bucket counts to a pickle file for efficient storage.
-
-    Args:
-        bucket_counts (dict): Dictionary of bucket_start → token count.
-        filename (str): Output .pkl filename.
-    """
-    with open(filename, 'wb') as f:
-        pickle.dump(bucket_counts, f)
 
 
 def create_instance(inputStringList: list[str],
@@ -192,6 +287,8 @@ def create_instance(inputStringList: list[str],
         tokens=tokensList[0]
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
     
+
+
     print("Finished preparing data")
 
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
@@ -215,6 +312,11 @@ def create_instance(inputStringList: list[str],
 
     print(f"number of edges after: {edges_after}")
 
+    no_compression=compression(freeEdgesList,inputStringFreq,numVertices )
+
+    print(f"With no compression the value is {no_compression}")
+
+
     lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
 
     numAllowedTokensParam = lpProblem.parameters()[0]
@@ -228,11 +330,21 @@ def create_instance(inputStringList: list[str],
     lpVariables=lpProblem.variables()
    
     tVar=lpVariables[2].value
-
+    
+    chosenTokens=[]
     for i in range(len(tokens)):
         tokens[i].lpValue=tVar[i]
-        if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
-            print(tokens[i].token)
+        if tokens[i].lpValue>0.0:
+            chosenTokens.append(tokens[i])
+
+    newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
+
+    now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
+
+    print(f"Now the compression value is {now_compression}")
+
+
+
    
     
 # inputStrings=["world","hello","hello"]

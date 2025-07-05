@@ -1,4 +1,5 @@
 from datastructures import tokenInstance, possibleToken
+from collections import defaultdict
 import json
 
 def get_all_nonFree_substrings_upto_len_t(inputString: str, maxTokenLength: int) -> list[tokenInstance]:
@@ -93,3 +94,15 @@ def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int =
 
     # Sort the result by bucket start
     return dict(sorted(bucket_counts.items()))
+
+
+def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
+    """
+    Saves bucket counts to a pickle file for efficient storage.
+
+    Args:
+        bucket_counts (dict): Dictionary of bucket_start → token count.
+        filename (str): Output .pkl filename.
+    """
+    with open(filename, 'wb') as f:
+        pickle.dump(bucket_counts, f)
