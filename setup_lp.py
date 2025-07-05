@@ -153,7 +153,7 @@ def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
         pickle.dump(bucket_counts, f)
 
 
-def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int = 10000) -> dict:
+def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int = 1000) -> dict:
     """
     Groups tokens into buckets based on token_instance_count and counts how many tokens fall into each bucket.
 
@@ -220,7 +220,7 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
     bucketed_counts = bucket_token_instance_counts(tokens)
 
     for bucket_start, count in bucketed_counts.items():
-        print(f"{bucket_start}-{bucket_start + 9999}: {count} tokens")
+        print(f"{bucket_start}-{bucket_start + 999}: {count} tokens")
 
     save_bucket_counts_pickle(bucketed_counts, "bucketed_counts.pkl")
     # k = 20
