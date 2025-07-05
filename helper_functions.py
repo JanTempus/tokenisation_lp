@@ -71,3 +71,25 @@ def print_top_tokens_by_instance_count(tokens: list[tokenInstance], top_n: int =
     print(f"Top {top_n} tokens by instance count:")
     for token in sorted_tokens[:top_n]:
         print(f"{token.token}: {token.token_instance_count}")
+
+
+def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int = 1000) -> dict:
+    """
+    Groups tokens into buckets based on token_instance_count and counts how many tokens fall into each bucket.
+
+    Args:
+        tokens (list[possibleToken]): List of token objects with token_instance_count.
+        bucket_size (int): Size of each bucket (default is 100).
+
+    Returns:
+        dict: Mapping from bucket_start -> count of tokens in that bucket.
+              For example, 200 → number of tokens with count in [200, 299]
+    """
+    bucket_counts = defaultdict(int)
+
+    for token in tokens:
+        bucket_start = (token.token_instance_count // bucket_size) * bucket_size
+        bucket_counts[bucket_start] += 1
+
+    # Sort the result by bucket start
+    return dict(sorted(bucket_counts.items()))

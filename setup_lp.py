@@ -154,32 +154,10 @@ def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
         pickle.dump(bucket_counts, f)
 
 
-def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int = 1000) -> dict:
-    """
-    Groups tokens into buckets based on token_instance_count and counts how many tokens fall into each bucket.
-
-    Args:
-        tokens (list[possibleToken]): List of token objects with token_instance_count.
-        bucket_size (int): Size of each bucket (default is 100).
-
-    Returns:
-        dict: Mapping from bucket_start -> count of tokens in that bucket.
-              For example, 200 → number of tokens with count in [200, 299]
-    """
-    bucket_counts = defaultdict(int)
-
-    for token in tokens:
-        bucket_start = (token.token_instance_count // bucket_size) * bucket_size
-        bucket_counts[bucket_start] += 1
-
-    # Sort the result by bucket start
-    return dict(sorted(bucket_counts.items()))
-
-
 def create_instance(inputStringList: list[str],
                     inputStringFreq:list[int],
                     numAllowedTokens:int, 
-                    minTokenCount:int=1,  
+                    minTokenCount:int=10000,  
                     maxTokenLength: int=5, 
                     all_tokens:bool=True ):
     
@@ -237,24 +215,24 @@ def create_instance(inputStringList: list[str],
 
     print(f"number of edges after: {edges_after}")
 
-    lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
+    # lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
 
-    numAllowedTokensParam = lpProblem.parameters()[0]
-    numAllowedTokensParam.value = numAllowedTokens
+    # numAllowedTokensParam = lpProblem.parameters()[0]
+    # numAllowedTokensParam.value = numAllowedTokens
 
-    start = time.time()
-    lpProblem.solve(solver=cp.GLOP,verbose=True)
-    end=time.time()
-    print(f"Took {end - start:.4f} seconds")
+    # start = time.time()
+    # lpProblem.solve(solver=cp.GLOP,verbose=True)
+    # end=time.time()
+    # print(f"Took {end - start:.4f} seconds")
 
-    lpVariables=lpProblem.variables()
+    # lpVariables=lpProblem.variables()
    
-    tVar=lpVariables[2].value
+    # tVar=lpVariables[2].value
 
-    for i in range(len(tokens)):
-        tokens[i].lpValue=tVar[i]
-        if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
-            print(tokens[i].token)
+    # for i in range(len(tokens)):
+    #     tokens[i].lpValue=tVar[i]
+    #     if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
+    #         print(tokens[i].token)
    
     
 # inputStrings=["world","hello","hello"]
