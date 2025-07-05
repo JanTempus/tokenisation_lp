@@ -157,7 +157,7 @@ def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
 def create_instance(inputStringList: list[str],
                     inputStringFreq:list[int],
                     numAllowedTokens:int, 
-                    minTokenCount:int=10000,  
+                    minTokenCount:int=2000,  
                     maxTokenLength: int=5, 
                     all_tokens:bool=True ):
     
@@ -215,24 +215,24 @@ def create_instance(inputStringList: list[str],
 
     print(f"number of edges after: {edges_after}")
 
-    # lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
+    lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
 
-    # numAllowedTokensParam = lpProblem.parameters()[0]
-    # numAllowedTokensParam.value = numAllowedTokens
+    numAllowedTokensParam = lpProblem.parameters()[0]
+    numAllowedTokensParam.value = numAllowedTokens
 
-    # start = time.time()
-    # lpProblem.solve(solver=cp.GLOP,verbose=True)
-    # end=time.time()
-    # print(f"Took {end - start:.4f} seconds")
+    start = time.time()
+    lpProblem.solve(solver=cp.GLOP,verbose=True)
+    end=time.time()
+    print(f"Took {end - start:.4f} seconds")
 
-    # lpVariables=lpProblem.variables()
+    lpVariables=lpProblem.variables()
    
-    # tVar=lpVariables[2].value
+    tVar=lpVariables[2].value
 
-    # for i in range(len(tokens)):
-    #     tokens[i].lpValue=tVar[i]
-    #     if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
-    #         print(tokens[i].token)
+    for i in range(len(tokens)):
+        tokens[i].lpValue=tVar[i]
+        if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
+            print(tokens[i].token)
    
     
 # inputStrings=["world","hello","hello"]
