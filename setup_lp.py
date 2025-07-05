@@ -3,6 +3,7 @@ import numpy as np
 import scipy.sparse as sp
 import pickle
 from collections import defaultdict
+import time
 
 from datastructures import tokenInstance, possibleToken
 from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
@@ -175,11 +176,14 @@ def bucket_token_instance_counts(tokens: list[possibleToken], bucket_size: int =
     return dict(sorted(bucket_counts.items()))
 
 
-def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTokenLength: int ):
+def create_instance(inputStringList: list[str],
+                    inputStringFreq:list[int],
+                    numAllowedTokens:int, 
+                    minTokenCount:int=1,  
+                    maxTokenLength: int=5, 
+                    all_tokens:bool=True ):
     
     numStrings=len(inputStringList)
- 
-    all_tokens=True
 
     edgesList=[]
     tokensList=[]
@@ -194,13 +198,9 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
             tokensList.append(get_tokens(inputStringList[i]))
             freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen+1)
-
-        print("Finished preparing data")
         
         tokens=tokensList[0]
-
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
-       
 
     else:
         for i in range(numStrings):
@@ -210,33 +210,51 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
             freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen+1)
 
-        print("Finished preparing data")
-        
+       
         tokens=tokensList[0]
-
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
+    
+    print("Finished preparing data")
+
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
     print("Total number of tokens " ,len(tokens))
-    # bucketed_counts = bucket_token_instance_counts(tokens)
 
-    # for bucket_start, count in bucketed_counts.items():
-    #     print(f"{bucket_start}-{bucket_start + 999}: {count} tokens")
-
-    #save_bucket_counts_pickle(bucketed_counts, "bucketed_counts.pkl")
-    k = maxTokenLength
-
-    tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
+    tokens_to_remove =[token for token in tokens if token.token_instance_count <= minTokenCount]
     print("Total number of tokens removed " ,len(tokens_to_remove))
-    # remove_set = set(t.token for t in tokens_to_remove)
-    # edges_before=sum(len(sublist) for sublist in edgesList)
-    # print(f"number of edges before: {edges_before}  ")
-    # for sublist_idx, sublist in enumerate(edgesList):
-    #     # Filter sublist to only keep tokens NOT in remove_set
-    #     edgesList[sublist_idx] = [token for token in sublist if token.token not in remove_set]
 
-    # edges_after=sum(len(sublist) for sublist in edgesList)
 
-    # print(f"number of edges after: {edges_after}")
+    remove_set = set(t.token for t in tokens_to_remove)
+
+    edges_before=sum(len(sublist) for sublist in edgesList)
+    print(f"number of edges before: {edges_before}  ")
+
+
+    for sublist_idx, sublist in enumerate(edgesList):
+        # Filter sublist to only keep tokens NOT in remove_set
+        edgesList[sublist_idx] = [token for token in sublist if token.token not in remove_set]
+
+    edges_after=sum(len(sublist) for sublist in edgesList)
+
+    print(f"number of edges after: {edges_after}")
+
+    lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
+
+    numAllowedTokensParam = lpProblem.parameters()[0]
+    numAllowedTokensParam.value = numAllowedTokens
+
+    start = time.time()
+    lpProblem.solve(solver=cp.GLOP,verbose=True)
+    end=time.time()
+    print(f"Took {end - start:.4f} seconds")
+
+    lpVariables=lpProblem.variables()
+   
+    tVar=lpVariables[2].value
+
+    for i in range(len(tokens)):
+        tokens[i].lpValue=tVar[i]
+        if tokens[i].lpValue<1.0 and tokens[i].lpValue>0.0:
+            print(tokens[i].token)
    
     
 # inputStrings=["world","hello","hello"]
