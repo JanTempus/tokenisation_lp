@@ -216,16 +216,17 @@ def create_instance(inputStringList: list[str],inputStringFreq:list[int], maxTok
 
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
-    print(len(tokens))
+    print("Total number of tokens " ,len(tokens))
     # bucketed_counts = bucket_token_instance_counts(tokens)
 
     # for bucket_start, count in bucketed_counts.items():
     #     print(f"{bucket_start}-{bucket_start + 999}: {count} tokens")
 
     #save_bucket_counts_pickle(bucketed_counts, "bucketed_counts.pkl")
-    # k = 20
+    k = maxTokenLength
 
-    # tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
+    tokens_to_remove =[token for token in tokens if token.token_instance_count <= k]
+    print("Total number of tokens removed " ,len(tokens_to_remove))
     # remove_set = set(t.token for t in tokens_to_remove)
     # edges_before=sum(len(sublist) for sublist in edgesList)
     # print(f"number of edges before: {edges_before}  ")
