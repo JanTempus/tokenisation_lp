@@ -345,7 +345,9 @@ def create_instance(inputStringList: list[str],
 
     print(f"Now the compression value is {now_compression}")
 
-    lpProblem=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
+    lpProblemRound2=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
+    numAllowedTokensParamRound2 = lpProblemRound2.parameters()[0]
+    numAllowedTokensParamRound2.value = numAllowedTokens
 
     start = time.time()
     lpProblem.solve(solver=cp.GLOP,verbose=True)
