@@ -332,10 +332,12 @@ def create_instance(inputStringList: list[str],
     tVar=lpVariables[2].value
     
     chosenTokens=[]
+    chosenTokensCount=0
     for i in range(len(tokens)):
         tokens[i].lpValue=tVar[i]
         if tokens[i].lpValue>0.0:
             chosenTokens.append(tokens[i])
+            chosenTokensCount+=1
 
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     chosen_set = set(chosenTokens)  
@@ -344,6 +346,7 @@ def create_instance(inputStringList: list[str],
     now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
 
     print(f"Now the compression value is {now_compression}")
+    print(f"We have selected {chosenTokensCount} tokens out of {numAllowedTokens}")
 
     # lpProblemRound2=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
     # numAllowedTokensParamRound2 = lpProblemRound2.parameters()[0]
