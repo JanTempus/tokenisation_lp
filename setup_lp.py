@@ -323,7 +323,7 @@ def create_instance(inputStringList: list[str],
     numAllowedTokensParam.value = numAllowedTokens
 
     start = time.time()
-    lpProblem.solve(solver=cp.PDLP,solver_opts={"num_threads": 4})
+    lpProblem.solve(solver=cp.PDLP,solver_opts={"eps_optimal_absolute": 1.0e-8})
     end=time.time()
     print(f"The first iteration took {end - start:.4f} seconds")
 
@@ -338,6 +338,7 @@ def create_instance(inputStringList: list[str],
         if tokens[i].lpValue>0.0:
             chosenTokens.append(tokens[i])
             chosenTokensCount+=1
+            print(f"The token {tokens[i].token} has value {tokens[i].lpValue}")
 
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     chosen_set = set(chosenTokens)  
