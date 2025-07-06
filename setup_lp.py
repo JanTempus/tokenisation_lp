@@ -323,7 +323,7 @@ def create_instance(inputStringList: list[str],
     numAllowedTokensParam.value = numAllowedTokens
 
     start = time.time()
-    lpProblem.solve(solver=cp.PDLP)
+    lpProblem.solve(solver=cp.PDLP,solver_opts={"num_threads": 4})
     end=time.time()
     print(f"The first iteration took {end - start:.4f} seconds")
 
