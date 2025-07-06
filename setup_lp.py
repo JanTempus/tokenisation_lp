@@ -252,7 +252,7 @@ def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int
 def create_instance(inputStringList: list[str],
                     inputStringFreq:list[int],
                     numAllowedTokens:int, 
-                    minTokenCount:int=2000,  
+                    minTokenCount:int=1,  
                     maxTokenLength: int=5, 
                     all_tokens:bool=True ):
     
@@ -323,7 +323,7 @@ def create_instance(inputStringList: list[str],
     numAllowedTokensParam.value = numAllowedTokens
 
     start = time.time()
-    lpProblem.solve(solver=cp.GLOP,verbose=True)
+    lpProblem.solve(solver=cp.GLOP)
     end=time.time()
     print(f"The first iteration took {end - start:.4f} seconds")
 
@@ -350,7 +350,7 @@ def create_instance(inputStringList: list[str],
     numAllowedTokensParamRound2.value = numAllowedTokens
 
     start = time.time()
-    lpProblem.solve(solver=cp.GLOP,verbose=True)
+    lpProblem.solve(solver=cp.GLOP)
     end=time.time()
     print(f"With chosen tokens it took {end - start:.4f} seconds")
 
