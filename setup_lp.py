@@ -338,8 +338,7 @@ def create_instance(inputStringList: list[str],
         if tokens[i].lpValue>0.0:
             chosenTokens.append(tokens[i])
             chosenTokensCount+=1
-            print(f"The token {tokens[i].token} has value {tokens[i].lpValue}")
-
+            
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     chosen_set = set(chosenTokens)  
     newTokens=[token for token in tokens if token not in chosen_set]
