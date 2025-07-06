@@ -180,7 +180,7 @@ def compression(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
     start = time.time()
-    problem.solve(solver=cp.GLOP,verbose=True)
+    problem.solve(solver=cp.GLOP)
     end=time.time()
     print(f"Took {end - start:.4f} seconds")
 
@@ -339,7 +339,7 @@ def create_instance(inputStringList: list[str],
 
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     chosen_set = set(chosenTokens)  
-    newTokens=[token for token in all_tokens if token not in chosen_set]
+    newTokens=[token for token in tokens if token not in chosen_set]
 
     now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
 
