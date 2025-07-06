@@ -323,7 +323,7 @@ def create_instance(inputStringList: list[str],
     numAllowedTokensParam.value = numAllowedTokens
 
     start = time.time()
-    lpProblem.solve(solver=cp.GLOP)
+    lpProblem.solve(solver=cp.PDLP)
     end=time.time()
     print(f"The first iteration took {end - start:.4f} seconds")
 
@@ -345,14 +345,14 @@ def create_instance(inputStringList: list[str],
 
     print(f"Now the compression value is {now_compression}")
 
-    lpProblemRound2=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
-    numAllowedTokensParamRound2 = lpProblemRound2.parameters()[0]
-    numAllowedTokensParamRound2.value = numAllowedTokens
+    # lpProblemRound2=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
+    # numAllowedTokensParamRound2 = lpProblemRound2.parameters()[0]
+    # numAllowedTokensParamRound2.value = numAllowedTokens
 
-    start = time.time()
-    lpProblem.solve(solver=cp.GLOP)
-    end=time.time()
-    print(f"With chosen tokens it took {end - start:.4f} seconds")
+    # start = time.time()
+    # lpProblem.solve(solver=cp.GLOP)
+    # end=time.time()
+    # print(f"With chosen tokens it took {end - start:.4f} seconds")
 
 
 
@@ -360,6 +360,6 @@ def create_instance(inputStringList: list[str],
 
    
     
-# inputStrings=["world","hello","hello"]
+inputStrings=["world","hello","hello"]
 
-# create_instance(inputStrings,[1,1,1],5)
+create_instance(inputStrings,[1,1,1],5)
