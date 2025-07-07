@@ -76,6 +76,12 @@ else:
 
 word_freqs={k: v for k, v in word_freqs.items() if len(k) > 1}
 
+unique_chars = set()
+for word in word_freqs:
+    unique_chars.update(word)
+
+print(f"Number of unique characters: {len(unique_chars)}")
+print(f"Unique characters: {sorted(unique_chars)}")
 
 inputStrings=list(word_freqs.keys())
 inputStringsfrequencies=list(word_freqs.values())
