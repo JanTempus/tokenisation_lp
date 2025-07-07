@@ -213,7 +213,7 @@ def extendFreeEdges(
 
     for edge_row, free_row in zip(edgesList, freeEdgesList):
         new_edge_row = []
-        new_free_row = list(free_row)  # copy existing free edges
+        new_free_row = [] #list(free_row)  # copy existing free edges
         
         for token_instance in edge_row:
             if token_instance.token in accepted_token_set:
@@ -332,13 +332,16 @@ def create_instance(inputStringList: list[str],
     tVar=lpVariables[2].value
     
     chosenTokens=[]
+    nonZeroTokenCount=0
     chosenTokensCount=0
     for i in range(len(tokens)):
         tokens[i].lpValue=tVar[i]
         if tokens[i].lpValue>0.0:
+            nonZeroTokenCount+=1
+        if tokens[i].lpValue>0.99:
             chosenTokens.append(tokens[i])
             chosenTokensCount+=1
-            
+
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     chosen_set = set(chosenTokens)  
     newTokens=[token for token in tokens if token not in chosen_set]
@@ -347,6 +350,7 @@ def create_instance(inputStringList: list[str],
 
     print(f"Now the compression value is {now_compression}")
     print(f"We have selected {chosenTokensCount} tokens out of {numAllowedTokens}")
+    print( f"The number of non zero tokens is {nonZeroTokenCount}  which is {1-(nonZeroTokenCount/numAllowedTokens)} percent more")
 
     # lpProblemRound2=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
     # numAllowedTokensParamRound2 = lpProblemRound2.parameters()[0]
