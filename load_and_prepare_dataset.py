@@ -43,7 +43,7 @@ corpus=[]
 
 dataSetSize=len(TinyStories['train'])
 
-dataSetSize = int(dataSetSize)
+dataSetSize = int(dataSetSize/2)
 
 for i in range(dataSetSize):
     corpus.append(TinyStories['train'][i]['text'])
