@@ -213,7 +213,7 @@ def extendFreeEdges(
 
     for edge_row, free_row in zip(edgesList, freeEdgesList):
         new_edge_row = []
-        new_free_row = [] #list(free_row)  # copy existing free edges
+        new_free_row = list(free_row)  # copy existing free edges
         
         for token_instance in edge_row:
             if token_instance.token in accepted_token_set:
