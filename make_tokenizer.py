@@ -21,19 +21,19 @@ unique_chars = list(unique_chars_npz["unique_chars"].item())  # .item() to extra
 
 # Now ensure it's a list for concatenation
 
-print(unique_chars[0])
 
-# tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
-# all_tokens = tokens + unique_chars
+tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
-# # Build vocab dictionary
-# vocab = {token: idx for idx, token in enumerate(all_tokens)}
+all_tokens = tokens + unique_chars
 
-# # Create tokenizer
-# tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
-# tokenizer.pre_tokenizer = Whitespace()
+# Build vocab dictionary
+vocab = {token: idx for idx, token in enumerate(all_tokens)}
 
-# # Save to disk
-# tokenizer.save("my_tokenizer.json")
+# Create tokenizer
+tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
+tokenizer.pre_tokenizer = Whitespace()
+
+# Save to disk
+tokenizer.save("my_tokenizer.json")
 
