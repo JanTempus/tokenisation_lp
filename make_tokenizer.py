@@ -17,7 +17,7 @@ inputStringsfrequencies=data["inputStringsfrequencies"]
 
 # Load .npz and extract correctly
 unique_chars_npz = np.load("unique_characters.npz", allow_pickle=True)
-unique_chars = unique_chars_npz["unique_chars"].item()  # .item() to extract the original Python object (e.g., set or list)
+unique_chars = list(unique_chars_npz["unique_chars"].item())  # .item() to extract the original Python object (e.g., set or list)
 
 # Now ensure it's a list for concatenation
 
@@ -25,7 +25,7 @@ print(type(unique_chars))
 
 # tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
-# all_tokens = tokens + list(unique_chars)
+# all_tokens = tokens + unique_chars
 
 # # Build vocab dictionary
 # vocab = {token: idx for idx, token in enumerate(all_tokens)}
