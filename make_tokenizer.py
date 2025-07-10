@@ -22,7 +22,6 @@ unique_chars = list(unique_chars_npz["unique_chars"].item())  # .item() to extra
 # Now ensure it's a list for concatenation
 
 
-
 tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
 all_tokens = tokens + unique_chars
