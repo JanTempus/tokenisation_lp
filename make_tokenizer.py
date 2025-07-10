@@ -15,19 +15,25 @@ data = np.load("strings_with_frequency.npz")
 inputStrings=data["inputStrings" ]
 inputStringsfrequencies=data["inputStringsfrequencies"]
 
-unique_chars = np.load("unique_characters.npz", allow_pickle=True)["unique_chars"]
+# Load .npz and extract correctly
+unique_chars_npz = np.load("unique_characters.npz", allow_pickle=True)
+unique_chars = unique_chars_npz["unique_chars"].item()  # .item() to extract the original Python object (e.g., set or list)
 
-tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
+# Now ensure it's a list for concatenation
 
-all_tokens=tokens+list(unique_chars)
+print(type(unique_chars))
 
-# Build vocab dictionary
-vocab = {token: idx for idx, token in enumerate(all_tokens)}
+# tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
-# Create tokenizer
-tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
-tokenizer.pre_tokenizer = Whitespace()
+# all_tokens = tokens + list(unique_chars)
 
-# Save to disk
-tokenizer.save("my_tokenizer.json")
+# # Build vocab dictionary
+# vocab = {token: idx for idx, token in enumerate(all_tokens)}
+
+# # Create tokenizer
+# tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
+# tokenizer.pre_tokenizer = Whitespace()
+
+# # Save to disk
+# tokenizer.save("my_tokenizer.json")
 
