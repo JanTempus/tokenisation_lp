@@ -5,11 +5,7 @@ from transformers import PreTrainedTokenizerFast
 from setup_lp import create_instance
 import numpy as np
 import os
-from datasets import load_dataset, load_from_disk
-from transformers import AutoTokenizer
 import pickle
-from collections import defaultdict
-
 
 data = np.load("strings_with_frequency.npz")
 inputStrings=data["inputStrings" ]
@@ -33,6 +29,17 @@ vocab = {token: idx for idx, token in enumerate(all_tokens)}
 tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
 tokenizer.pre_tokenizer = Whitespace()
 
-# Save to disk
-tokenizer.save("my_tokenizer.json")
+# Wrap in a HuggingFace-compatible wrapper
+hf_tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer)
 
+# Add special tokens
+hf_tokenizer.add_special_tokens({
+    "unk_token": "[UNK]",
+    "pad_token": "[PAD]",
+    "cls_token": "[CLS]",
+    "sep_token": "[SEP]",
+    "mask_token": "[MASK]"
+})
+
+# Save the tokenizer (HuggingFace-compatible format)
+hf_tokenizer.save_pretrained("my_tokenizer")

@@ -6,20 +6,6 @@ import os
 import matplotlib.pyplot as plt
 import pickle
 
-
-
-def count_total_and_single_occurrences(word_freqs, num_count):
-    """
-    Args:
-        word_freqs (dict or defaultdict): A dictionary mapping items (e.g. words) to integer counts.
-    
-    Returns:
-        tuple: (total_number_of_elements, number_with_count_1)
-    """
-
-    single_occurrence_count = sum(1 for count in word_freqs.values() if count == num_count)
-    return single_occurrence_count
-
 dataset_path = "tinystories_data"
 
 if os.path.exists(dataset_path):
@@ -78,9 +64,6 @@ word_freqs={k: v for k, v in word_freqs.items() if len(k) > 1}
 unique_chars = set()
 for word in word_freqs:
     unique_chars.update(word)
-
-print(f"Number of unique characters: {len(unique_chars)}")
-print(f"Unique characters: {sorted(unique_chars)}")
 
 inputStrings=list(word_freqs.keys())
 inputStringsfrequencies=list(word_freqs.values())
