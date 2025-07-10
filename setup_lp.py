@@ -361,7 +361,7 @@ def create_instance(inputStringList: list[str],
     now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
 
     print(f"We have selected {chosenTokensCount} tokens out of {numAllowedTokens}")
-    print( f"The number of non zero tokens is {nonZeroTokenCount}  which is {1-(nonZeroTokenCount/numAllowedTokens)} percent more")
+    print( f"The number of non zero tokens is {nonZeroTokenCount}  which is {(nonZeroTokenCount/numAllowedTokens)} percent")
 
 
     return chosenTokensStrings

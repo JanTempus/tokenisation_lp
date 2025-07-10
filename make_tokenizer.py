@@ -15,7 +15,7 @@ data = np.load("strings_with_frequency.npz")
 inputStrings=data["inputStrings" ]
 inputStringsfrequencies=data["inputStringsfrequencies"]
 
-unique_chars=np.load("unique_characters.npz")
+unique_chars = np.load("unique_characters.npz")["unique_characters"]
 
 tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
