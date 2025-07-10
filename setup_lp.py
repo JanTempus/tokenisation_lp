@@ -184,7 +184,20 @@ def compression(edgesList: list[list[tokenInstance]] ,
     end=time.time()
     print(f"Took {end - start:.4f} seconds")
 
-    return problem.value
+    print(f"The compression is now {problem.value}")
+
+    flow_values = f.value   
+    shortest_paths = []
+    offset = 0
+    for i in range(numStrings):
+        edges = edgesList[i]
+        numEdges = len(edges)
+        flows = flow_values[offset:offset+numEdges]
+        used_edges = [edges[j] for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
+        shortest_paths.append(used_edges)
+        offset += numEdges
+
+    return shortest_paths
 
 
 def extendFreeEdges(
@@ -314,8 +327,6 @@ def create_instance(inputStringList: list[str],
 
     no_compression=compression(freeEdgesList,inputStringFreq,numVertices )
 
-    print(f"With no compression the value is {no_compression}")
-
 
     lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
 
@@ -343,27 +354,17 @@ def create_instance(inputStringList: list[str],
             chosenTokensCount+=1
 
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
-    chosen_set = set(chosenTokens)  
-    newTokens=[token for token in tokens if token not in chosen_set]
+    
+    chosenTokensStrings=[token.token for token in tokens]
+
 
     now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
 
-    print(f"Now the compression value is {now_compression}")
     print(f"We have selected {chosenTokensCount} tokens out of {numAllowedTokens}")
     print( f"The number of non zero tokens is {nonZeroTokenCount}  which is {1-(nonZeroTokenCount/numAllowedTokens)} percent more")
 
-    # lpProblemRound2=setup_LP_tokenization(newEdges,inputStringFreq,newTokens, newFreeEdges,numVertices)
-    # numAllowedTokensParamRound2 = lpProblemRound2.parameters()[0]
-    # numAllowedTokensParamRound2.value = numAllowedTokens
 
-    # start = time.time()
-    # lpProblem.solve(solver=cp.GLOP)
-    # end=time.time()
-    # print(f"With chosen tokens it took {end - start:.4f} seconds")
-
-
-
-
+    return chosenTokensStrings
 
    
     
