@@ -19,7 +19,7 @@ unique_chars = np.load("unique_characters.npz", allow_pickle=True)["unique_chars
 
 tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
-all_tokens=tokens+unique_chars
+all_tokens=tokens+list(unique_chars)
 
 # Build vocab dictionary
 vocab = {token: idx for idx, token in enumerate(all_tokens)}
