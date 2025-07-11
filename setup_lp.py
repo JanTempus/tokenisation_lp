@@ -346,17 +346,17 @@ def create_instance(inputStringList: list[str],
     chosenTokens=[]
     nonZeroTokenCount=0
     chosenTokensCount=0
-    for i in range(len(tokens)):
-        tokens[i].lpValue=tVar[i]
-        if tokens[i].lpValue>0.0:
+    for i in range(len(tokens_to_keep)):
+        tokens_to_keep[i].lpValue=tVar[i]
+        if tokens_to_keep[i].lpValue>0.0:
             nonZeroTokenCount+=1
-        if tokens[i].lpValue>0.99:
-            chosenTokens.append(tokens[i])
+        if tokens_to_keep[i].lpValue>0.99:
+            chosenTokens.append(tokens_to_keep[i])
             chosenTokensCount+=1
 
     newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     
-    chosenTokensStrings=[token.token for token in tokens]
+    chosenTokensStrings=[token.token for token in chosenTokens]
 
 
     now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
