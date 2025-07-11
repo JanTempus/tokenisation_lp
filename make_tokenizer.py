@@ -42,4 +42,4 @@ hf_tokenizer.add_special_tokens({
 })
 
 # Save the tokenizer (HuggingFace-compatible format)
-hf_tokenizer.save_pretrained("my_tokenizer")
+hf_tokenizer.save_pretrained("lp_tokenizer")

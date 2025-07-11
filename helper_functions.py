@@ -106,3 +106,22 @@ def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
     """
     with open(filename, 'wb') as f:
         pickle.dump(bucket_counts, f)
+
+
+
+def get_token_instance_count(token_string: str, tokens: list[possibleToken]) -> int:
+    """
+    Returns the token_instance_count for a given token string from the list of token instances.
+
+    Args:
+        token_string (str): The token string to search for.
+        tokens (list[tokenInstance]): List of tokenInstance objects.
+
+    Returns:
+        int: The instance count for the token, or 0 if not found.
+    """
+    print("Hello")
+    for token in tokens:
+        if token.token == token_string:
+            return token.token_instance_count
+    return -1  # Token not found

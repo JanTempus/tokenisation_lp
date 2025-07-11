@@ -306,29 +306,30 @@ def create_instance(inputStringList: list[str],
 
     update_token_instance_counts(tokens,inputStringFreq,edgesList)
     print("Total number of tokens " ,len(tokens))
+    tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
+    print("Total number of tokens kept:", len(tokens_to_keep))
 
-    tokens_to_remove =[token for token in tokens if token.token_instance_count <= minTokenCount]
-    print("Total number of tokens removed " ,len(tokens_to_remove))
+    # Create a set of valid token strings
+    keep_set = set(t.token for t in tokens_to_keep)
 
+    # Count edges before filtering
+    edges_before = sum(len(sublist) for sublist in edgesList)
+    print(f"Number of edges before: {edges_before}")
 
-    remove_set = set(t.token for t in tokens_to_remove)
+    # Create a new edgesList that only contains tokens in keep_set
+    filtered_edgesList = [
+        [token for token in sublist if token.token in keep_set]
+        for sublist in edgesList
+    ]
 
-    edges_before=sum(len(sublist) for sublist in edgesList)
-    print(f"number of edges before: {edges_before}  ")
-
-
-    for sublist_idx, sublist in enumerate(edgesList):
-        # Filter sublist to only keep tokens NOT in remove_set
-        edgesList[sublist_idx] = [token for token in sublist if token.token not in remove_set]
-
-    edges_after=sum(len(sublist) for sublist in edgesList)
-
-    print(f"number of edges after: {edges_after}")
+    # Count edges after filtering
+    edges_after = sum(len(sublist) for sublist in filtered_edgesList)
+    print(f"Number of edges after: {edges_after}")
 
     no_compression=compression(freeEdgesList,inputStringFreq,numVertices )
 
 
-    lpProblem=setup_LP_tokenization(edgesList,inputStringFreq,tokens , freeEdgesList,numVertices)
+    lpProblem=setup_LP_tokenization(filtered_edgesList,inputStringFreq,tokens_to_keep , freeEdgesList,numVertices)
 
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens

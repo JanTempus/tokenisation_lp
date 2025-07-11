@@ -59,7 +59,6 @@ else:
         pickle.dump(word_freqs, f)
     print("Saved word frequencies to disk.")
 
-word_freqs={k: v for k, v in word_freqs.items() if len(k) > 1}
 
 unique_chars = set()
 for word in word_freqs:
