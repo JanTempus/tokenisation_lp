@@ -1,11 +1,15 @@
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
-from tokenizers.pre_tokenizers import Whitespace
-from transformers import PreTrainedTokenizerFast
+from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.processors import ByteLevel as ByteLevelProcessor
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+from tokenizers.normalizers import NFKC
+from collections import OrderedDict
 from setup_lp import create_instance
 import numpy as np
 import os
 import pickle
+import json
 
 data = np.load("strings_with_frequency.npz")
 inputStrings=data["inputStrings" ]
@@ -22,24 +26,22 @@ tokens=create_instance(inputStrings,inputStringsfrequencies,35000)
 
 all_tokens = tokens + unique_chars
 
-# Build vocab dictionary
-vocab = {token: idx for idx, token in enumerate(all_tokens)}
+output_path="lp_tokenizer.json"
+vocab = OrderedDict((token, idx) for idx, token in enumerate(all_tokens))
 
-# Create tokenizer
+# Ensure there's an unknown token
+if "[UNK]" not in vocab:
+    vocab["[UNK]"] = len(vocab)
+
+# Build the tokenizer with WordLevel model
 tokenizer = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
-tokenizer.pre_tokenizer = Whitespace()
 
-# Wrap in a HuggingFace-compatible wrapper
-hf_tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer)
+# Add byte-level behavior
+tokenizer.normalizer = NFKC()
+tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=True)
+tokenizer.decoder = ByteLevelDecoder()
+tokenizer.post_processor = ByteLevelProcessor(trim_offsets=True)
 
-# Add special tokens
-hf_tokenizer.add_special_tokens({
-    "unk_token": "[UNK]",
-    "pad_token": "[PAD]",
-    "cls_token": "[CLS]",
-    "sep_token": "[SEP]",
-    "mask_token": "[MASK]"
-})
-
-# Save the tokenizer (HuggingFace-compatible format)
-hf_tokenizer.save_pretrained("lp_tokenizer")
+# Save to single HuggingFace-style JSON
+tokenizer.save(output_path)
+print(f"Tokenizer with custom merge logic saved to {output_path}")
