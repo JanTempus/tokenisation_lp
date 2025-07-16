@@ -108,6 +108,68 @@ def save_bucket_counts_pickle(bucket_counts: dict, filename: str):
         pickle.dump(bucket_counts, f)
 
 
+def extendFreeEdges(
+    edgesList: list[list['tokenInstance']], 
+    Acceptedtokens: list['possibleToken'], 
+    freeEdgesList: list[list['tokenInstance']]
+) -> tuple[list[list['tokenInstance']], list[list['tokenInstance']]]:
+    """
+    Moves accepted tokens from edgesList into freeEdgesList.
+    
+    Args:
+        edgesList: List of lists of tokenInstance objects (non-free edges).
+        Acceptedtokens: List of possibleToken objects to be moved to free list.
+        freeEdgesList: Existing list of lists of tokenInstance objects (free edges).
+        
+    Returns:
+        Tuple of two new lists:
+            - new_edgesList: with tokenInstances not in Acceptedtokens
+            - new_freeEdgesList: with tokenInstances moved to free list
+    """
+    # Convert accepted tokens to a set of strings for fast lookup
+    accepted_token_set = set(t.token for t in Acceptedtokens)
+
+    new_edgesList = []
+    new_freeEdgesList = []
+
+    for edge_row, free_row in zip(edgesList, freeEdgesList):
+        new_edge_row = []
+        new_free_row = list(free_row)  # copy existing free edges
+        
+        for token_instance in edge_row:
+            if token_instance.token in accepted_token_set:
+                new_free_row.append(token_instance)
+            else:
+                new_edge_row.append(token_instance)
+
+        new_edgesList.append(new_edge_row)
+        new_freeEdgesList.append(new_free_row)
+
+    return new_edgesList, new_freeEdgesList
+
+
+
+def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int], tokensList: list[list[possibleToken]]):
+    """
+    Updates the `token_instance_count` field for each `possibleToken` in `tokens`,
+    based on how many times it appears in `tokensList`.
+
+    Args:
+        tokens (list[possibleToken]): Unique list of token objects.
+        tokensList (list[list[possibleToken]]): Nested lists of token objects per string.
+    """
+    # Count occurrences of each token string
+    freq_map = defaultdict(int)
+    numStrings=len(tokensList)
+    for i in range(numStrings):
+        for token in tokensList[i]:
+            freq_map[token.token] += stringFreq[i]
+
+    # Update the count in each unique possibleToken
+    for token in tokens:
+        token.token_instance_count = freq_map[token.token]
+
+
 
 def get_token_instance_count(token_string: str, tokens: list[possibleToken]) -> int:
     """

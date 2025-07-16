@@ -3,13 +3,15 @@ class tokenInstance:
     token: str
     start: int
     end: int
-    lpValue:float
+    lp_value:float
+    token_index:int
 
     def __init__(self,token,start,end):
         self.token=token
         self.start=start
         self.end=end
-        self.lpValue=float(-1)
+        self.lp_value=float(-1)
+        self.token_index=0
     
     def __eq__(self, other):
         if not isinstance(other,possibleToken):
@@ -20,20 +22,22 @@ class tokenInstance:
         return hash(self.token)
 
     def __str__(self):
-        return f"{self.start,self.end,self.token,self.lpValue}"
+        return f"{self.start,self.end,self.token,self.lp_value}"
 
     def __repr__(self):
         return self.__str__()
 
 class possibleToken:
     token:str
-    lpValue:float
+    lp_value:float
     token_instance_count:int
+    token_index:int
 
     def __init__(self,token):
         self.token=token
-        self.lpValue=float(-1)
+        self.lp_value=float(-1)
         self.token_instance_count=0
+        self.token_index=0
 
     def __eq__(self, other):
         if not isinstance(other,possibleToken):
@@ -44,7 +48,7 @@ class possibleToken:
         return hash(self.token)
     
     def __str__(self):
-        return f"{self.token, self.lpValue, self.token_instance_count}"
+        return f"{self.token, self.lp_value, self.token_instance_count}"
 
     def __repr__(self):
         return self.__str__()

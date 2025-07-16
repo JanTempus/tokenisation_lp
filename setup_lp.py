@@ -6,7 +6,9 @@ from collections import defaultdict
 import time
 
 from datastructures import tokenInstance, possibleToken
-from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
+
+import helper_functions as hf
+#from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -121,13 +123,12 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
 
     return problem
 
-def compression(edgesList: list[list[tokenInstance]] , 
+def tokenize(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
             numVerticesList:list[int]):
     
     numStrings = len(edgesList)
 
-    # Data holders for constructing big sparse matrices in COO format
     A_rows, A_cols, A_data = [], [], []
    
     BigbVector_parts = []
@@ -200,69 +201,7 @@ def compression(edgesList: list[list[tokenInstance]] ,
     return shortest_paths
 
 
-def extendFreeEdges(
-    edgesList: list[list['tokenInstance']], 
-    Acceptedtokens: list['possibleToken'], 
-    freeEdgesList: list[list['tokenInstance']]
-) -> tuple[list[list['tokenInstance']], list[list['tokenInstance']]]:
-    """
-    Moves accepted tokens from edgesList into freeEdgesList.
-    
-    Args:
-        edgesList: List of lists of tokenInstance objects (non-free edges).
-        Acceptedtokens: List of possibleToken objects to be moved to free list.
-        freeEdgesList: Existing list of lists of tokenInstance objects (free edges).
-        
-    Returns:
-        Tuple of two new lists:
-            - new_edgesList: with tokenInstances not in Acceptedtokens
-            - new_freeEdgesList: with tokenInstances moved to free list
-    """
-    # Convert accepted tokens to a set of strings for fast lookup
-    accepted_token_set = set(t.token for t in Acceptedtokens)
-
-    new_edgesList = []
-    new_freeEdgesList = []
-
-    for edge_row, free_row in zip(edgesList, freeEdgesList):
-        new_edge_row = []
-        new_free_row = list(free_row)  # copy existing free edges
-        
-        for token_instance in edge_row:
-            if token_instance.token in accepted_token_set:
-                new_free_row.append(token_instance)
-            else:
-                new_edge_row.append(token_instance)
-
-        new_edgesList.append(new_edge_row)
-        new_freeEdgesList.append(new_free_row)
-
-    return new_edgesList, new_freeEdgesList
-
-
-
-def update_token_instance_counts(tokens: list[tokenInstance],stringFreq:list[int], tokensList: list[list[possibleToken]]):
-    """
-    Updates the `token_instance_count` field for each `possibleToken` in `tokens`,
-    based on how many times it appears in `tokensList`.
-
-    Args:
-        tokens (list[possibleToken]): Unique list of token objects.
-        tokensList (list[list[possibleToken]]): Nested lists of token objects per string.
-    """
-    # Count occurrences of each token string
-    freq_map = defaultdict(int)
-    numStrings=len(tokensList)
-    for i in range(numStrings):
-        for token in tokensList[i]:
-            freq_map[token.token] += stringFreq[i]
-
-    # Update the count in each unique possibleToken
-    for token in tokens:
-        token.token_instance_count = freq_map[token.token]
-
-
-def create_instance(inputStringList: list[str],
+def create_vocab(inputStringList: list[str],
                     inputStringFreq:list[int],
                     numAllowedTokens:int, 
                     minTokenCount:int=1,  
@@ -280,9 +219,9 @@ def create_instance(inputStringList: list[str],
     if all_tokens:  
         for i in range(numStrings):
             stringLen=len(inputStringList[i])
-            edgesList.append(get_all_nonFree_substrings(inputStringList[i]) )
-            tokensList.append(get_tokens(inputStringList[i]))
-            freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
+            edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]) )
+            tokensList.append(hf.get_tokens(inputStringList[i]))
+            freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen+1)
         
         tokens=tokensList[0]
@@ -291,9 +230,9 @@ def create_instance(inputStringList: list[str],
     else:
         for i in range(numStrings):
             stringLen=len(inputStringList[i])
-            edgesList.append(get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
-            tokensList.append(get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
-            freeEdgesList.append(get_all_free_substrings(inputStringList[i]))
+            edgesList.append(hf.get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
+            tokensList.append(hf.get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
+            freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen+1)
 
        
@@ -304,7 +243,7 @@ def create_instance(inputStringList: list[str],
 
     print("Finished preparing data")
 
-    update_token_instance_counts(tokens,inputStringFreq,edgesList)
+    hf.update_token_instance_counts(tokens,inputStringFreq,edgesList)
     print("Total number of tokens " ,len(tokens))
     tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
     print("Total number of tokens kept:", len(tokens_to_keep))
@@ -325,9 +264,6 @@ def create_instance(inputStringList: list[str],
     # Count edges after filtering
     edges_after = sum(len(sublist) for sublist in filtered_edgesList)
     print(f"Number of edges after: {edges_after}")
-
-    no_compression=compression(freeEdgesList,inputStringFreq,numVertices )
-
 
     lpProblem=setup_LP_tokenization(filtered_edgesList,inputStringFreq,tokens_to_keep , freeEdgesList,numVertices)
 
@@ -354,12 +290,9 @@ def create_instance(inputStringList: list[str],
             chosenTokens.append(tokens_to_keep[i])
             chosenTokensCount+=1
 
-    newEdges,newFreeEdges=extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
+    newEdges,newFreeEdges=hf.extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     
     chosenTokensStrings=[token.token for token in chosenTokens]
-
-
-    now_compression=compression(newFreeEdges,inputStringFreq,numVertices)
 
     print(f"We have selected {chosenTokensCount} tokens out of {numAllowedTokens}")
     print( f"The number of non zero tokens is {nonZeroTokenCount}  which is {(nonZeroTokenCount/numAllowedTokens)} percent")
@@ -368,6 +301,8 @@ def create_instance(inputStringList: list[str],
     return chosenTokensStrings
 
    
+
+
     
 # inputStrings=["world","hello","hello"]
 
