@@ -6,12 +6,13 @@ class tokenInstance:
     lp_value:float
     token_index:int
 
-    def __init__(self,token,start,end):
+    def __init__(self,token,start,end,token_index=0,lp_value=float(-1)):
         self.token=token
         self.start=start
         self.end=end
-        self.lp_value=float(-1)
-        self.token_index=0
+        self.token_index=token_index
+        self.lp_value=lp_value
+        
     
     def __eq__(self, other):
         if not isinstance(other,possibleToken):
@@ -22,7 +23,7 @@ class tokenInstance:
         return hash(self.token)
 
     def __str__(self):
-        return f"{self.start,self.end,self.token,self.lp_value}"
+        return f"{self.start,self.end,self.token,self.token_index,self.lp_value}"
 
     def __repr__(self):
         return self.__str__()

@@ -20,6 +20,30 @@ def get_all_nonFree_substrings(inputString: str) ->list[tokenInstance]:
     return substrings
 
 
+
+def get_strings_from_vocab(input_string: str, vocab: defaultdict[str, int]) -> list[tokenInstance]:
+  
+    if len(vocab)==0:
+        raise(ValueError)
+    
+    token_instances = []
+    max_len = max(len(tok) for tok in vocab) if vocab else 0
+
+    for start in range(len(input_string)):
+        for end in range(start + 1, min(len(input_string) + 1, start + max_len + 1)):
+            substring = input_string[start:end]
+            if substring in vocab:
+                ti = tokenInstance(
+                    token=substring,
+                    start=start,
+                    end=end,
+                    token_index=vocab[substring],
+                )
+                token_instances.append(ti)
+
+    return token_instances
+
+
 def get_tokens(inputString: str) -> list[possibleToken]:
     substrings = []
     maxTokenLength=len(inputString)
