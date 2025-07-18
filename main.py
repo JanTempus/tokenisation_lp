@@ -14,7 +14,6 @@ tokenizer.make_vocab()
 
 TinyStories = load_from_disk(dataset_path)
 
-corpus=TinyStories['train'][1]['text']#+TinyStories['train'][2]['text']+TinyStories['train'][3]['text']
-
+corpus=TinyStories['train'][1]['text']
 tokenized_data= tokenizer.tokenize_data_set([corpus] )
 print(tokenized_data)
