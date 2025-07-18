@@ -5,7 +5,7 @@ from tokenizers.processors import ByteLevel as ByteLevelProcessor
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from tokenizers.normalizers import NFKC
 from collections import OrderedDict
-from setup_lp import create_instance
+from lp_functions import create_instance
 import numpy as np
 import os
 import pickle

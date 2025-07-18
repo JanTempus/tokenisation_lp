@@ -1,9 +1,10 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from setup_lp import create_vocab,tokenize
+from lp_functions import create_vocab,tokenize
 import numpy as np
 import os
 import pickle
+import json
 import helper_functions as hf
 from datasets import load_dataset, load_from_disk
 import matplotlib.pyplot as plt
@@ -28,15 +29,16 @@ class Tokenizer:
                                                         revision="step3000",
                                                         cache_dir="./pythia-70m-deduped/step3000",
                                                         )
-        self.max_token_count=35000
+        self.max_token_count=200
         self.vocab=None
         self.dataset_path="strings_with_frequency.npz" # Has 2 values inputStrings and inputStringsfrequencies
         self.unique_chars_path="unique_characters.npz"
         self.original_corpus_size=0
         self.tokenized_corpus_size=0
         self.data_set_size = 2119719
-
-    def make_vocab(self):
+        self.starting_data_path= "tinystories_data"
+        self.debug=False
+    def make_vocab(self,save_vocab:bool=True):
         data = np.load(self.dataset_path)
         input_strings=data["input_strings" ]
         input_strings_frequencies=data["input_strings_frequencies"]
@@ -50,11 +52,17 @@ class Tokenizer:
              all_tokens.append("[UNK]")
 
         vocab = OrderedDict((token, idx) for idx, token in enumerate(all_tokens))
-
+        
+        if save_vocab:
+            vocab_length=len(all_tokens)
+            file_name= os.path.join("vocab_" + self.starting_data_path + f"{vocab_length}.json")
+            with open(file_name, "w") as f:
+                json.dump(vocab, f)
         self.vocab=vocab
 
 
-    def load_and_prepare_dataset(self,data_set_size_div:int=2,raw_dataset_path:str = "tinystories_data"):
+    def load_and_prepare_dataset(self, data_set_size_div:int=2,raw_dataset_path:str ="tinystories_data"):
+        self.starting_data_path=raw_dataset_path
         if os.path.exists(raw_dataset_path):
             print("Loading dataset from disk...")
             TinyStories = load_from_disk(raw_dataset_path)
@@ -68,11 +76,10 @@ class Tokenizer:
         data_set_size=len(TinyStories['train'])
 
         data_set_size = int(data_set_size/data_set_size_div)
+    
 
-        for i in range(data_set_size):
+        for i in range(1,data_set_size):
             corpus.append(TinyStories['train'][i]['text'])
-
-        word_freqs = defaultdict(int)
 
         print("created the corpus")
 
@@ -109,30 +116,23 @@ class Tokenizer:
         np.savez(self.dataset_path, input_strings=np.array(input_strings), input_strings_frequencies=np.array(input_strings_frequencies))
 
 
-    def tokenize_data_set(self,corpus_path:str):
-
-        with open(corpus_path, "rb") as f:
-            corpus = pickle.load(f)
-
-
-        print("Started working on pre tokenization")
-        word_freqs = defaultdict(int)
-        
+    def tokenize_data_set(self,corpus:list[str]):
+        if self.debug:
+            print("Started working on pre tokenization")
+        input_strings=[]
+        print(corpus)
         for i, text in tqdm(enumerate(corpus), total=len(corpus)):
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
-            for word in new_words:
-                word_freqs[word] += 1
-      
-        print("We have finished pretokenizing")
+            input_strings+=new_words
+            
 
-        unique_chars = set()
-        for word in word_freqs:
-            unique_chars.update(word)
+        if self.debug:
+            print("We have finished pretokenizing")
 
-        input_strings=list(word_freqs.keys())
-        edges_list_weight=list(word_freqs.values())
 
+        #input_strings=list(word_freqs.keys())
+        edges_list_weight=np.ones(len(input_strings),dtype=float)
         num_strings=len(input_strings)
 
         edges_list=[]
@@ -142,6 +142,11 @@ class Tokenizer:
             string_len=len(input_strings[i])
             edges_list.append(hf.get_strings_from_vocab(input_strings[i],self.vocab) )
             num_vertices.append(string_len+1)
+        
+
+
+     
+
 
         tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices )
 
@@ -149,8 +154,6 @@ class Tokenizer:
 
 
     def get_unique_chars(self):
-
-        corpus=[]
 
         file_name= "word_freqs_"+str(self.data_set_size)+".pkl"
 
@@ -160,31 +163,17 @@ class Tokenizer:
             with open(file_name, "rb") as f:
                 word_freqs = pickle.load(f)
 
-        else:
-            print("Started working on pre tokenization")
-            word_freqs = defaultdict(int)
-            
-            for i, text in tqdm(enumerate(corpus), total=len(corpus)):
-                words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-                new_words = [word for word, offset in words_with_offsets]
-                for word in new_words:
-                    word_freqs[word] += 1
-            print("Finished working on pre tokenization")
-            with open(file_name, "wb") as f:
-                pickle.dump(word_freqs, f)
-            print("Saved word frequencies to disk.")
+            unique_chars = set()
+            for word in word_freqs:
+                unique_chars.update(word)
 
-        unique_chars = set()
-        for word in word_freqs:
-            unique_chars.update(word)
+            # Convert to NumPy array (dtype=object since it's strings)
+            unique_chars_array = np.array(unique_chars, dtype=object)
 
-        # Convert to NumPy array (dtype=object since it's strings)
-        unique_chars_array = np.array(unique_chars, dtype=object)
+            # Save to .npz file
+            np.savez_compressed("unique_characters.npz", unique_chars=unique_chars_array)
 
-        # Save to .npz file
-        np.savez_compressed("unique_characters.npz", unique_chars=unique_chars_array)
-
-        print(f"Saved {len(unique_chars)} unique characters to 'unique_characters.npz'")
+            print(f"Saved {len(unique_chars)} unique characters to 'unique_characters.npz'")
 
 
 
