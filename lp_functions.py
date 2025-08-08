@@ -3,7 +3,9 @@ import numpy as np
 import scipy.sparse as sp
 import pickle
 from collections import defaultdict
+from datastructures import possibleToken
 import time
+from numpy.typing import NDArray
 
 from datastructures import tokenInstance, possibleToken
 
@@ -181,24 +183,25 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
     start = time.time()
-    problem.solve(solver=cp.GLOP)
+    problem.solve(solver=cp.GLOP,verbose=True)
     end=time.time()
-    #print(f"Took {end - start:.4f} seconds")
 
-    #print(f"The compression is now {problem.value}")
-
-    flow_values = f.value   
+    flow_values = f.value 
     shortest_paths = []
     offset = 0
-    for i in range(numStrings):
-        edges = edgesList[i]
-        numEdges = len(edges)
-        flows = flow_values[offset:offset+numEdges]
-        used_edges = [edges[j].token for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
-        shortest_paths.append(used_edges)
-        offset += numEdges
 
-    return shortest_paths
+    if flow_values is not None:
+        for i in range(numStrings):
+            edges = edgesList[i]
+            numEdges = len(edges)
+            flows = flow_values[offset:offset+numEdges]
+            used_edges = [edges[j].token for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
+            shortest_paths.append(used_edges)
+            offset += numEdges
+
+        return shortest_paths
+    else:
+        return -1
 
 
 def create_vocab(inputStringList: list[str],
@@ -271,7 +274,8 @@ def create_vocab(inputStringList: list[str],
     numAllowedTokensParam.value = numAllowedTokens
 
     start = time.time()
-    lpProblem.solve(solver=cp.PDLP,solver_opts={"eps_optimal_absolute": 1.0e-8})
+    #lpProblem.solve(solver=cp.GLOP)
+    lpProblem.solve(solver=cp.PDLP,solver_opts={"eps_optimal_absolute": 1.0e-10})
     end=time.time()
     print(f"The first iteration took {end - start:.4f} seconds")
 
@@ -279,31 +283,80 @@ def create_vocab(inputStringList: list[str],
    
     tVar=lpVariables[2].value
     
-    chosenTokens=[]
-    nonZeroTokenCount=0
-    chosenTokensCount=0
-    for i in range(len(tokens_to_keep)):
-        tokens_to_keep[i].lpValue=tVar[i]
-        if tokens_to_keep[i].lpValue>0.0:
-            nonZeroTokenCount+=1
-        if tokens_to_keep[i].lpValue>0.99:
-            chosenTokens.append(tokens_to_keep[i])
-            chosenTokensCount+=1
-
-    newEdges,newFreeEdges=hf.extendFreeEdges(edgesList,chosenTokens,freeEdgesList)
     
-    chosenTokensStrings=[token.token for token in chosenTokens]
+    possibleTokens=[]
+    for i in range(len(tokens_to_keep)):
+        if(tVar[i]>0.0):
+            nonZeroToken=possibleToken(tokens_to_keep[i].get_token(),
+                                       tVar[i],
+                                       tokens_to_keep[i].get_count(),
+                                       tokens_to_keep[i].get_index()  )
 
-    print(f"We have selected {chosenTokensCount} tokens out of {numAllowedTokens}")
-    print( f"The number of non zero tokens is {nonZeroTokenCount}  which is {(nonZeroTokenCount/numAllowedTokens)} percent")
-
-
-    return chosenTokensStrings
+            
+            possibleTokens.append(nonZeroToken)
+    
+    return possibleTokens
 
    
 
+def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,vocab_size:int):
+    if(vocab_size<len(unique_chars)):
+        raise(ValueError( "Number of unique characters is greater than vocab size "))
+    sorted_tokens=sorted(possible_tokens, key=lambda obj: obj.lp_value, reverse=True)
+
+    tokens_to_choose=vocab_size-len(unique_chars)
+
+    chosen_tokens=[token.token for token in sorted_tokens[0:tokens_to_choose]]
+
+    tokens=list(set(unique_chars+chosen_tokens))
+
+    return tokens
+
+
+import numpy as np
+import random
+
+def probabilistic_rounding(possible_tokens: list, unique_chars: list[str], vocab_size: int):
+    if vocab_size < len(unique_chars):
+        raise ValueError("Number of unique characters is greater than vocab size.")
+
+    # Tokens that are always taken
+    always_taking = [token.token for token in possible_tokens if token.lp_value > 0.99]
+
+    # All candidate tokens (excluding those already taken)
+    candidate_tokens = [token for token in possible_tokens 
+                        if token.token not in always_taking]
+
+    # If there are not enough tokens to sample, raise error
+    remaining_budget = vocab_size - len(unique_chars)
+    if len(always_taking) > remaining_budget:
+        raise ValueError("Too many always-taking tokens to fit in vocabulary.")
+
+    # Adjust remaining budget
+    remaining_budget -= len(always_taking)
+
+    # Get tokens and their associated probabilities
+    token_list = [token.token for token in candidate_tokens]
+    lp_values = np.array([token.lp_value for token in candidate_tokens])
+
+    if len(lp_values) == 0 and remaining_budget > 0:
+        raise ValueError("No available tokens to sample from.")
+        
+    probabilities = lp_values / lp_values.sum()
+
+    # Sample without replacement
+    sampled_tokens = list(np.random.choice(token_list, size=remaining_budget, replace=False, p=probabilities))
+
+    # Final vocabulary
+    final_vocab = list(set(unique_chars) | set(always_taking) | set(sampled_tokens))
+
+    # Sanity check
+    if len(final_vocab) != vocab_size:
+        raise ValueError(f"Final vocabulary size {len(final_vocab)} does not match expected size {vocab_size}.")
+
+    return final_vocab
+
+
+
 
     
-# inputStrings=["world","hello","hello"]
-
-# create_instance(inputStrings,[1,1,1],5)
