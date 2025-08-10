@@ -3,13 +3,15 @@ import numpy as np
 import scipy.sparse as sp
 import pickle
 from collections import defaultdict
-from datastructures import possibleToken
+
 import time
 from numpy.typing import NDArray
+import random
 
-from datastructures import tokenInstance, possibleToken
 
-import helper_functions as hf
+from .datastructures import tokenInstance, possibleToken
+
+from . import helper_functions as hf
 #from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
@@ -244,19 +246,17 @@ def create_vocab(inputStringList: list[str],
     
 
 
-    print("Finished preparing data")
 
     hf.update_token_instance_counts(tokens,inputStringFreq,edgesList)
-    print("Total number of tokens " ,len(tokens))
+
     tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
-    print("Total number of tokens kept:", len(tokens_to_keep))
 
     # Create a set of valid token strings
     keep_set = set(t.token for t in tokens_to_keep)
 
     # Count edges before filtering
     edges_before = sum(len(sublist) for sublist in edgesList)
-    print(f"Number of edges before: {edges_before}")
+
 
     # Create a new edgesList that only contains tokens in keep_set
     filtered_edgesList = [
@@ -266,7 +266,7 @@ def create_vocab(inputStringList: list[str],
 
     # Count edges after filtering
     edges_after = sum(len(sublist) for sublist in filtered_edgesList)
-    print(f"Number of edges after: {edges_after}")
+ 
 
     lpProblem=setup_LP_tokenization(filtered_edgesList,inputStringFreq,tokens_to_keep , freeEdgesList,numVertices)
 
@@ -310,11 +310,8 @@ def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list
 
     tokens=list(set(unique_chars+chosen_tokens))
 
+
     return tokens
-
-
-import numpy as np
-import random
 
 def probabilistic_rounding(possible_tokens: list, unique_chars: list[str], vocab_size: int):
     if vocab_size < len(unique_chars):

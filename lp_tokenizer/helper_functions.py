@@ -1,4 +1,4 @@
-from datastructures import tokenInstance, possibleToken
+from .datastructures import tokenInstance, possibleToken
 from collections import defaultdict
 import json,pickle
 
@@ -40,7 +40,8 @@ def get_strings_from_vocab(input_string: str, vocab: defaultdict[str, int]) -> l
                     token_index=vocab[substring],
                 )
                 token_instances.append(ti)
-
+    if len(token_instances)==0:
+        print(input_string)
     return token_instances
 
 

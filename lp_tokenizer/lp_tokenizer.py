@@ -3,12 +3,12 @@ from collections import OrderedDict,defaultdict
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding
+from .lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding
 import numpy as np
 import os
 import pickle
 import json
-import helper_functions as hf
+from . import helper_functions as hf
 from datasets import load_dataset, load_from_disk
 import matplotlib.pyplot as plt
 import pickle
@@ -18,101 +18,90 @@ from tqdm import tqdm
 class Tokenizer:
     vocab: OrderedDict
     pretokenizer: AutoTokenizer
-    dataset_path:str
+    saved_dataset_path:str
     unique_chars_path:str
-    original_corpus_size:int
-    tokenized_corpus_size:int
-    data_set_size:int
-    lp_budget:int
+    dataset_size:int
+    max_dataset_size:int
+    dataset_url:str
+    vocab_size:int
+
     
 
-    def __init__(self):
+    def __init__(self,dataset_url,saved_dataset_path,dataset_size,vocab_size):
         self.pretokenizer=AutoTokenizer.from_pretrained(
                                                         "EleutherAI/pythia-70m-deduped",
                                                         revision="step3000",
                                                         cache_dir="./pythia-70m-deduped/step3000",
                                                         )
         self.vocab=None
-        self.dataset_path="strings_with_frequency.npz" # Has 2 values inputStrings and inputStringsfrequencies
-        self.unique_chars_path="unique_characters.npz"
+        self.saved_dataset_path=saved_dataset_path
+        self.vocab_size=vocab_size
+        self.unique_chars_path=None
         self.original_corpus_size=0
-        self.tokenized_corpus_size=0
-        self.data_set_size = 2119719
-        self.starting_data_path= "tinystories_data"
+        self.dataset_size = dataset_size
+        self.dataset_url= dataset_url
         self.debug=False
-        self.lp_budget=60
 
 
     def make_vocab(self,save_vocab:bool=True):
-        data = np.load(self.dataset_path)
-        input_strings=data["input_strings" ]
-        input_strings_frequencies=data["input_strings_frequencies"]
 
-        # Load .npz and extract correctly
-        unique_chars_npz = np.load(self.unique_chars_path, allow_pickle=True)
-        unique_chars = list(unique_chars_npz["unique_chars"].item()) 
-        
-        possible_tokens=create_vocab(input_strings,input_strings_frequencies,self.lp_budget)
-        
-        vocab_size=len(unique_chars)+self.lp_budget
-        
-        
-        all_tokens=deterministic_rounding(possible_tokens,unique_chars,vocab_size)
-
-
+        if self.dataset_url is None and self.dataset_path is None:
+            raise ValueError("Must include either dataset_url or dataset_path")
+       
+        if os.path.exists(self.saved_dataset_path):
+            dataset=load_from_disk(self.saved_dataset_path)
+        else:
+            dataset=load_dataset(self.dataset_url)
+            dataset.save_to_disk(self.saved_dataset_path)
     
+        
+        input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_dataset(self.dataset_size,dataset)
+
+        unique_chars = self.get_unique_chars(dataset)
+      
+        lp_budget=self.vocab_size-len(unique_chars)-2 # Minus 2 for the special tokens unknown and end of text
+        
+        if lp_budget <= 0:
+            raise ValueError("Vocab size is too small, entire vocab already unique characters")
+
+
+        possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget)
+        
+        # Change this depending on what behaviour one woud like
+        # Minus 2 as we add two special tokens
+        all_tokens=deterministic_rounding(possible_tokens,unique_chars,self.vocab_size-2)
         if "[UNK]" not in all_tokens:
              all_tokens.append("[UNK]")
 
+        if "<|endoftext|>" not in all_tokens:
+            all_tokens.append("<|endoftext|>")   
+
+        assert(len(all_tokens)==self.vocab_size)
+
         vocab = OrderedDict((token, idx) for idx, token in enumerate(all_tokens))
-        
+   
         if save_vocab:
             vocab_length=len(all_tokens)
-            file_name= os.path.join("vocab_" + self.starting_data_path + f"{vocab_length}.json")
+            file_name= os.path.join("vocab_" + self.saved_dataset_path + f"{vocab_length}.json")
             with open(file_name, "w") as f:
                 json.dump(vocab, f)
         self.vocab=vocab
 
 
-    def load_and_prepare_dataset(self, data_set_size:int=20,data_set_url:str="roneneldan/TinyStories", raw_dataset_path:str ="tinystories_data"):
-        self.starting_data_path=raw_dataset_path
-        if os.path.exists(raw_dataset_path):
-            print("Loading dataset from disk...")
-            TinyStories = load_from_disk(raw_dataset_path)
-        else:
-            print("Downloading dataset...")
-            TinyStories = load_dataset(data_set_url)
-            TinyStories.save_to_disk(raw_dataset_path)
+    def pretokenize_and_prepare_dataset(self, dataset_size,dataset):
 
         corpus=[]
 
+        for i in range(dataset_size):
+            corpus.append(dataset['train'][i]['text'])
 
-        for i in range(data_set_size):
-            corpus.append(TinyStories['train'][i]['text'])
-
-        print("created the corpus")
-
-        file_name= "word_freqs_"+str(data_set_size)+".pkl"
-
-
-        if os.path.exists(file_name):
-            print("Loading word frequencies from pickle...")
-            with open(file_name, "rb") as f:
-                word_freqs = pickle.load(f)
-
-        else:
-            print("Started working on pre tokenization")
-            word_freqs = defaultdict(int)
-            
-            for i, text in tqdm(enumerate(corpus), total=len(corpus)):
-                words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-                new_words = [word for word, offset in words_with_offsets]
-                for word in new_words:
-                    word_freqs[word] += 1
-            print("Finished working on pre tokenization")
-            with open(file_name, "wb") as f:
-                pickle.dump(word_freqs, f)
-            print("Saved word frequencies to disk.")
+        word_freqs = defaultdict(int)
+        
+        for i, text in tqdm(enumerate(corpus), total=len(corpus)):
+            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+            new_words = [word for word, offset in words_with_offsets]
+            for word in new_words:
+                word_freqs[word] += 1
 
         unique_chars = set()
         for word in word_freqs:
@@ -121,22 +110,16 @@ class Tokenizer:
         input_strings=list(word_freqs.keys())
         input_strings_frequencies=list(word_freqs.values())
 
-        np.savez(self.dataset_path, input_strings=np.array(input_strings), input_strings_frequencies=np.array(input_strings_frequencies))
-
+        return input_strings, input_strings_frequencies
 
     def encode(self,corpus:list[str],vocab):
-        if self.debug:
-            print("Started working on pre tokenization")
+     
         input_strings=[]
         for i, text in tqdm(enumerate(corpus), total=len(corpus)):
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
             input_strings+=new_words
-            
-        if self.debug:
-            print("We have finished pretokenizing")
-
-
+       
     
         edges_list_weight=np.ones(len(input_strings),dtype=float)
         num_strings=len(input_strings)
@@ -146,8 +129,10 @@ class Tokenizer:
 
         for i in range(num_strings):
             string_len=len(input_strings[i])
+            #self.get_unique_bytes_and_check_vocab(input_strings[i], vocab)
             edges_list.append(hf.get_strings_from_vocab(input_strings[i],vocab) )
             num_vertices.append(string_len+1)
+        
         
         
         tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices )
@@ -158,32 +143,41 @@ class Tokenizer:
             return tokenized_data
 
 
-    def get_unique_chars(self):
+    def get_unique_chars(self,dataset):
 
-        file_name= "word_freqs_"+str(self.data_set_size)+".pkl"
+        unique_chars = set()
+        dataset_size = len(dataset['train'])
 
+        for i in tqdm(range(dataset_size), desc="Processing dataset"):
+            unique_chars.update(dataset['train'][i]['text'])
 
-        if os.path.exists(file_name):
-            print("Loading word frequencies from pickle...")
-            with open(file_name, "rb") as f:
-                word_freqs = pickle.load(f)
-
-            unique_chars = set()
-            for word in word_freqs:
-                unique_chars.update(word)
-
-            # Convert to NumPy array (dtype=object since it's strings)
-            unique_chars_array = np.array(unique_chars, dtype=object)
-
-            # Save to .npz file
-            np.savez_compressed("unique_characters.npz", unique_chars=unique_chars_array)
-
-            print(f"Saved {len(unique_chars)} unique characters to 'unique_characters.npz'")
-            
-
+        return list(unique_chars)
+    
     def get_vocab(self):
         return self.vocab
-            
+        
 
-            
+    def get_unique_bytes_and_check_vocab(self, input_strings: list[str], vocab: set[str]):
+        # Get all unique single-byte strings from input
+        unique_chars = set()
+        for word in input_strings:
+            unique_chars.update(word)
+
+        # Encode each char to bytes and decode using the vocab mapping
+        missing_chars = []
+        for ch in unique_chars:
+            if ch in vocab:
+                continue
+            # Try byte fallback
+            byte_str = bytes([ord(ch)]) if ord(ch) < 256 else None
+            if byte_str and byte_str.decode("utf-8", errors="ignore") in vocab:
+                continue
+            missing_chars.append(ch)
+
+        if missing_chars:
+            print("⚠️ Missing from vocab:", missing_chars)
+        else:
+            print("✅ All characters are covered by vocab")
+
+        return list(unique_chars)
 
