@@ -110,7 +110,7 @@ class Tokenizer:
 
         return input_strings, input_strings_frequencies
 
-    def encode(self,corpus:list[str],vocab,using_id):
+    def encode(self,corpus:list[str],vocab):
      
         input_strings=[]
         for i, text in tqdm(enumerate(corpus), total=len(corpus)):
@@ -144,13 +144,9 @@ class Tokenizer:
             
         
         edges_list_weight=np.ones(len(edges_list),dtype=float)
-        tokenized_data_extended=tokenize(edges_list,edges_list_weight,num_vertices )
+        tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices )
 
-        if using_id:
-            tokenized_data=[token.token_index for token in tokenized_data_extended]
-        else:
-            tokenized_data=[token.token for token in tokenized_data_extended]
-
+        
         flat_tokens = []
         for sublist in tokenized_data:
             flat_tokens.extend(sublist)
