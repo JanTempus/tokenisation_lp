@@ -55,7 +55,7 @@ class Tokenizer:
         self.max_dataset_size=len(dataset['train'])
         input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_dataset(self.dataset_size,dataset)
 
-        unique_chars = self.get_unique_chars(dataset,self.dataset_size)
+        unique_chars = self.get_unique_chars(dataset,self.max_dataset_size)
       
         lp_budget=self.vocab_size-len(unique_chars)-2 # Minus 2 for the special tokens unknown and end of text
         
@@ -65,7 +65,7 @@ class Tokenizer:
 
         possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget)
         
-        # Change this depending on what behaviour one woud like
+        # Change this depending on what behaviour one would like
         # Minus 2 as we add two special tokens
         all_tokens=deterministic_rounding(possible_tokens,unique_chars,self.vocab_size-2)
         if "[UNK]" not in all_tokens:

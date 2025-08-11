@@ -16,22 +16,22 @@ datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
-tokenizer=Tokenizer(dataset_url, dataset_path, 10,300)
+tokenizer=Tokenizer(dataset_url, dataset_path, 1000000,32000)
 
 tokenizer.make_vocab()
 
 
 
-dataset=load_from_disk(dataset_path)
+# dataset=load_from_disk(dataset_path)
 
-corpus=[]
+# corpus=[]
 
-for i in range(4,8):
-    corpus.append(dataset['train'][i]['text'])
+# for i in range(4,8):
+#     corpus.append(dataset['train'][i]['text'])
 
-vocab=tokenizer.get_vocab()
+# vocab=tokenizer.get_vocab()
 
-tokenized_data=tokenizer.encode(corpus,vocab,False)
-print(tokenized_data)
+# tokenized_data=tokenizer.encode(corpus,vocab)
+# print(tokenized_data)
 
 
