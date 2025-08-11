@@ -116,21 +116,6 @@ class Tokenizer:
             input_strings=list(word_freqs.keys())
             input_strings_frequencies=list(word_freqs.values())
 
-            unique_chars = set()
-
-            for i in tqdm(range(dataset_size), desc="Getting Unique characters"):
-                text = dataset['train'][i]['text']
-                words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-                # words_with_offsets is list of (token, (start_offset, end_offset))
-
-                # Extract tokens only
-                tokens = [word for word, _ in words_with_offsets]
-
-                # Update unique_chars with all characters from all tokens
-                for token in tokens:
-                    unique_chars.update(token)
-            np.savez(file_name, unique_chars=np.array(unique_chars))
-            
         return input_strings, input_strings_frequencies
 
     def encode(self,corpus:list[str],vocab):
@@ -188,7 +173,7 @@ class Tokenizer:
         if os.path.exists(file_name):
             chars = np.load(file_name)
 
-            unique_chars=chars["unique_chars" ]
+            unique_chars=chars["unique_chars"]
         else:
             unique_chars = set()
 
