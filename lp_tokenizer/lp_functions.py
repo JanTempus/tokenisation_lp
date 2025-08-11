@@ -195,7 +195,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
             edges = edgesList[i]
             numEdges = len(edges)
             flows = flow_values[offset:offset+numEdges]
-            used_edges = [edges[j].token for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
+            used_edges = [edges[j] for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
             shortest_paths.append(used_edges)
             offset += numEdges
 

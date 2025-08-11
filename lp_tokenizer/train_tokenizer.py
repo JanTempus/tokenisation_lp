@@ -31,7 +31,7 @@ for i in range(4,8):
 
 vocab=tokenizer.get_vocab()
 
-tokenized_data=tokenizer.encode(corpus,vocab)
+tokenized_data=tokenizer.encode(corpus,vocab,False)
 print(tokenized_data)
 
 

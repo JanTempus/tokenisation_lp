@@ -20,7 +20,6 @@ class Tokenizer:
     vocab: OrderedDict
     pretokenizer: AutoTokenizer
     saved_dataset_path:str
-    unique_chars_path:str
     dataset_size:int
     max_dataset_size:int
     dataset_url:str
@@ -28,17 +27,15 @@ class Tokenizer:
 
     
 
-    def __init__(self,dataset_url,saved_dataset_path,dataset_size,vocab_size):
+    def __init__(self,dataset_url,saved_dataset_path,dataset_size,vocab_size,vocab=None):
         self.pretokenizer=AutoTokenizer.from_pretrained(
                                                         "EleutherAI/pythia-70m-deduped",
                                                         revision="step3000",
                                                         cache_dir="./pythia-70m-deduped/step3000",
                                                         )
-        self.vocab=None
+        self.vocab=vocab
         self.saved_dataset_path=saved_dataset_path
         self.vocab_size=vocab_size
-        self.unique_chars_path=None
-        self.original_corpus_size=0
         self.dataset_size = dataset_size
         self.dataset_url= dataset_url
         self.debug=False
@@ -113,7 +110,7 @@ class Tokenizer:
 
         return input_strings, input_strings_frequencies
 
-    def encode(self,corpus:list[str],vocab):
+    def encode(self,corpus:list[str],vocab,using_id):
      
         input_strings=[]
         for i, text in tqdm(enumerate(corpus), total=len(corpus)):
@@ -147,9 +144,13 @@ class Tokenizer:
             
         
         edges_list_weight=np.ones(len(edges_list),dtype=float)
-        tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices )
+        tokenized_data_extended=tokenize(edges_list,edges_list_weight,num_vertices )
 
-        
+        if using_id:
+            tokenized_data=[token.token_index for token in tokenized_data_extended]
+        else:
+            tokenized_data=[token.token for token in tokenized_data_extended]
+
         flat_tokens = []
         for sublist in tokenized_data:
             flat_tokens.extend(sublist)
