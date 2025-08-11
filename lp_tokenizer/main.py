@@ -17,3 +17,7 @@ TinyStories = load_from_disk(dataset_path)
 corpus=TinyStories['train'][1]['text']
 tokenized_data= tokenizer.tokenize_data_set([corpus] )
 print(tokenized_data)
+
+datasetname="finewebedu"
+dataset_url="pietrolesci/finewebedu-20B"
+dataset_path="finewebedu_data"

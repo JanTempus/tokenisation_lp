@@ -9,10 +9,8 @@ from numpy.typing import NDArray
 import random
 
 
-from .datastructures import tokenInstance, possibleToken
-
-from . import helper_functions as hf
-#from helper_functions import get_all_nonFree_substrings_upto_len_t, get_tokens_upto_len_t, get_tokens, get_all_free_substrings, get_all_nonFree_substrings
+from datastructures import tokenInstance, possibleToken
+import helper_functions as hf
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -185,7 +183,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
     start = time.time()
-    problem.solve(solver=cp.GLOP,verbose=True)
+    problem.solve(solver=cp.GLOP)
     end=time.time()
 
     flow_values = f.value 
@@ -203,7 +201,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
         return shortest_paths
     else:
-        return -1
+      raise ValueError("Cannot represent data")
 
 
 def create_vocab(inputStringList: list[str],
@@ -254,9 +252,6 @@ def create_vocab(inputStringList: list[str],
     # Create a set of valid token strings
     keep_set = set(t.token for t in tokens_to_keep)
 
-    # Count edges before filtering
-    edges_before = sum(len(sublist) for sublist in edgesList)
-
 
     # Create a new edgesList that only contains tokens in keep_set
     filtered_edgesList = [
@@ -264,9 +259,6 @@ def create_vocab(inputStringList: list[str],
         for sublist in edgesList
     ]
 
-    # Count edges after filtering
-    edges_after = sum(len(sublist) for sublist in filtered_edgesList)
- 
 
     lpProblem=setup_LP_tokenization(filtered_edgesList,inputStringFreq,tokens_to_keep , freeEdgesList,numVertices)
 

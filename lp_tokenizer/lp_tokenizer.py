@@ -3,12 +3,13 @@ from collections import OrderedDict,defaultdict
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from .lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding
+from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding
+from datastructures import tokenInstance
 import numpy as np
 import os
 import pickle
 import json
-from . import helper_functions as hf
+import helper_functions as hf
 from datasets import load_dataset, load_from_disk
 import matplotlib.pyplot as plt
 import pickle
@@ -54,10 +55,10 @@ class Tokenizer:
             dataset=load_dataset(self.dataset_url)
             dataset.save_to_disk(self.saved_dataset_path)
     
-        
+        self.max_dataset_size=len(dataset['train'])
         input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_dataset(self.dataset_size,dataset)
 
-        unique_chars = self.get_unique_chars(dataset)
+        unique_chars = self.get_unique_chars(dataset,self.max_dataset_size)
       
         lp_budget=self.vocab_size-len(unique_chars)-2 # Minus 2 for the special tokens unknown and end of text
         
@@ -121,63 +122,62 @@ class Tokenizer:
             input_strings+=new_words
        
     
-        edges_list_weight=np.ones(len(input_strings),dtype=float)
+     
         num_strings=len(input_strings)
 
         edges_list=[]
         num_vertices=[]
 
+        unk_token_instance=[tokenInstance(
+                    token="[UNK]",
+                    start=0,
+                    end=1,
+                    token_index=vocab.get("[UNK]", -1)
+                )]
+
         for i in range(num_strings):
             string_len=len(input_strings[i])
-            #self.get_unique_bytes_and_check_vocab(input_strings[i], vocab)
-            edges_list.append(hf.get_strings_from_vocab(input_strings[i],vocab) )
-            num_vertices.append(string_len+1)
+            edges=hf.get_strings_from_vocab(input_strings[i],vocab)
+            if(edges != []):
+                edges_list.append(edges )
+                num_vertices.append(string_len+1)
+            else:
+                edges_list.append(unk_token_instance)
+                num_vertices.append(2)
+            
         
-        
-        
+        edges_list_weight=np.ones(len(edges_list),dtype=float)
         tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices )
 
-        if(tokenized_data==-1):
-            raise ValueError("Cannot represent data set with given tokens")
-        else:
-            return tokenized_data
-
-
-    def get_unique_chars(self,dataset):
-
+        
+        flat_tokens = []
+        for sublist in tokenized_data:
+            flat_tokens.extend(sublist)
+        return flat_tokens
+      
+                    
+            
+    def get_unique_chars(self, dataset,dataset_size):
+        """
+        Collect unique characters from the pretokenized dataset.
+        Uses pre_tokenize_str to get tokens, then collects all unique characters from those tokens.
+        """
         unique_chars = set()
-        dataset_size = len(dataset['train'])
 
-        for i in tqdm(range(dataset_size), desc="Processing dataset"):
-            unique_chars.update(dataset['train'][i]['text'])
+        for i in tqdm(range(dataset_size), desc="Getting Unique characters"):
+            text = dataset['train'][i]['text']
+            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+            # words_with_offsets is list of (token, (start_offset, end_offset))
 
-        return list(unique_chars)
+            # Extract tokens only
+            tokens = [word for word, _ in words_with_offsets]
+
+            # Update unique_chars with all characters from all tokens
+            for token in tokens:
+                unique_chars.update(token)
+
+        return list(sorted(unique_chars))
     
     def get_vocab(self):
         return self.vocab
-        
-
-    def get_unique_bytes_and_check_vocab(self, input_strings: list[str], vocab: set[str]):
-        # Get all unique single-byte strings from input
-        unique_chars = set()
-        for word in input_strings:
-            unique_chars.update(word)
-
-        # Encode each char to bytes and decode using the vocab mapping
-        missing_chars = []
-        for ch in unique_chars:
-            if ch in vocab:
-                continue
-            # Try byte fallback
-            byte_str = bytes([ord(ch)]) if ord(ch) < 256 else None
-            if byte_str and byte_str.decode("utf-8", errors="ignore") in vocab:
-                continue
-            missing_chars.append(ch)
-
-        if missing_chars:
-            print("⚠️ Missing from vocab:", missing_chars)
-        else:
-            print("✅ All characters are covered by vocab")
-
-        return list(unique_chars)
-
+      
