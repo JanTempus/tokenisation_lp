@@ -87,18 +87,17 @@ class Tokenizer:
 
 
     def pretokenize_and_prepare_dataset(self, dataset_size,dataset):
-        file_name= "word_freqs_testing"+self.saved_dataset_path+str(dataset_size)+".pkl"
-        
-        if os.path.exists(file_name):
-            print("Loading file")
-            with open(file_name, "rb") as f:
-                data = pickle.load(f)
-
-            input_strings=data["input_strings" ]
-            input_strings_frequencies=data["input_strings_frequencies"]
-         
+        base_name = f"word_freqs_testing{self.saved_dataset_path}{dataset_size}"
+        strings_file = base_name + "_strings.npy"
+        freqs_file = base_name + "_freqs.npy"
+    
+        if os.path.exists(strings_file) and os.path.exists(freqs_file):
+            print("Loading .npy files")
+            input_strings = np.load(strings_file, allow_pickle=True).tolist()
+            input_strings_frequencies = np.load(freqs_file).tolist()
+            
         else:
-            print("Creating input strings and input strings frequencies")
+            print("Creating input strings and input strings req")
             corpus=[]
 
             for i in range(dataset_size):
@@ -118,6 +117,10 @@ class Tokenizer:
 
             input_strings=list(word_freqs.keys())
             input_strings_frequencies=list(word_freqs.values())
+
+            # Save as .npy for faster reloads
+            np.save(strings_file, np.array(input_strings, dtype=object),allow_pickle=True)
+            np.save(freqs_file, np.array(input_strings_frequencies, dtype=np.int64))
 
         return input_strings, input_strings_frequencies
 
@@ -171,33 +174,26 @@ class Tokenizer:
         Uses pre_tokenize_str to get tokens, then collects all unique characters from those tokens.
         """
 
-        file_name= "unique_chars"+self.saved_dataset_path+str(dataset_size)+".pkl"
-        
-        if os.path.exists(file_name):
-            print("loading characters")
-            with open(file_name, "rb") as f:
-                chars = pickle.load(f)
+        file_name = f"unique_chars{self.saved_dataset_path}{dataset_size}.npy"
 
-            unique_chars=chars["unique_chars"]
+        if os.path.exists(file_name):
+            # Load directly from .npy
+            unique_chars = np.load(file_name, allow_pickle=True).tolist()
         else:
             unique_chars = set()
 
             for i in tqdm(range(dataset_size), desc="Getting Unique characters"):
                 text = dataset['train'][i]['text']
                 words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-                # words_with_offsets is list of (token, (start_offset, end_offset))
-
-                # Extract tokens only
                 tokens = [word for word, _ in words_with_offsets]
-
-                # Update unique_chars with all characters from all tokens
                 for token in tokens:
                     unique_chars.update(token)
-                    
-            np.savez(file_name, unique_chars=np.array(unique_chars))
-                
 
-        return list(sorted(unique_chars))
+            unique_chars = sorted(unique_chars)
+            np.save(file_name, np.array(unique_chars, dtype=object))
+
+        return unique_chars
+
     
     def get_vocab(self):
         return self.vocab
