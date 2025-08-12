@@ -97,7 +97,7 @@ class Tokenizer:
             input_strings_frequencies = np.load(freqs_file).tolist()
             
         else:
-            print("Creating input strings and input strings req")
+            print("Creating input strings and input strings freq")
             corpus=[]
 
             for i in range(dataset_size):
@@ -127,7 +127,7 @@ class Tokenizer:
     def encode(self,corpus:list[str],vocab):
      
         input_strings=[]
-        for i, text in tqdm(enumerate(corpus), total=len(corpus)):
+        for i, text in tqdm(enumerate(corpus), total=len(corpus, desc="Pretokenizing")):
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
             input_strings+=new_words

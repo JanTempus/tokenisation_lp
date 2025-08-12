@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as sp
 import pickle
 from collections import defaultdict
-
+from tqdm import tqdm
 import time
 from numpy.typing import NDArray
 import random
@@ -42,7 +42,8 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
     A_col_offset = 0
     B_col_offset = 0
 
-    for i in range(numStrings):
+    
+    for i in tqdm(range(numStrings), desc="Preparing matrices"):
         edges = edgesList[i]
         freeEdges = freeEdgesList[i]
         numEdges = len(edges)
@@ -139,7 +140,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     A_row_offset = 0
     A_col_offset = 0
 
-    for i in range(numStrings):
+    for i in tqdm(range(numStrings), desc="Preparing matrices"):
         edges = edgesList[i]
         numEdges = len(edges)
         numVertices = numVerticesList[i]
@@ -220,7 +221,7 @@ def create_vocab(inputStringList: list[str],
 
 
     if all_tokens:  
-        for i in range(numStrings):
+        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
             stringLen=len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]) )
             tokensList.append(hf.get_tokens(inputStringList[i]))
@@ -231,7 +232,7 @@ def create_vocab(inputStringList: list[str],
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
 
     else:
-        for i in range(numStrings):
+        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
             stringLen=len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
             tokensList.append(hf.get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
