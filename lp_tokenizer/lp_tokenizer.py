@@ -55,7 +55,7 @@ class Tokenizer:
         self.max_dataset_size=len(dataset['train'])
         input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_dataset(self.dataset_size,dataset)
 
-        unique_chars = self.get_unique_chars(dataset,self.dataset_size)
+        unique_chars = self.get_unique_chars(dataset,1000000)
       
         lp_budget=self.vocab_size-len(unique_chars)-2 # Minus 2 for the special tokens unknown and end of text
         
