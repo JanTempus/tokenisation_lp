@@ -90,12 +90,15 @@ class Tokenizer:
         file_name= "word_freqs_testing"+self.saved_dataset_path+str(dataset_size)+".pkl"
         
         if os.path.exists(file_name):
-            data = np.load(file_name)
+            print("Loading file")
+            with open(file_name, "rb") as f:
+                data = pickle.load(f)
 
             input_strings=data["input_strings" ]
             input_strings_frequencies=data["input_strings_frequencies"]
          
         else:
+            print("Creating input strings and input strings frequencies")
             corpus=[]
 
             for i in range(dataset_size):
@@ -103,7 +106,7 @@ class Tokenizer:
 
             word_freqs = defaultdict(int)
             
-            for i, text in tqdm(enumerate(corpus), total=len(corpus)):
+            for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
                 words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
                 new_words = [word for word, offset in words_with_offsets]
                 for word in new_words:
@@ -171,7 +174,9 @@ class Tokenizer:
         file_name= "unique_chars"+self.saved_dataset_path+str(dataset_size)+".pkl"
         
         if os.path.exists(file_name):
-            chars = np.load(file_name)
+            print("loading characters")
+            with open(file_name, "rb") as f:
+                chars = pickle.load(f)
 
             unique_chars=chars["unique_chars"]
         else:
