@@ -97,10 +97,9 @@ class Tokenizer:
             input_strings_frequencies = np.load(freqs_file).tolist()
             
         else:
-            print("Creating input strings and input strings freq")
             corpus=[]
 
-            for i in range(dataset_size):
+            for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
                 corpus.append(dataset['train'][i]['text'])
 
             word_freqs = defaultdict(int)

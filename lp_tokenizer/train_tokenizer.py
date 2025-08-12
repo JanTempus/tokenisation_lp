@@ -16,7 +16,7 @@ datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
-tokenizer=Tokenizer(dataset_url, dataset_path,300000,32000)
+tokenizer=Tokenizer(dataset_url, dataset_path,75000,32000)
 
 tokenizer.make_vocab()
 
