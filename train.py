@@ -117,7 +117,7 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=
 # poor man's data loader
 #
 
-data_dir = os.path.join('data', dataset)
+data_dir = os.path.join(os.path.dirname(__file__), 'lp_tokenizer')
 def get_batch(split):
     # We recreate np.memmap every batch to avoid a memory leak, as per
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
