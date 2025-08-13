@@ -1,8 +1,5 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from tokenizers import Tokenizer
-from tokenizers.models import BPE
-from tokenizers.trainers import BpeTrainer
 from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding
 from datastructures import tokenInstance
 import numpy as np
@@ -27,7 +24,7 @@ class Tokenizer:
 
     
 
-    def __init__(self,dataset_url,saved_dataset_path,dataset_size,vocab_size,vocab=None):
+    def __init__(self,dataset_url=None,saved_dataset_path=None,dataset_size=None,vocab_size=None,vocab=None):
         self.pretokenizer=AutoTokenizer.from_pretrained(
                                                         "EleutherAI/pythia-70m-deduped",
                                                         revision="step3000",

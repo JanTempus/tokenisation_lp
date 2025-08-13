@@ -4,9 +4,9 @@
 import os
 from tqdm import tqdm
 import numpy as np
-
-from datasets import load_dataset # huggingface datasets
-
+import json
+from datasets import load_dataset,load_from_disk # huggingface datasets
+from lp_tokenizer import Tokenizer
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
 num_proc = 8
@@ -18,15 +18,26 @@ num_proc_load_dataset = num_proc
 
 
 
+file_path="vocab_finewebedu_data32000.json"
+with open(file_path, 'r', encoding='utf-8') as f:
+        vocab = json.load(f)
+
+tokenizer=Tokenizer(vocab_size=32000,vocab=vocab)
+
 if __name__ == '__main__':
    
-    dataset = load_dataset("pietrolesci/finewebedu-20B", num_proc=num_proc_load_dataset)
+    dataset = load_from_disk("finewebedu_data")
 
-    # owt by default only contains the 'train' split, so create a test split
-    split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
+    # # owt by default only contains the 'train' split, so create a test split
+    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
 
-    # this results in:
+    dataset_small = dataset["train"].select(range(5))
+
+    # Split into train/val (tiny split just for testing)
+    split_dataset = dataset_small.train_test_split(test_size=0.4, seed=2357, shuffle=True)
+    split_dataset['val'] = split_dataset.pop('test')
+        # this results in:
     # >>> split_dataset
     # DatasetDict({
     #     train: Dataset({
@@ -41,8 +52,9 @@ if __name__ == '__main__':
 
     # we now want to tokenize the dataset. first define the encoding function (gpt2 bpe)
     def process(example):
-        ids = enc.encode_ordinary(example['text']) # encode_ordinary ignores any special tokens
-        ids.append(enc.eot_token) # add the end of text token, e.g. 50256 for gpt2 bpe
+        ids = tokenizer.encode(example['text']) # encode_ordinary ignores any special tokens
+        ids.append(31999) # add the end of text token, 3199 for 
+        print(ids)
         # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
         out = {'ids': ids, 'len': len(ids)}
         return out
