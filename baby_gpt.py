@@ -13,7 +13,7 @@ wandb_log = False # override via command line if you like
 wandb_project = 'tiny_tokenizer'
 wandb_run_name = 'lp_tokenizer_gpt'
 
-dataset = 'finewebedu-20B'
+dataset = "finewebedu_data"
 gradient_accumulation_steps = 1
 batch_size = 64
 block_size = 256 # context of up to 256 previous characters

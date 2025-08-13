@@ -46,7 +46,7 @@ wandb_log = False # disabled by default
 wandb_project = 'owt'
 wandb_run_name = 'basic_version' # 'run' + str(time.time())
 # data
-dataset = 'finewebedu-20B'
+dataset = "finewebedu_data"
 gradient_accumulation_steps = 5 * 8 # used to simulate larger batch sizes
 batch_size = 12 # if gradient_accumulation_steps > 1, this is the micro-batch size
 block_size = 1024
@@ -117,7 +117,7 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=
 # poor man's data loader
 #
 
-
+data_dir = os.path.join('data', dataset)
 def get_batch(split):
     # We recreate np.memmap every batch to avoid a memory leak, as per
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
