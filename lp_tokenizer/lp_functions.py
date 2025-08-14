@@ -126,6 +126,65 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
 
     return problem
 
+def tokenize_single(edges: list[tokenInstance], edge_weight: int, num_vertices: int):
+    """
+    Solve a single shortest path LP with flow constraints.
+    
+    Args:
+        edges (list[tokenInstance]): List of edges (each with .start, .end, .token_index).
+        edge_weight (int): Weight for all edges.
+        num_vertices (int): Number of vertices in the graph.
+
+    Returns:
+        list[int]: Token indices of edges used in the shortest path.
+    """
+    num_edges = len(edges)
+
+    # Build flow constraint matrix A
+    A_rows, A_cols, A_data = [], [], []
+    for idx, edge in enumerate(edges):
+        A_rows.append(edge.start)
+        A_cols.append(idx)
+        A_data.append(1)
+
+        A_rows.append(edge.end)
+        A_cols.append(idx)
+        A_data.append(-1)
+
+    A = sp.coo_matrix((A_data, (A_rows, A_cols)), shape=(num_vertices, num_edges)).tocsr()
+
+    # Build b vector (source = 1, sink = -1)
+    b = np.zeros(num_vertices, dtype=int)
+    b[0] = 1
+    b[num_vertices - 1] = -1
+
+    # Edge weights vector
+    w = np.full(num_edges, edge_weight)
+
+    # CVXPY variables and problem
+    f = cp.Variable(num_edges, nonneg=True)
+    constraints = [A @ f == b]
+    objective = cp.Minimize(w.T @ f)
+    problem = cp.Problem(objective, constraints)
+
+    start = time.time()
+    problem.solve(solver=cp.GLOP)
+    end = time.time()
+
+    print(f"Solved in {end - start:.4f} seconds")
+
+    # Extract used edges
+    flow_values = f.value
+    if flow_values is None:
+
+
+        raise ValueError("No feasible solution found.")
+
+    used_edges = [edges[j].token_index for j in range(num_edges) if flow_values[j] > 1e-6]
+
+    return used_edges
+
+
 def tokenize(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
             numVerticesList:list[int]):
@@ -347,6 +406,30 @@ def probabilistic_rounding(possible_tokens: list, unique_chars: list[str], vocab
     return final_vocab
 
 
+def fill_missing_edges_with_unk(edges: list[tokenInstance], num_vertices: int, unk_token:str,unk_id: int ):
+   
+    # Keep only direct edges i -> i+1
+    direct_edges = {(e.start, e.end): e for e in edges if e.end == e.start + 1}
+
+    
+    result_edges = edges
+
+    # Walk through consecutive vertices
+    for i in range(num_vertices - 1):
+        if (i, i + 1) in direct_edges:
+            # Keep the original edge
+            result_edges.append(direct_edges[(i, i + 1)])
+        else:
+            # Insert UNK edge for missing step
+            unk_edge = tokenInstance(
+                token=unk_token,
+                start=i,
+                end=i + 1,
+                token_index=unk_id
+            )
+            result_edges.append(unk_edge)
+
+    return result_edges
 
 
     

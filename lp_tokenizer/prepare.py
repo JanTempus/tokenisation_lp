@@ -35,7 +35,7 @@ if __name__ == '__main__':
     dataset_small = dataset["train"].select(range(5))
 
     # Split into train/val (tiny split just for testing)
-    split_dataset = dataset_small.train_test_split(test_size=0.4, seed=2357, shuffle=True)
+    split_dataset = dataset_small.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
         # this results in:
     # >>> split_dataset

@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding
+from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk
 from datastructures import tokenInstance
 import numpy as np
 import os
@@ -21,10 +21,15 @@ class Tokenizer:
     max_dataset_size:int
     dataset_url:str
     vocab_size:int
+    unk_token:str
+    eot_token:str
 
     
 
-    def __init__(self,dataset_url=None,saved_dataset_path=None,dataset_size=None,vocab_size=None,vocab=None):
+    def __init__(self,dataset_url=None,saved_dataset_path=None,
+                 dataset_size=0,max_dataset_size=0,
+                 vocab_size=0,vocab=None,
+                 unk_token=None,eot_token=None):
         self.pretokenizer=AutoTokenizer.from_pretrained(
                                                         "EleutherAI/pythia-70m-deduped",
                                                         revision="step3000",
@@ -34,11 +39,13 @@ class Tokenizer:
         self.saved_dataset_path=saved_dataset_path
         self.vocab_size=vocab_size
         self.dataset_size = dataset_size
+        self.max_dataset_size=max_dataset_size
         self.dataset_url= dataset_url
         self.debug=False
+        self.unk_token=unk_token
+        self.eot_token=eot_token     
 
-
-    def make_vocab(self,save_vocab:bool=True):
+    def make_vocab(self,save_vocab:bool=True,input_strings=None,input_strings_frequencies=None,unique_chars=None):
 
         if self.dataset_url is None and self.dataset_path is None:
             raise ValueError("Must include either dataset_url or dataset_path")
@@ -48,13 +55,31 @@ class Tokenizer:
         else:
             dataset=load_dataset(self.dataset_url)
             dataset.save_to_disk(self.saved_dataset_path)
-    
-        self.max_dataset_size=len(dataset['train'])
-        input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_dataset(self.dataset_size,dataset)
 
-        unique_chars = self.get_unique_chars(dataset,1000000)
+
+        if self.max_dataset_size == 0:
+            self.max_dataset_size=len(dataset['train'])
+
+
+        if input_strings is None:
+            input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_dataset(self.dataset_size,dataset)
+
+
+        if unique_chars is None:
+            unique_chars = self.get_unique_chars(dataset,self.max_dataset_size)
       
-        lp_budget=self.vocab_size-len(unique_chars)-2 # Minus 2 for the special tokens unknown and end of text
+        special_char_count=0
+        special_tokens=[]
+
+        if self.unk_token is None:
+            special_tokens.append("[UNK]")
+            special_char_count+=1
+
+        if self.eot_token is None:
+            special_tokens.append("<|endoftext|>") 
+            special_char_count+=1
+
+        lp_budget=self.vocab_size-len(unique_chars)-special_char_count # Minus 2 for the special tokens unknown and end of text
         
         if lp_budget <= 0:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
@@ -63,13 +88,14 @@ class Tokenizer:
         possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget)
         
         # Change this depending on what behaviour one would like
-        # Minus 2 as we add two special tokens
-        all_tokens=deterministic_rounding(possible_tokens,unique_chars,self.vocab_size-2)
-        if "[UNK]" not in all_tokens:
-             all_tokens.append("[UNK]")
+        # Minus special_char_count as we add two special tokens
 
-        if "<|endoftext|>" not in all_tokens:
-            all_tokens.append("<|endoftext|>")   
+        
+        rounded_tokens=deterministic_rounding(possible_tokens,unique_chars,self.vocab_size-special_char_count)
+
+        all_tokens=special_tokens+rounded_tokens
+             
+              
 
         assert(len(all_tokens)==self.vocab_size)
 
@@ -77,13 +103,13 @@ class Tokenizer:
    
         if save_vocab:
             vocab_length=len(all_tokens)
-            file_name= os.path.join("vocab_" + self.saved_dataset_path + f"{vocab_length}.json")
+            file_name= os.path.join(f"vocab_{ self.saved_dataset_path}_{ self.dataset_size}_{vocab_length}.json")
             with open(file_name, "w") as f:
                 json.dump(vocab, f)
         self.vocab=vocab
 
-
-    def pretokenize_and_prepare_dataset(self, dataset_size,dataset):
+    
+    def pretokenize_and_prepare_dataset(self, dataset_size,dataset,save:bool=True):
         base_name = f"word_freqs_testing{self.saved_dataset_path}{dataset_size}"
         strings_file = base_name + "_strings.npy"
         freqs_file = base_name + "_freqs.npy"
@@ -113,15 +139,19 @@ class Tokenizer:
 
             input_strings=list(word_freqs.keys())
             input_strings_frequencies=list(word_freqs.values())
-
+           
+            if save:
             # Save as .npy for faster reloads
-            np.save(strings_file, np.array(input_strings, dtype=object),allow_pickle=True)
-            np.save(freqs_file, np.array(input_strings_frequencies, dtype=np.int64))
+                np.save(strings_file, np.array(input_strings, dtype=object),allow_pickle=True)
+                np.save(freqs_file, np.array(input_strings_frequencies, dtype=np.int64))
 
         return input_strings, input_strings_frequencies
 
     def encode(self,corpus:list[str],vocab):
-     
+        
+        if self.unk_token is None:
+            raise KeyError("Please assign a token to the unkown token")
+
         input_strings=[]
         for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
@@ -135,22 +165,14 @@ class Tokenizer:
         edges_list=[]
         num_vertices=[]
 
-        unk_token_instance=[tokenInstance(
-                    token="[UNK]",
-                    start=0,
-                    end=1,
-                    token_index=vocab.get("[UNK]", -1)
-                )]
+        unk_id=vocab[self.unk_token]
 
         for i in range(num_strings):
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
-            if(edges != []):
-                edges_list.append(edges )
-                num_vertices.append(string_len+1)
-            else:
-                edges_list.append(unk_token_instance)
-                num_vertices.append(2)
+            edges=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
+
+
             
         
         edges_list_weight=np.ones(len(edges_list),dtype=float)
