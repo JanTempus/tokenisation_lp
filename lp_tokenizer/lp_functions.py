@@ -187,7 +187,8 @@ def tokenize_single(edges: list[tokenInstance], edge_weight: int, num_vertices: 
 
 def tokenize(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
-            numVerticesList:list[int]):
+            numVerticesList:list[int],
+            just_size:bool=False):
     
     numStrings = len(edgesList)
 
@@ -251,15 +252,22 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     offset = 0
 
     if flow_values is not None:
-        for i in range(numStrings):
-            edges = edgesList[i]
-            numEdges = len(edges)
-            flows = flow_values[offset:offset+numEdges]
-            used_edges = [edges[j].token_index for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
-            shortest_paths.append(used_edges)
-            offset += numEdges
+        if not just_size:
+            for i in range(numStrings):
+                edges = edgesList[i]
+                numEdges = len(edges)
+                flows = flow_values[offset:offset+numEdges]
+                used_edges = [edges[j].token_index for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
+                shortest_paths.append(used_edges)
+                offset += numEdges
 
-        return shortest_paths
+               
+            flat_tokens = []
+            for sublist in shortest_paths:
+                flat_tokens.extend(sublist)
+            return shortest_paths
+        else:
+            return f.value
     else:
       raise ValueError("Cannot represent data")
 

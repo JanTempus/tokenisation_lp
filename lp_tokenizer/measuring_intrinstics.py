@@ -1,10 +1,35 @@
 from lp_tokenizer import Tokenizer
 
 from datasets import  load_from_disk,load_dataset
-import pickle
 import os
 import csv
+import tqdm
 
+def save_data(csv_path: str, num1: float, num2: float, num3:int):
+    """
+    Opens (or creates) a CSV file and appends a row with two numbers.
+
+    Args:
+        csv_path (str): Path to the CSV file.
+        num1 (float): First number.
+        num2 (float): Second number.
+    """
+    # Check if file exists
+    file_exists = os.path.isfile(csv_path)
+
+    # Open in append mode
+    with open(csv_path, mode="a", newline="") as f:
+        writer = csv.writer(f)
+
+        # If file didn't exist, write a header first (optional)
+        if not file_exists:
+            writer.writerow(["Data Set size", "Vocab Size", "Compression"])
+
+        # Write the numbers as a new row
+        writer.writerow([num1, num2, num3])
+
+
+intristics_path="intrinstics.csv"
 
 # datasetname="finewebedu"
 # dataset_url="pietrolesci/finewebedu-20B"
@@ -37,31 +62,11 @@ unique_chars = tokenizer.get_unique_chars(dataset,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
 
+corpus=[]
 
+for i in tqdm(range(dataset_size_max),desc="Appending text to the corpus"):
+    corpus.append(dataset['train'][i]['text'])
 
-
-def write_two_numbers(csv_path: str, num1: float, num2: float, num3:int):
-    """
-    Opens (or creates) a CSV file and appends a row with two numbers.
-
-    Args:
-        csv_path (str): Path to the CSV file.
-        num1 (float): First number.
-        num2 (float): Second number.
-    """
-    # Check if file exists
-    file_exists = os.path.isfile(csv_path)
-
-    # Open in append mode
-    with open(csv_path, mode="a", newline="") as f:
-        writer = csv.writer(f)
-
-        # If file didn't exist, write a header first (optional)
-        if not file_exists:
-            writer.writerow(["Data Set size", "Vocab Size", "Compression"])
-
-        # Write the numbers as a new row
-        writer.writerow([num1, num2, num3])
 
 
 
@@ -79,6 +84,8 @@ while dataset_size<dataset_size_max:
         
         vocab=tokenizer.get_vocab()
 
+        compression=tokenizer.encode(corpus, vocab)
+        save_data(intristics_path,dataset_size,vocab_size,compression)
         vocab_size_dif=vocab_size_dif*2
 
     dataset_size=dataset_size*2
