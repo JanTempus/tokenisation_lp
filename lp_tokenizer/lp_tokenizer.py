@@ -47,7 +47,7 @@ class Tokenizer:
 
     def make_vocab(self,save_vocab:bool=True,input_strings=None,input_strings_frequencies=None,unique_chars=None):
 
-        if self.dataset_url is None and self.saved_dataset_path is None:
+        if self.dataset_url is None and self.saved_dataset_path is None and input_strings is None:
             raise ValueError("Must include either dataset_url or dataset_path")
        
         if os.path.exists(self.saved_dataset_path):
