@@ -75,7 +75,7 @@ while dataset_size<dataset_size_max:
     vocab_size_dif=20
     vocab_size=unique_chars_size+vocab_size_dif
     while vocab_size<vocab_size_max:
-        tokenizer=Tokenizer(vocab_size=vocab_size)
+        tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
         input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset,save=False)
 
         tokenizer.make_vocab(input_strings=input_strings,
