@@ -74,10 +74,12 @@ class Tokenizer:
 
         if self.unk_token is None:
             special_tokens.append("[UNK]")
+            self.unk_token="[UNK]"
             special_char_count+=1
 
         if self.eot_token is None:
-            special_tokens.append("<|endoftext|>") 
+            special_tokens.append("<|endoftext|>")
+            self.eot_token="<|endoftext|>" 
             special_char_count+=1
 
         lp_budget=self.vocab_size-len(unique_chars)-special_char_count # Minus 2 for the special tokens unknown and end of text
