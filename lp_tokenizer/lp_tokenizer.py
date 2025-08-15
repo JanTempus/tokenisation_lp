@@ -118,7 +118,7 @@ class Tokenizer:
         self.vocab=vocab
 
     
-    def pretokenize_and_prepare_dataset(self, dataset_size,dataset,save:bool=True):
+    def pretokenize_and_prepare_dataset(self, dataset_size,dataset,input_strings=None, save:bool=True):
         base_name = f"word_freqs_testing{self.saved_dataset_path}{dataset_size}"
         strings_file = base_name + "_strings.npy"
         freqs_file = base_name + "_freqs.npy"
@@ -161,11 +161,12 @@ class Tokenizer:
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
 
-        input_strings=[]
-        for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
-            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-            new_words = [word for word, offset in words_with_offsets]
-            input_strings+=new_words
+        if input_strings is None:
+            input_strings=[]
+            for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+                words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+                new_words = [word for word, offset in words_with_offsets]
+                input_strings+=new_words
        
     
      

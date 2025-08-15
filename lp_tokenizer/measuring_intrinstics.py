@@ -1,5 +1,5 @@
 from lp_tokenizer import Tokenizer
-
+from transformers import AutoTokenizer
 from datasets import  load_from_disk,load_dataset
 import os
 import csv
@@ -69,6 +69,17 @@ for i in tqdm(range(dataset_size_max),desc="Appending text to the corpus"):
 
 
 
+pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
+                                           revision="step3000",
+                                           cache_dir="./pythia-70m-deduped/step3000",
+                                                        )
+
+input_strings_encoding=[]
+for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+    words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+    new_words = [word for word, offset in words_with_offsets]
+    input_strings_encoding+=new_words
+
 
 while dataset_size<dataset_size_max:
     
@@ -84,7 +95,7 @@ while dataset_size<dataset_size_max:
         
         vocab=tokenizer.get_vocab()
 
-        compression=tokenizer.encode(corpus, vocab)
+        compression=tokenizer.encode(corpus, vocab,input_strings=input_strings_encoding)
         print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
         save_data(intristics_path,dataset_size,vocab_size,compression)
         vocab_size_dif=vocab_size_dif*2
