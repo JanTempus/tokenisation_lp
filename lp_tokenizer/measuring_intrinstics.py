@@ -3,7 +3,7 @@ from lp_tokenizer import Tokenizer
 from datasets import  load_from_disk,load_dataset
 import os
 import csv
-import tqdm
+from tqdm import tqdm
 
 def save_data(csv_path: str, num1: float, num2: float, num3:int):
     """
