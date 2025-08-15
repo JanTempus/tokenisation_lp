@@ -85,6 +85,7 @@ while dataset_size<dataset_size_max:
         vocab=tokenizer.get_vocab()
 
         compression=tokenizer.encode(corpus, vocab)
+        print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
         save_data(intristics_path,dataset_size,vocab_size,compression)
         vocab_size_dif=vocab_size_dif*2
 
