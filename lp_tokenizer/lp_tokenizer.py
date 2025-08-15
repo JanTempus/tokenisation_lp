@@ -101,10 +101,16 @@ class Tokenizer:
 
         vocab = OrderedDict((token, idx) for idx, token in enumerate(all_tokens))
    
+            
         if save_vocab:
-            vocab_length=len(all_tokens)
-            file_name= os.path.join(f"vocab_{ self.saved_dataset_path}_{ self.dataset_size}_{vocab_length}.json")
-            with open(file_name, "w") as f:
+            vocab_length = len(all_tokens)
+            file_name = f"vocab_{self.saved_dataset_path}_{self.dataset_size}_{vocab_length}.json"
+
+            folder_name = "vocabs"
+            os.makedirs(folder_name, exist_ok=True)
+
+            file_path = os.path.join(folder_name, file_name)
+            with open(file_path, "w") as f:
                 json.dump(vocab, f)
         self.vocab=vocab
 
