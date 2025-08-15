@@ -428,6 +428,7 @@ def fill_missing_edges_with_unk(edges: list[tokenInstance], num_vertices: int, u
             # Keep the original edge
             result_edges.append(direct_edges[(i, i + 1)])
         else:
+            print("There was an unkown edge")
             # Insert UNK edge for missing step
             unk_edge = tokenInstance(
                 token=unk_token,
