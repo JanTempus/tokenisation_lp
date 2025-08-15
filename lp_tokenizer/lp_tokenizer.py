@@ -50,11 +50,12 @@ class Tokenizer:
         if self.dataset_url is None and self.saved_dataset_path is None and input_strings is None:
             raise ValueError("Must include either dataset_url or dataset_path")
        
-        if os.path.exists(self.saved_dataset_path):
-            dataset=load_from_disk(self.saved_dataset_path)
-        else:
-            dataset=load_dataset(self.dataset_url)
-            dataset.save_to_disk(self.saved_dataset_path)
+        if self.saved_dataset_path is not None:
+            if os.path.exists(self.saved_dataset_path):
+                dataset=load_from_disk(self.saved_dataset_path)
+            else:
+                dataset=load_dataset(self.dataset_url)
+                dataset.save_to_disk(self.saved_dataset_path)
 
 
         if self.max_dataset_size == 0:
