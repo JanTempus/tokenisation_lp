@@ -156,7 +156,7 @@ class Tokenizer:
 
         return input_strings, input_strings_frequencies
 
-    def encode(self,corpus:list[str], vocab, just_size:bool=False):
+    def encode(self,corpus:list[str], vocab, input_strings=None,just_size:bool=False):
         
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
