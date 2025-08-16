@@ -103,8 +103,9 @@ class Tokenizer:
         all_tokens=special_tokens+rounded_tokens
              
               
-
-        assert(len(all_tokens)==self.vocab_size)
+        if len(all_tokens) != self.vocab_size:
+            print(f"number of tokens {all_tokens}, vocab size {self.vocab_size} all tokens {possible_tokens}")
+            assert(len(all_tokens)==self.vocab_size)
 
         vocab = OrderedDict((token, idx) for idx, token in enumerate(all_tokens))
    
