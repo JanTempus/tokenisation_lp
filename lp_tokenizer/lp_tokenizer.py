@@ -177,7 +177,7 @@ class Tokenizer:
 
         unk_id=vocab[self.unk_token]
 
-        for i in range(num_strings):
+        for i in tqdm(range(num_strings), desc="Processing strings"):
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
             edges=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
