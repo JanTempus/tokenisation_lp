@@ -120,7 +120,7 @@ while dataset_size<dataset_size_max:
                              unique_chars=unique_chars )
         
         vocab=tokenizer.get_vocab()
-        vocab=global_vocab
+        global_vocab=vocab
 
         def process(example):
             tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size,unk_token="[UNK]",pretokenizer=pretokenizer)
