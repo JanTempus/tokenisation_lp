@@ -5,6 +5,7 @@ import os
 import csv
 from tqdm import tqdm
 import numpy as np
+from functools import partial
 
 def save_data(csv_path: str, num1: float, num2: float, num3:int):
     """
@@ -55,6 +56,17 @@ def merge_into_chunks(dataset, t: int,):
     dataset_merged = Dataset.from_dict({'text': merged_texts})
     return dataset_merged
 
+
+def process(example, vocab, vocab_size, pretokenizer, dataset_path):
+    tokenizer = Tokenizer(
+        saved_dataset_path=dataset_path,
+        vocab_size=vocab_size,
+        unk_token="[UNK]",
+        pretokenizer=pretokenizer
+    )
+    ids = tokenizer.encode(example['text'], vocab)
+    return {'ids': ids, 'len': len(ids)}
+
 intristics_path="intrinstics.csv"
 
 # datasetname="finewebedu"
@@ -101,9 +113,6 @@ unique_chars_size=len(unique_chars)
 # for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
 #     corpus.append(dataset['train'][i]['text'])
 
-
-global_vocab=None
-
 while dataset_size<dataset_size_max:
     
     vocab_size_dif=20
@@ -120,21 +129,18 @@ while dataset_size<dataset_size_max:
                              unique_chars=unique_chars )
         
         vocab=tokenizer.get_vocab()
-        global_vocab=vocab
-
-        def process(example):
-            tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size,unk_token="[UNK]",pretokenizer=pretokenizer)
-            ids = tokenizer.encode(example['text'],global_vocab) 
-            out = {'ids': ids, 'len': len(ids)}
-            return out
+        process_fn = partial(process, vocab=vocab, vocab_size=vocab_size, pretokenizer=pretokenizer, dataset_path=dataset_path)
 
         # tokenize the merged_dataset
+            
         tokenized = merged_dataset.map(
-            process,
+            process_fn,
             remove_columns=['text'],
             desc="tokenizing the splits",
             num_proc=num_proc
         )
+
+
 
         # Sum all lengths to get total number of token IDs
         compression = np.sum(tokenized['len'], dtype=np.uint64)
