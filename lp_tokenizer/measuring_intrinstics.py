@@ -107,6 +107,7 @@ while dataset_size<dataset_size_max:
     vocab_size_dif=20
     vocab_size=unique_chars_size+vocab_size_dif
     while vocab_size<vocab_size_max:
+        vocab_size=unique_chars_size+vocab_size_dif
         print(f"Curr vocab size {vocab_size}, Curr dataset size {dataset_size}")
 
         tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
