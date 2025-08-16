@@ -107,6 +107,7 @@ while dataset_size<dataset_size_max:
             remove_columns=['text'],
             desc="Counting token lengths",
             num_proc=num_proc,
+            fn_kwargs={'vocab': vocab}   # pass extra keyword arguments
         )
 
         # Sum all lengths to get total number of token IDs
