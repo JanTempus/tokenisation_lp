@@ -107,6 +107,8 @@ while dataset_size<dataset_size_max:
     vocab_size_dif=20
     vocab_size=unique_chars_size+vocab_size_dif
     while vocab_size<vocab_size_max:
+        print(f"Curr vocab size {vocab_size}, Curr dataset size {dataset_size}")
+
         tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
         input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
 
@@ -129,18 +131,6 @@ while dataset_size<dataset_size_max:
             desc="tokenizing the splits",
             num_proc=num_proc
         )
-        # # concatenate all the ids in the dataset into one large file we can use for training
-        # arr_len = np.sum(tokenized['len'], dtype=np.uint64)
-        # filename = os.path.join(os.path.dirname(__file__), 'train.bin')
-        # dtype = np.uint16
-        # arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
-
-        # idx = 0
-        # for ids in tokenized['ids']:
-        #     arr[idx:idx+len(ids)] = ids
-        #     idx += len(ids)
-
-        # arr.flush()
 
         # Sum all lengths to get total number of token IDs
         compression = np.sum(tokenized['len'], dtype=np.uint64)
