@@ -82,7 +82,7 @@ while dataset_size<dataset_size_max:
         vocab=tokenizer.get_vocab()
 
         def process(example):
-            tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
+            tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size,unk_token="[UNK]")
             ids = tokenizer.encode(example['text'],vocab) 
             out = {'ids': ids, 'len': len(ids)}
             return out
