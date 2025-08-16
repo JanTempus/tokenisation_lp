@@ -75,7 +75,7 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                                             )
 vocab_size_max=32000
 dataset_size_max=1500000
-dataset_size=1
+dataset_size=20
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
