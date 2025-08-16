@@ -30,7 +30,7 @@ def save_data(csv_path: str, num1: float, num2: float, num3:int):
         writer.writerow([num1, num2, num3])
 
 
-def merge_into_chunks(dataset, t: int, text_column: str = "train"):
+def merge_into_chunks(dataset, t: int,):
     """
     Load dataset from disk, merge every t examples into one example, 
     and return a new dataset with multiple merged examples.
@@ -46,13 +46,13 @@ def merge_into_chunks(dataset, t: int, text_column: str = "train"):
 
     merged_texts = []
     # Go through dataset in steps of t
-    for i in range(0, len(dataset[text_column]), t):
-        chunk = dataset[text_column][i : i + t]  # list of texts
+    for i in range(0, len(dataset), t):
+        chunk = dataset[i : i + t]  # list of texts
         merged_text = " ".join(chunk)
         merged_texts.append(merged_text)
 
     # Create new dataset
-    dataset_merged = Dataset.from_dict({text_column: merged_texts})
+    dataset_merged = Dataset.from_dict({'text': merged_texts})
     return dataset_merged
 
 intristics_path="intrinstics.csv"
@@ -81,20 +81,25 @@ if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
 
 if os.path.exists(dataset_path):
-    dataset=load_from_disk(dataset_path)
+    dataset_raw=load_from_disk(dataset_path)
 else:
-    dataset=load_dataset(dataset_url)
-    dataset.save_to_disk(dataset_path)
+    dataset_raw=load_dataset(dataset_url)
+    dataset_raw.save_to_disk(dataset_path)
+
+dataset=dataset_raw['train']
 
 
-merged_dataset=merge_into_chunks(dataset,1000,"text")
+merged_dataset=merge_into_chunks(dataset,1000)
 
-true_dataset_size=len(merged_dataset)
-unique_chars = tokenizer.get_unique_chars(merged_dataset,true_dataset_size)
+true_dataset_size=len(dataset)
+unique_chars = tokenizer.get_unique_chars(dataset,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
 
+# corpus=[]
 
+# for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
+#     corpus.append(dataset['train'][i]['text'])
 
 
 while dataset_size<dataset_size_max:
