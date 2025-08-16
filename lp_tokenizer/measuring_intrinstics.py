@@ -129,7 +129,6 @@ while dataset_size<dataset_size_max:
                              unique_chars=unique_chars )
         
         vocab=tokenizer.get_vocab()
-        print(vocab)
         process_fn = partial(process, vocab=vocab, vocab_size=vocab_size, pretokenizer=pretokenizer, dataset_path=dataset_path)
 
         # tokenize the merged_dataset
