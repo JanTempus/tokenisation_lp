@@ -198,7 +198,7 @@ class Tokenizer:
             for i in range(0, len(iterable), n):
                 yield iterable[i:i+n]
 
-        def process_all_strings(input_strings, vocab, unk_token, unk_id, num_workers=None, batch_size=1000):
+        def process_all_strings(input_strings, vocab, unk_token, unk_id, num_workers=None, batch_size=10000):
             if num_workers is None:
                 num_workers = cpu_count()
 
