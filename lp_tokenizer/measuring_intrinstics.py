@@ -63,26 +63,6 @@ true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars(dataset,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
-
-# corpus=[]
-
-# # for i in tqdm(range(dataset_size_max),desc="Appending text to the corpus"):
-# #     corpus.append(dataset['train'][i]['text'])
-
-
-
-# # pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
-# #                                            revision="step3000",
-# #                                            cache_dir="./pythia-70m-deduped/step3000",
-# #                                                         )
-
-# # input_strings_encoding=[]
-# # for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
-# #     words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-# #     new_words = [word for word, offset in words_with_offsets]
-# #     input_strings_encoding+=new_words
-
-# Function that returns only the length of tokenized text
 def process(example,vocab):
     tokenizer = Tokenizer(vocab_size=vocab_size,unk_token="[UNK]")
     return {'len':tokenizer.encode(example['text'], vocab)}

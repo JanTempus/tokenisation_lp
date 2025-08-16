@@ -161,7 +161,7 @@ class Tokenizer:
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
 
-        pretokenizer = AutoTokenizer.from_pretrained("/path/to/local/pythia-70m-deduped")
+        pretokenizer = AutoTokenizer.from_pretrained("pythia-70m-deduped")
         input_strings=[]
         for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
             words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
