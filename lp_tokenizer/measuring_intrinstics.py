@@ -84,6 +84,7 @@ unique_chars_size=len(unique_chars)
 
 # Function that returns only the length of tokenized text
 def process(example,vocab):
+    tokenizer = Tokenizer(vocab_size=vocab_size)
     return {'len':tokenizer.encode(example['text'], vocab)}
 
 
