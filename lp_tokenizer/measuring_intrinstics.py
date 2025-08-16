@@ -66,7 +66,7 @@ datasetname="tinystories"
 dataset_url="roneneldan/TinyStories"
 dataset_path="tinystories_data"
 
-tokenizer=Tokenizer()
+tokenizer=Tokenizer(saved_dataset_path=dataset_path)
 
 num_proc = 12
 pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
