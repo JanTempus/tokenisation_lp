@@ -1,6 +1,6 @@
 from lp_tokenizer import Tokenizer
 from transformers import AutoTokenizer
-from datasets import  load_from_disk,load_dataset
+from datasets import  load_from_disk,load_dataset, Dataset
 import os
 import csv
 from tqdm import tqdm
@@ -29,6 +29,31 @@ def save_data(csv_path: str, num1: float, num2: float, num3:int):
         # Write the numbers as a new row
         writer.writerow([num1, num2, num3])
 
+
+def merge_into_chunks(dataset, t: int, text_column: str = "text"):
+    """
+    Load dataset from disk, merge every t examples into one example, 
+    and return a new dataset with multiple merged examples.
+
+    Args:
+        dataset_path (str): Path to dataset saved with `save_to_disk`.
+        t (int): Number of examples per chunk.
+        text_column (str): Column containing text data (default: "text").
+
+    Returns:
+        Dataset: A new dataset where each row is a merged chunk.
+    """
+
+    merged_texts = []
+    # Go through dataset in steps of t
+    for i in range(0, len(dataset), t):
+        chunk = dataset[i : i + t][text_column]  # list of texts
+        merged_text = " ".join(chunk)
+        merged_texts.append(merged_text)
+
+    # Create new dataset
+    dataset_merged = Dataset.from_dict({text_column: merged_texts})
+    return dataset_merged
 
 intristics_path="intrinstics.csv"
 
@@ -61,8 +86,11 @@ else:
     dataset=load_dataset(dataset_url)
     dataset.save_to_disk(dataset_path)
 
-true_dataset_size=len(dataset)
-unique_chars = tokenizer.get_unique_chars(dataset,true_dataset_size)
+
+merged_dataset=merge_into_chunks(dataset,1000,"text")
+
+true_dataset_size=len(merged_dataset)
+unique_chars = tokenizer.get_unique_chars(merged_dataset,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
 
@@ -75,7 +103,7 @@ while dataset_size<dataset_size_max:
     vocab_size=unique_chars_size+vocab_size_dif
     while vocab_size<vocab_size_max:
         tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
-        input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset,save=False)
+        input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,merged_dataset,save=False)
 
         tokenizer.make_vocab(input_strings=input_strings,
                              input_strings_frequencies=input_strings_frequencies, 
@@ -89,8 +117,8 @@ while dataset_size<dataset_size_max:
             out = {'ids': ids, 'len': len(ids)}
             return out
 
-        # tokenize the dataset
-        tokenized = dataset.map(
+        # tokenize the merged_dataset
+        tokenized = merged_dataset.map(
             process,
             remove_columns=['text'],
             desc="tokenizing the splits",
@@ -98,7 +126,7 @@ while dataset_size<dataset_size_max:
             batched=True
         )
 
-        # concatenate all the ids in each dataset into one large file we can use for training
+        # concatenate all the ids in each merged_dataset into one large file we can use for training
         for split, dset in tokenized.items():
             arr_len = np.sum(dset['len'], dtype=np.uint64)
             filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
