@@ -13,6 +13,8 @@ import pickle
 from tqdm import tqdm
 
 from multiprocessing import Pool, cpu_count
+from functools import partial
+
  
 class Tokenizer:
     vocab: OrderedDict
@@ -174,38 +176,56 @@ class Tokenizer:
 
         unk_id=vocab[self.unk_token]
         
-
+     
         def process_string(s, vocab, unk_token, unk_id):
             string_len = len(s)
             edges = hf.get_strings_from_vocab(s, vocab)
             edges_corrected = fill_missing_edges_with_unk(edges, string_len + 1, unk_token, unk_id)
             return edges_corrected, string_len + 1
 
-        def process_all_strings(input_strings, vocab, unk_token, unk_id, num_workers=None):
+        def process_batch(batch, vocab, unk_token, unk_id):
+            """Process a batch of strings in one worker"""
+            edges_list = []
+            num_vertices = []
+            for s in batch:
+                edges, n = process_string(s, vocab, unk_token, unk_id)
+                edges_list.append(edges)
+                num_vertices.append(n)
+            return edges_list, num_vertices
+
+        def chunked(iterable, n):
+            """Yield successive n-sized chunks from iterable"""
+            for i in range(0, len(iterable), n):
+                yield iterable[i:i+n]
+
+        def process_all_strings(input_strings, vocab, unk_token, unk_id, num_workers=None, batch_size=1000):
             if num_workers is None:
-                num_workers = cpu_count()  # use all cores
+                num_workers = cpu_count()
+
+            worker_fn = partial(process_batch, vocab=vocab, unk_token=unk_token, unk_id=unk_id)
+            batches = list(chunked(input_strings, batch_size))
 
             with Pool(num_workers) as pool:
                 results = list(
                     tqdm(
-                        pool.imap(
-                            lambda s: process_string(s, vocab, unk_token, unk_id), 
-                            input_strings
-                        ),
-                        total=len(input_strings),
-                        desc="Processing strings (parallel)"
+                        pool.imap(worker_fn, batches),
+                        total=len(batches),
+                        desc=f"Processing strings in batches of {batch_size}"
                     )
-                )
+                    )
 
-            # unzip results
-            edges_list, num_vertices = zip(*results)
-            return list(edges_list), list(num_vertices)
+            # Flatten the results
+            edges_list = []
+            num_vertices = []
+            for edges, n in results:
+                edges_list.extend(edges)
+                num_vertices.extend(n)
 
-
-        # usage
+                return edges_list, num_vertices
+        
         edges_list, num_vertices = process_all_strings(
-            input_strings, vocab, self.unk_token, unk_id, num_workers=8
-        )
+        input_strings, vocab, self.unk_token, unk_id, num_workers=8
+)
 
         # for i in tqdm(range(num_strings), desc="Processing strings"):
         #     string_len=len(input_strings[i])
