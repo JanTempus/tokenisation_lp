@@ -84,7 +84,7 @@ else:
 dataset=dataset_raw['train']
 
 
-merged_dataset=merge_into_chunks(dataset,10)
+merged_dataset=merge_into_chunks(dataset,1000)
 
 true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars(dataset_raw,true_dataset_size)
@@ -101,7 +101,6 @@ while dataset_size<dataset_size_max:
     vocab_size_dif=20
     vocab_size=unique_chars_size+vocab_size_dif
     while vocab_size<vocab_size_max:
-        vocab_size=unique_chars_size+vocab_size_dif
         print(f"Curr vocab size {vocab_size}, Curr dataset size {dataset_size}")
 
         tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
@@ -111,26 +110,26 @@ while dataset_size<dataset_size_max:
                              input_strings_frequencies=input_strings_frequencies, 
                              unique_chars=unique_chars )
         
-        vocab=tokenizer.get_vocab()
-        process_fn = partial(process, vocab=vocab, tokenizer=tokenizer)
+        #vocab=tokenizer.get_vocab()
+        # process_fn = partial(process, vocab=vocab, tokenizer=tokenizer)
 
-        # tokenize the merged_dataset
+        # # tokenize the merged_dataset
             
-        tokenized = merged_dataset.map(
-            process_fn,
-            remove_columns=['text'],
-            desc="tokenizing the splits",
-            num_proc=num_proc
-        )
+        # tokenized = merged_dataset.map(
+        #     process_fn,
+        #     remove_columns=['text'],
+        #     desc="tokenizing the splits",
+        #     num_proc=num_proc
+        # )
 
 
 
-        # Sum all lengths to get total number of token IDs
-        compression = np.sum(tokenized['len'], dtype=np.uint64)
+        # # Sum all lengths to get total number of token IDs
+        # compression = np.sum(tokenized['len'], dtype=np.uint64)
 
-        print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
-        save_data(intristics_path,dataset_size,vocab_size,compression)
-        vocab_size_dif=vocab_size_dif*2
+        # print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
+        # save_data(intristics_path,dataset_size,vocab_size,compression)
+        vocab_size=vocab_size*2
 
     dataset_size=dataset_size*2
     
