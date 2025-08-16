@@ -92,6 +92,8 @@ while dataset_size<dataset_size_max:
             remove_columns=['text'],
             desc="tokenizing the splits",
             num_proc=num_proc,
+            batched=True,          # <-- enable batching
+            batch_size=262144  
         )
 
         # concatenate all the ids in each dataset into one large file we can use for training
