@@ -122,8 +122,7 @@ while dataset_size<dataset_size_max:
             process,
             remove_columns=['text'],
             desc="tokenizing the splits",
-            num_proc=num_proc,
-            batched=True
+            num_proc=num_proc
         )
 
         # concatenate all the ids in each merged_dataset into one large file we can use for training
