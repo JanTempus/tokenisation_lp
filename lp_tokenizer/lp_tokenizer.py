@@ -160,7 +160,7 @@ class Tokenizer:
 
         return input_strings, input_strings_frequencies
 
-    def encode(self,corpus:list[str], vocab,just_size:bool=False):
+    def encode(self,corpus:list[str], vocab, just_size:bool=False):
         
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
@@ -180,7 +180,7 @@ class Tokenizer:
         edges_list=[]
         num_vertices=[]
 
-        unk_id=vocab[self.unk_token]
+        #unk_id=vocab[self.unk_token]
 
         # for i in tqdm(range(num_strings), desc="Processing strings"):
         for i in range(num_strings):
