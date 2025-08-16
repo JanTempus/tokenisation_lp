@@ -30,7 +30,7 @@ def save_data(csv_path: str, num1: float, num2: float, num3:int):
         writer.writerow([num1, num2, num3])
 
 
-def merge_into_chunks(dataset, t: int, text_column: str = "text"):
+def merge_into_chunks(dataset, t: int, text_column: str = "train"):
     """
     Load dataset from disk, merge every t examples into one example, 
     and return a new dataset with multiple merged examples.
@@ -46,8 +46,8 @@ def merge_into_chunks(dataset, t: int, text_column: str = "text"):
 
     merged_texts = []
     # Go through dataset in steps of t
-    for i in range(0, len(dataset), t):
-        chunk = dataset[i : i + t][text_column]  # list of texts
+    for i in range(0, len(dataset[text_column]), t):
+        chunk = dataset[text_column][i : i + t]  # list of texts
         merged_text = " ".join(chunk)
         merged_texts.append(merged_text)
 
