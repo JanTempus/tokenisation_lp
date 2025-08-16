@@ -102,6 +102,8 @@ unique_chars_size=len(unique_chars)
 #     corpus.append(dataset['train'][i]['text'])
 
 
+global_vocab=None
+
 while dataset_size<dataset_size_max:
     
     vocab_size_dif=20
@@ -118,10 +120,11 @@ while dataset_size<dataset_size_max:
                              unique_chars=unique_chars )
         
         vocab=tokenizer.get_vocab()
+        vocab=global_vocab
 
         def process(example):
             tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size,unk_token="[UNK]",pretokenizer=pretokenizer)
-            ids = tokenizer.encode(example['text'],vocab) 
+            ids = tokenizer.encode(example['text'],global_vocab) 
             out = {'ids': ids, 'len': len(ids)}
             return out
 
