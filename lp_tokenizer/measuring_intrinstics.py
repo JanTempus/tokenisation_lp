@@ -32,18 +32,7 @@ def save_data(csv_path: str, num1: float, num2: float, num3:int):
 
 
 def merge_into_chunks(dataset, t: int,):
-    """
-    Load dataset from disk, merge every t examples into one example, 
-    and return a new dataset with multiple merged examples.
 
-    Args:
-        dataset_path (str): Path to dataset saved with `save_to_disk`.
-        t (int): Number of examples per chunk.
-        text_column (str): Column containing text data (default: "text").
-
-    Returns:
-        Dataset: A new dataset where each row is a merged chunk.
-    """
 
     merged_texts = []
     # Go through dataset in steps of t
@@ -57,13 +46,7 @@ def merge_into_chunks(dataset, t: int,):
     return dataset_merged
 
 
-def process(example, vocab, vocab_size, pretokenizer, dataset_path):
-    tokenizer = Tokenizer(
-        saved_dataset_path=dataset_path,
-        vocab_size=vocab_size,
-        unk_token="[UNK]",
-        pretokenizer=pretokenizer
-    )
+def process(example, vocab, tokenizer):
     ids = tokenizer.encode(example['text'], vocab)
     return {'ids': ids, 'len': len(ids)}
 
@@ -129,7 +112,7 @@ while dataset_size<dataset_size_max:
                              unique_chars=unique_chars )
         
         vocab=tokenizer.get_vocab()
-        process_fn = partial(process, vocab=vocab, vocab_size=vocab_size, pretokenizer=pretokenizer, dataset_path=dataset_path)
+        process_fn = partial(process, vocab=vocab, tokenizer=tokenizer)
 
         # tokenize the merged_dataset
             
