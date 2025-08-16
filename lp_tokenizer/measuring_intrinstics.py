@@ -4,6 +4,7 @@ from datasets import  load_from_disk,load_dataset
 import os
 import csv
 from tqdm import tqdm
+import numpy as np
 
 def save_data(csv_path: str, num1: float, num2: float, num3:int):
     """
@@ -42,6 +43,7 @@ dataset_path="tinystories_data"
 
 tokenizer=Tokenizer()
 
+num_proc = 8
 
 
 vocab_size_max=32000
@@ -62,23 +64,27 @@ unique_chars = tokenizer.get_unique_chars(dataset,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
 
-corpus=[]
+# corpus=[]
 
-for i in tqdm(range(dataset_size_max),desc="Appending text to the corpus"):
-    corpus.append(dataset['train'][i]['text'])
+# # for i in tqdm(range(dataset_size_max),desc="Appending text to the corpus"):
+# #     corpus.append(dataset['train'][i]['text'])
 
 
 
-pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
-                                           revision="step3000",
-                                           cache_dir="./pythia-70m-deduped/step3000",
-                                                        )
+# # pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
+# #                                            revision="step3000",
+# #                                            cache_dir="./pythia-70m-deduped/step3000",
+# #                                                         )
 
-input_strings_encoding=[]
-for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
-    words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-    new_words = [word for word, offset in words_with_offsets]
-    input_strings_encoding+=new_words
+# # input_strings_encoding=[]
+# # for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+# #     words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+# #     new_words = [word for word, offset in words_with_offsets]
+# #     input_strings_encoding+=new_words
+
+# Function that returns only the length of tokenized text
+def process(example,vocab):
+    return {'len':tokenizer.encode(example['text'], vocab)}
 
 
 while dataset_size<dataset_size_max:
@@ -95,7 +101,17 @@ while dataset_size<dataset_size_max:
         
         vocab=tokenizer.get_vocab()
 
-        compression=tokenizer.encode(corpus, vocab,input_strings_encoding)
+        # Compute lengths in parallel
+        tokenized = dataset.map(
+            process,
+            remove_columns=['text'],
+            desc="Counting token lengths",
+            num_proc=num_proc,
+        )
+
+        # Sum all lengths to get total number of token IDs
+        compression = np.sum(tokenized['len'], dtype=np.uint64)
+
         print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
         save_data(intristics_path,dataset_size,vocab_size,compression)
         vocab_size_dif=vocab_size_dif*2
