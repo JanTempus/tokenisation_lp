@@ -96,7 +96,7 @@ class Tokenizer:
         
         # Change this depending on what behaviour one would like
         # Minus special_char_count as we add two special tokens
-
+        self.vocab_size=min(possible_tokens-special_char_count,self.vocab_size)
         
         rounded_tokens=deterministic_rounding(possible_tokens,unique_chars,self.vocab_size-special_char_count)
 
