@@ -200,7 +200,8 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     A_row_offset = 0
     A_col_offset = 0
 
-    for i in tqdm(range(numStrings), desc="Preparing matrices"):
+    #for i in tqdm(range(numStrings), desc="Preparing matrices"):
+    for i in range(numStrings):
         edges = edgesList[i]
         numEdges = len(edges)
         numVertices = numVerticesList[i]
