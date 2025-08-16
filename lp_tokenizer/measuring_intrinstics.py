@@ -63,9 +63,8 @@ true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars(dataset,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
-def process(example,vocab):
-    tokenizer = Tokenizer(vocab_size=vocab_size,unk_token="[UNK]")
-    return {'len':tokenizer.encode(example['text'], vocab)}
+
+
 
 
 while dataset_size<dataset_size_max:
@@ -82,14 +81,31 @@ while dataset_size<dataset_size_max:
         
         vocab=tokenizer.get_vocab()
 
-        # Compute lengths in parallel
+        def process(example):
+            ids = tokenizer.encode(example['text'],vocab) 
+            out = {'ids': ids, 'len': len(ids)}
+            return out
+
+        # tokenize the dataset
         tokenized = dataset.map(
             process,
             remove_columns=['text'],
-            desc="Counting token lengths",
+            desc="tokenizing the splits",
             num_proc=num_proc,
-            fn_kwargs={'vocab': vocab}   # pass extra keyword arguments
         )
+
+        # concatenate all the ids in each dataset into one large file we can use for training
+        for split, dset in tokenized.items():
+            arr_len = np.sum(dset['len'], dtype=np.uint64)
+            filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
+            dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
+            arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
+            total_batches = min(1024, len(dset))
+
+            total_ids = 0
+            for split, dset in tqdm(tokenized.items(), desc="Summing token IDs"):
+                total_ids += np.sum(dset['len'], dtype=np.uint64)
+            arr.flush()
 
         # Sum all lengths to get total number of token IDs
         compression = np.sum(tokenized['len'], dtype=np.uint64)

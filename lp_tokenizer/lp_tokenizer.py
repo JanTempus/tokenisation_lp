@@ -161,10 +161,8 @@ class Tokenizer:
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
 
-        pretokenizer = AutoTokenizer.from_pretrained("pythia-70m-deduped")
-        input_strings=[]
         for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
-            words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
             input_strings+=new_words
     
@@ -185,7 +183,7 @@ class Tokenizer:
             num_vertices.append(string_len+1)
         
         edges_list_weight=np.ones(len(edges_list),dtype=float)
-        tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices,just_size=just_size)
+        tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices)
 
      
         return tokenized_data
