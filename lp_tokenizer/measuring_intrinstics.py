@@ -44,7 +44,10 @@ dataset_path="tinystories_data"
 tokenizer=Tokenizer()
 
 num_proc = 12
-
+pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
+                              revision="step3000",
+                              cache_dir="./pythia-70m-deduped/step3000",
+                                            )
 vocab_size_max=32000
 dataset_size_max=1500000
 dataset_size=1
@@ -81,7 +84,7 @@ while dataset_size<dataset_size_max:
         vocab=tokenizer.get_vocab()
 
         def process(example):
-            tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size,unk_token="[UNK]")
+            tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size,unk_token="[UNK]",pretokenizer=pretokenizer)
             ids = tokenizer.encode(example['text'],vocab) 
             out = {'ids': ids, 'len': len(ids)}
             return out

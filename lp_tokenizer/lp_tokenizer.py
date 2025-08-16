@@ -29,12 +29,16 @@ class Tokenizer:
     def __init__(self,dataset_url=None,saved_dataset_path=None,
                  dataset_size=0,max_dataset_size=0,
                  vocab_size=0,vocab=None,
-                 unk_token=None,eot_token=None):
-        self.pretokenizer=AutoTokenizer.from_pretrained(
-                                                        "EleutherAI/pythia-70m-deduped",
-                                                        revision="step3000",
-                                                        cache_dir="./pythia-70m-deduped/step3000",
-                                                        )
+                 unk_token=None,eot_token=None,pretokenizer=None):
+        
+        if pretokenizer is None:    
+            self.pretokenizer=AutoTokenizer.from_pretrained(
+                                                            "EleutherAI/pythia-70m-deduped",
+                                                            revision="step3000",
+                                                            cache_dir="./pythia-70m-deduped/step3000",
+                                            )
+        else:
+            self.pretokenizer=pretokenizer                                                                                                                
         self.vocab=vocab
         self.saved_dataset_path=saved_dataset_path
         self.vocab_size=vocab_size
