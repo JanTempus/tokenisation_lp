@@ -43,7 +43,7 @@ dataset_path="tinystories_data"
 
 tokenizer=Tokenizer()
 
-num_proc = 8
+num_proc = 20
 
 
 vocab_size_max=32000
