@@ -129,19 +129,18 @@ while dataset_size<dataset_size_max:
             desc="tokenizing the splits",
             num_proc=num_proc
         )
+        # # concatenate all the ids in the dataset into one large file we can use for training
+        # arr_len = np.sum(tokenized['len'], dtype=np.uint64)
+        # filename = os.path.join(os.path.dirname(__file__), 'train.bin')
+        # dtype = np.uint16
+        # arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
 
-        # concatenate all the ids in each merged_dataset into one large file we can use for training
-        for split, dset in tokenized.items():
-            arr_len = np.sum(dset['len'], dtype=np.uint64)
-            filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
-            dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
-            arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
-            total_batches = min(1024, len(dset))
+        # idx = 0
+        # for ids in tokenized['ids']:
+        #     arr[idx:idx+len(ids)] = ids
+        #     idx += len(ids)
 
-            total_ids = 0
-            for split, dset in tqdm(tokenized.items(), desc="Summing token IDs"):
-                total_ids += np.sum(dset['len'], dtype=np.uint64)
-            arr.flush()
+        # arr.flush()
 
         # Sum all lengths to get total number of token IDs
         compression = np.sum(tokenized['len'], dtype=np.uint64)
