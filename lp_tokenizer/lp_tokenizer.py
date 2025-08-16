@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
 
-
+from multiprocessing import Pool, cpu_count
+ 
 class Tokenizer:
     vocab: OrderedDict
     pretokenizer: AutoTokenizer
@@ -170,17 +171,48 @@ class Tokenizer:
        
     
      
-        num_strings=len(input_strings)
-
-        edges_list=[]
-        num_vertices=[]
 
         unk_id=vocab[self.unk_token]
+        
 
-        for i in tqdm(range(num_strings), desc="Processing strings"):
-            string_len=len(input_strings[i])
-            edges=hf.get_strings_from_vocab(input_strings[i],vocab)
-            edges=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
+        def process_string(s, vocab, unk_token, unk_id):
+            string_len = len(s)
+            edges = hf.get_strings_from_vocab(s, vocab)
+            edges_corrected = fill_missing_edges_with_unk(edges, string_len + 1, unk_token, unk_id)
+            return edges_corrected, string_len + 1
+
+        def process_all_strings(input_strings, vocab, unk_token, unk_id, num_workers=None):
+            if num_workers is None:
+                num_workers = cpu_count()  # use all cores
+
+            with Pool(num_workers) as pool:
+                results = list(
+                    tqdm(
+                        pool.imap(
+                            lambda s: process_string(s, vocab, unk_token, unk_id), 
+                            input_strings
+                        ),
+                        total=len(input_strings),
+                        desc="Processing strings (parallel)"
+                    )
+                )
+
+            # unzip results
+            edges_list, num_vertices = zip(*results)
+            return list(edges_list), list(num_vertices)
+
+
+        # usage
+        edges_list, num_vertices = process_all_strings(
+            input_strings, vocab, self.unk_token, unk_id, num_workers=8
+        )
+
+        # for i in tqdm(range(num_strings), desc="Processing strings"):
+        #     string_len=len(input_strings[i])
+        #     edges=hf.get_strings_from_vocab(input_strings[i],vocab)
+        #     edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
+        #     edges_list.append(edges_corrected)
+        #     num_vertices.append(string_len+1)
         
         edges_list_weight=np.ones(len(edges_list),dtype=float)
         tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices,just_size=just_size)
