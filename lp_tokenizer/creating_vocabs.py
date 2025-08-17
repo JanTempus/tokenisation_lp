@@ -56,7 +56,7 @@ datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
-num_proc=20
+num_proc=12
 
 # datasetname="tinystories"
 # dataset_url="roneneldan/TinyStories"
