@@ -87,7 +87,7 @@ else:
 dataset=dataset_raw['train']
 
 
-merged_dataset=merge_into_chunks(dataset,1000)
+#merged_dataset=merge_into_chunks(dataset,1000)
 
 true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars(dataset_raw,true_dataset_size)
