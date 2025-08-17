@@ -52,14 +52,14 @@ def process(example, vocab, tokenizer):
 
 intristics_path="intrinstics.csv"
 
-# datasetname="finewebedu"
-# dataset_url="pietrolesci/finewebedu-20B"
-# dataset_path="finewebedu_data"
+datasetname="finewebedu"
+dataset_url="pietrolesci/finewebedu-20B"
+dataset_path="finewebedu_data"
 
 
-datasetname="tinystories"
-dataset_url="roneneldan/TinyStories"
-dataset_path="tinystories_data"
+# datasetname="tinystories"
+# dataset_url="roneneldan/TinyStories"
+# dataset_path="tinystories_data"
 
 tokenizer=Tokenizer(saved_dataset_path=dataset_path)
 
@@ -72,8 +72,8 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
 #dataset_size_max=1500000
 
 
-dataset_size=1048576
-vocab_sizes=[32768,16384,81924096]
+dataset_size=16384 #1048576
+vocab_sizes=[4096,8192,16384,32768]
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
