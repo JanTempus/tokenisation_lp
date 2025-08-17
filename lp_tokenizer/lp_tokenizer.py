@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
+from pqdm.threads import pqdm  # or pqdm.processes if you prefer processe
 
 
 
@@ -228,38 +229,48 @@ class Tokenizer:
         return unique_chars
 
 
-    def extract_unique_from_text(args):
-        text, pretokenizer = args
-        words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-        tokens = [word for word, _ in words_with_offsets]
-        chars = set()
-        for token in tokens:
-            chars.update(token)
-        return chars
+from pqdm.threads import pqdm  # or pqdm.processes if you prefer processes
+import numpy as np
+import os
 
-    def get_unique_chars_parallel(self, dataset, dataset_size, pretokenizer, num_proc=4):
-        """
-        Collect unique characters from the pretokenized dataset in parallel.
-        """
+def extract_unique_from_text(args):
+    text, pretokenizer = args
+    words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+    tokens = [word for word, _ in words_with_offsets]
+    chars = set()
+    for token in tokens:
+        chars.update(token)
+    return chars
 
-        file_name = f"unique_chars{self.saved_dataset_path}{dataset_size}.npy"
+def get_unique_chars_parallel(self, dataset, dataset_size, pretokenizer, num_proc=4):
+    """
+    Collect unique characters from the pretokenized dataset in parallel using pqdm.
+    """
 
-        if os.path.exists(file_name):
-            unique_chars = np.load(file_name, allow_pickle=True).tolist()
-        else:
-            texts = [dataset['train'][i]['text'] for i in range(dataset_size)]
+    file_name = f"unique_chars{self.saved_dataset_path}{dataset_size}.npy"
 
-            # Run in parallel
-            unique_chars = set()
-            with ProcessPoolExecutor(max_workers=num_proc) as executor:
-                futures = executor.map(self.extract_unique_from_text, [(t, pretokenizer) for t in texts])
-                for chars in tqdm(futures, total=len(texts), desc="Getting Unique characters (parallel)"):
-                    unique_chars.update(chars)
+    if os.path.exists(file_name):
+        unique_chars = np.load(file_name, allow_pickle=True).tolist()
+    else:
+        texts = [dataset['train'][i]['text'] for i in range(dataset_size)]
 
-            unique_chars = sorted(unique_chars)
-            np.save(file_name, np.array(unique_chars, dtype=object))
+        # Run with pqdm (parallel + progress bar)
+        results = pqdm(
+            [(t, pretokenizer) for t in texts],
+            self.extract_unique_from_text,
+            n_jobs=num_proc,
+            desc="Getting Unique characters (parallel)"
+        )
 
-        return unique_chars
+        # Merge all sets of characters
+        unique_chars = set()
+        for chars in results:
+            unique_chars.update(chars)
+
+        unique_chars = sorted(unique_chars)
+        np.save(file_name, np.array(unique_chars, dtype=object))
+
+    return unique_chars
 
 
 
