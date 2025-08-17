@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
-from pqdm.threads import pqdm  # or pqdm.processes if you prefer processe
+from tqdm.contrib.concurrent import process_map  # or thread_map
+
 
 class Tokenizer:
     vocab: OrderedDict
@@ -237,9 +238,11 @@ class Tokenizer:
             chars.update(token)
         return chars
 
+
     def get_unique_chars_parallel(self, dataset, dataset_size, pretokenizer, num_proc=4):
         """
-        Collect unique characters from the pretokenized dataset in parallel using pqdm.
+        Collect unique characters from the pretokenized dataset in parallel
+        using tqdm.contrib.concurrent's process_map.
         """
 
         file_name = f"unique_chars{self.saved_dataset_path}{dataset_size}.npy"
@@ -249,15 +252,14 @@ class Tokenizer:
         else:
             texts = [dataset['train'][i]['text'] for i in range(dataset_size)]
 
-            # Run with pqdm (parallel + progress bar)
-            results = pqdm(
-                [(t, pretokenizer) for t in texts],
+            results = process_map(
                 self.extract_unique_from_text,
-                n_jobs=num_proc,
+                [(t, pretokenizer) for t in texts],
+                max_workers=num_proc,
+                chunksize=1,
                 desc="Getting Unique characters (parallel)"
             )
 
-            # Merge all sets of characters
             unique_chars = set()
             for chars in results:
                 unique_chars.update(chars)
@@ -266,6 +268,7 @@ class Tokenizer:
             np.save(file_name, np.array(unique_chars, dtype=object))
 
         return unique_chars
+
 
 
 
