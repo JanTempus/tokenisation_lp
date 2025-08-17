@@ -68,9 +68,12 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
                               cache_dir="./pythia-70m-deduped/step3000",
                                             )
-vocab_size_max=32000
-dataset_size_max=1500000
-dataset_size=1
+#vocab_size_max=32000
+#dataset_size_max=1500000
+
+
+dataset_size=1048576
+vocab_sizes=[32768,16384,81924096]
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
@@ -90,47 +93,51 @@ true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars(dataset_raw,true_dataset_size)
 unique_chars_size=len(unique_chars)
 
+for vocab_size in vocab_sizes:
+    tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
+    input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
 
-# corpus=[]
-
-# for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
-#     corpus.append(dataset['train'][i]['text'])
-
-while dataset_size<dataset_size_max:
+    tokenizer.make_vocab(input_strings=input_strings,
+                            input_strings_frequencies=input_strings_frequencies, 
+                            unique_chars=unique_chars )
     
-    vocab_size_dif=20
-    vocab_size=unique_chars_size+vocab_size_dif
-    while vocab_size<vocab_size_max:
-        print(f"Curr vocab size {vocab_size}, Curr dataset size {dataset_size}")
+   
 
-        tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
-        input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
+# while dataset_size<dataset_size_max:
+    
+#     vocab_size_dif=20
+#     vocab_size=unique_chars_size+vocab_size_dif
+#     while vocab_size<vocab_size_max:
+#         print(f"Curr vocab size {vocab_size}, Curr dataset size {dataset_size}")
 
-        tokenizer.make_vocab(input_strings=input_strings,
-                             input_strings_frequencies=input_strings_frequencies, 
-                             unique_chars=unique_chars )
+#         tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
+#         input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
+
+#         tokenizer.make_vocab(input_strings=input_strings,
+#                              input_strings_frequencies=input_strings_frequencies, 
+#                              unique_chars=unique_chars )
         
-        #vocab=tokenizer.get_vocab()
-        # process_fn = partial(process, vocab=vocab, tokenizer=tokenizer)
+#         #vocab=tokenizer.get_vocab()
+#         # process_fn = partial(process, vocab=vocab, tokenizer=tokenizer)
 
-        # # tokenize the merged_dataset
+#         # # tokenize the merged_dataset
             
-        # tokenized = merged_dataset.map(
-        #     process_fn,
-        #     remove_columns=['text'],
-        #     desc="tokenizing the splits",
-        #     num_proc=num_proc
-        # )
+#         # tokenized = merged_dataset.map(
+#         #     process_fn,
+#         #     remove_columns=['text'],
+#         #     desc="tokenizing the splits",
+#         #     num_proc=num_proc
+#         # )
 
 
 
-        # # Sum all lengths to get total number of token IDs
-        # compression = np.sum(tokenized['len'], dtype=np.uint64)
+#         # # Sum all lengths to get total number of token IDs
+#         # compression = np.sum(tokenized['len'], dtype=np.uint64)
 
-        # print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
-        # save_data(intristics_path,dataset_size,vocab_size,compression)
-        vocab_size=vocab_size*2
+#         # print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
+#         # save_data(intristics_path,dataset_size,vocab_size,compression)
+#         vocab_size=vocab_size*2
 
-    dataset_size=dataset_size*2
+#     dataset_size=dataset_size*2
     
     
