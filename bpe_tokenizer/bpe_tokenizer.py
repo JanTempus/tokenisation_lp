@@ -72,7 +72,3 @@ if __name__ == '__main__':
 
     for vs in vocab_sizes:
         train_bpe_tokenizer(vs, dataset_size, dataset_path, dataset_url, save_dir)
-
-    # Example reload
-    tok = AutoTokenizer.from_pretrained("my_tokenizers/bpe_8192")
-    print(tok.tokenize("Hello world!"))
