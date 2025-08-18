@@ -1,7 +1,7 @@
 {
   "tokenizer": {
     "class": "myTokenizer",
-    "path":"~/tokenisation_lp/bpe_tokenizer/bpe_tokenizers/bpe_16384_finewebedu_data",
+    "path":"~/tokenisation_lp/bpe_tokenizer/bpe_tokenizers/bpe_16384_finewebedu_data/tokenizer_config.json",
     "vocabulary_files": "~/tokenisation_lp/bpe_tokenizer/bpe_tokenizers/bpe_16384_finewebedu_data/tokenizer.json"
   }
 }
