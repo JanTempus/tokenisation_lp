@@ -336,7 +336,7 @@ def create_vocab(inputStringList: list[str],
 
     start = time.time()
     #lpProblem.solve(solver=cp.GLOP)
-    lpProblem.solve(solver=cp.PDLP,verbose=True,solver_opts={"eps_optimal_absolute": 1.0e-10})
+    lpProblem.solve(solver=cp.CUOPT,verbose=True,solver_opts={"eps_optimal_absolute": 1.0e-10})
     end=time.time()
     print(f"The first iteration took {end - start:.4f} seconds")
 
