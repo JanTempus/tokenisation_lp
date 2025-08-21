@@ -94,7 +94,7 @@ class Tokenizer:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
 
 
-        possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget)
+        possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget,self.vocab_size)
         
         # Change this depending on what behaviour one would like
         # Minus special_char_count as we add two special tokens

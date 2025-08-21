@@ -8,6 +8,11 @@ import time
 from numpy.typing import NDArray
 import random
 
+import psutil
+import os
+import threading
+import matplotlib.pyplot as plt
+
 
 from datastructures import tokenInstance, possibleToken
 import helper_functions as hf
@@ -274,6 +279,120 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
 
 def create_vocab(inputStringList: list[str],
+                 inputStringFreq: list[int],
+                 numAllowedTokens: int, 
+                 vocab_size:int,
+                 minTokenCount: int = 1,  
+                 maxTokenLength: int = 5, 
+                 all_tokens: bool = True):
+
+    numStrings = len(inputStringList)
+
+    edgesList = []
+    tokensList = []
+    freeEdgesList = []
+    numVertices = []
+
+    if all_tokens:  
+        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+            stringLen = len(inputStringList[i])
+            edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]))
+            tokensList.append(hf.get_tokens(inputStringList[i]))
+            freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
+            numVertices.append(stringLen + 1)
+    else:
+        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+            stringLen = len(inputStringList[i])
+            edgesList.append(hf.get_all_nonFree_substrings_upto_len_t(inputStringList[i], maxTokenLength))
+            tokensList.append(hf.get_tokens_upto_len_t(inputStringList[i], maxTokenLength))
+            freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
+            numVertices.append(stringLen + 1)
+
+    tokens = list(set([item for sublist in tokensList for item in sublist]))
+    hf.update_token_instance_counts(tokens, inputStringFreq, edgesList)
+    tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
+    keep_set = set(t.token for t in tokens_to_keep)
+
+    filtered_edgesList = [
+        [token for token in sublist if token.token in keep_set]
+        for sublist in edgesList
+    ]
+
+    lpProblem = setup_LP_tokenization(filtered_edgesList, inputStringFreq, tokens_to_keep, freeEdgesList, numVertices)
+    numAllowedTokensParam = lpProblem.parameters()[0]
+    numAllowedTokensParam.value = numAllowedTokens
+
+    # --- Memory tracking setup ---
+    process = psutil.Process(os.getpid())
+    memory_samples = []
+    timestamps = []
+    stop_flag = False
+
+    def track_memory(interval=0.05):
+        start_time = time.time()
+        while not stop_flag:
+            mem = process.memory_info().rss / (1024**2)  # in MB
+            memory_samples.append(mem)
+            timestamps.append(time.time() - start_time)
+            time.sleep(interval)
+
+    tracker_thread = threading.Thread(target=track_memory, daemon=True)
+    tracker_thread.start()
+    # --- End memory tracking setup ---
+
+    start = time.time()
+    lpProblem.solve(
+        solver=cp.GLOP,
+        verbose=True,
+    )
+    # lpProblem.solve(
+    #     solver=cp.PDLP,
+    #     verbose=True,
+    #     solver_opts={
+    #         "eps_optimal_absolute": 1.0e-6,
+    #         "num_threads": 8,
+    #         "num_shards": 32
+    #     }
+    # )
+    end = time.time()
+
+    # Stop memory tracking
+    stop_flag = True
+    tracker_thread.join()
+
+    print(f"The LP solve took {end - start:.4f} seconds")
+    print(f"Peak memory: {max(memory_samples):.2f} MB, Average memory: {sum(memory_samples)/len(memory_samples):.2f} MB")
+
+    # Save memory usage plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(timestamps, memory_samples, label="RSS Memory (MB)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Memory (MB)")
+    plt.title("Memory Usage During LP Solve")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"lp_memory_usage_{vocab_size}.png")
+    print(f"Memory usage plot saved to lp_memory_usage_{vocab_size}.png")
+
+    lpVariables = lpProblem.variables()
+    tVar = lpVariables[2].value
+
+    possibleTokens = []
+    for i in range(len(tokens_to_keep)):
+        if tVar[i] > 0.0:
+            nonZeroToken = possibleToken(
+                tokens_to_keep[i].get_token(),
+                tVar[i],
+                tokens_to_keep[i].get_count(),
+                tokens_to_keep[i].get_index()
+            )
+            possibleTokens.append(nonZeroToken)
+
+    return possibleTokens
+
+
+def create_vocab_old(inputStringList: list[str],
                     inputStringFreq:list[int],
                     numAllowedTokens:int, 
                     minTokenCount:int=1,  
@@ -340,7 +459,7 @@ def create_vocab(inputStringList: list[str],
     solver=cp.PDLP,
     verbose=True,
     solver_opts={
-        "eps_optimal_absolute": 1.0e-8,
+        "eps_optimal_absolute": 1.0e-6,
         "num_threads": 8,
         "num_shards": 32
                  }
