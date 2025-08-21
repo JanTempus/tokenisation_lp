@@ -43,7 +43,7 @@ unique_chars_size=len(unique_chars)
 
 tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=8126)
 input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
-tokenizer.check_number_edges(input_strings)
+tokenizer.check_number_edges(input_strings,input_strings_frequencies)
 
 print(f"Number of input strings {len(input_strings)}")
    

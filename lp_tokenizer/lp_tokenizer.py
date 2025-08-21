@@ -276,7 +276,7 @@ class Tokenizer:
         return self.vocab
 
 
-    def check_number_edges(self,inputStringList: list[str],
+    def check_number_edges(self,inputStringList: list[str],input_strings_freq,
                         minTokenCount: int = 1):
         
         numStrings = len(inputStringList)
@@ -296,6 +296,8 @@ class Tokenizer:
         # Flatten all tokens and remove duplicates
         tokens = list(set([item for sublist in tokensList for item in sublist]))
         
+
+        hf.update_token_instance_counts(tokens,input_strings_freq,edgesList)
         # Filter tokens by minTokenCount
         tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
         keep_set = set(t.token for t in tokens_to_keep)
