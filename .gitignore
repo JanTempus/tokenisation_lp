@@ -3,3 +3,6 @@ __pycache__
 pythia-70m-deduped
 strings_with_frequency.npz
 tinystories_data
+vocabs/
+tokenizers_jsons/
+tokenizer_config.json
