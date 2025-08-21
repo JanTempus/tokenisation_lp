@@ -274,4 +274,41 @@ class Tokenizer:
 
     def get_vocab(self):
         return self.vocab
-      
+
+
+    def check_number_edges(inputStringList: list[str],
+                        minTokenCount: int = 1):
+        
+        numStrings = len(inputStringList)
+
+        edgesList = []
+        tokensList = []
+        freeEdgesList = []
+        numVertices = []
+
+        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+            stringLen = len(inputStringList[i])
+            edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]))
+            tokensList.append(hf.get_tokens(inputStringList[i]))
+            freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
+            numVertices.append(stringLen + 1)
+        
+        # Flatten all tokens and remove duplicates
+        tokens = list(set([item for sublist in tokensList for item in sublist]))
+        
+        # Filter tokens by minTokenCount
+        tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
+        keep_set = set(t.token for t in tokens_to_keep)
+
+        # Filter edges by the tokens we keep
+        filtered_edgesList = [
+            [token for token in sublist if token.token in keep_set]
+            for sublist in edgesList
+        ]
+
+        # Compute total number of edges
+        total_edges = sum(len(sublist) for sublist in filtered_edgesList)
+        # Compute total number of tokens
+        total_tokens = len(tokens_to_keep)
+
+        print(f"Total edges {total_edges}, total tokens {total_tokens}" )
