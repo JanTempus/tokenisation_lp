@@ -276,7 +276,7 @@ class Tokenizer:
         return self.vocab
 
 
-    def check_number_edges(inputStringList: list[str],
+    def check_number_edges(self,inputStringList: list[str],
                         minTokenCount: int = 1):
         
         numStrings = len(inputStringList)
