@@ -7,13 +7,20 @@ from tqdm import tqdm
 import numpy as np
 from functools import partial
 
-intristics_path="intrinstics.csv"
+def collect_pretokenized_words(corpus, pretokenizer):
+    all_words = []
+
+    for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+        words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+        new_words = [word for word, offset in words_with_offsets]
+        all_words.extend(new_words)  # collect all words
+
+    print(len(all_words))
+
 
 datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
-
-tokenizer=Tokenizer(saved_dataset_path=dataset_path)
 
 pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
@@ -21,6 +28,8 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                                             )
 
 dataset_size=8192 #1048576
+
+
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
@@ -34,16 +43,13 @@ else:
 dataset=dataset_raw['train']
 
 
-#merged_dataset=merge_into_chunks(dataset,1000)
+corpus=[]
 
-true_dataset_size=len(dataset)
-unique_chars = tokenizer.get_unique_chars(dataset_raw,true_dataset_size)
-unique_chars_size=len(unique_chars)
+for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
+    corpus.append(dataset['train'][i]['text'])
 
 
-tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=8126)
-input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
-tokenizer.check_number_edges(input_strings,input_strings_frequencies)
+collect_pretokenized_words(corpus, pretokenizer)
 
-print(f"Number of input strings {len(input_strings)}")
+
    

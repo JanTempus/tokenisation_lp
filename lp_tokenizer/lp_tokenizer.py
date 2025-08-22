@@ -149,10 +149,6 @@ class Tokenizer:
                 for word in new_words:
                     word_freqs[word] += 1
 
-            unique_chars = set()
-            for word in word_freqs:
-                unique_chars.update(word)
-
             input_strings=list(word_freqs.keys())
             input_strings_frequencies=list(word_freqs.values())
            
