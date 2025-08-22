@@ -73,7 +73,7 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
 
 #~/token_lp/tokenisation_lp/lp_tokenizer/vocabs/vocab_tinystories_data_0_32768.json
 dataset_size=8192 #1048576
-vocab_sizes=[4096,8192,16384,32768]
+vocab_sizes=[4096,8192,16384]
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")

@@ -165,8 +165,8 @@ class Tokenizer:
             raise KeyError("Please assign a token to the unkown token")
 
         input_strings=[]
-        #for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
 
+        #for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
         for text in corpus:
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
@@ -179,7 +179,6 @@ class Tokenizer:
         edges_list=[]
         num_vertices=[]
 
-        #unk_id=vocab[self.unk_token]
 
         # for i in tqdm(range(num_strings), desc="Processing strings"):
         for i in range(num_strings):
