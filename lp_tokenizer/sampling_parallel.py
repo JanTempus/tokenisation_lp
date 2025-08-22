@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 import itertools
 
-def collect_pretokenized_words(dataset, pretokenizer, t: int, num_proc: int = 1):
+def collect_pretokenized_words(dataset, pretokenizer, t: int, num_proc: int):
     """
     Pretokenize the first t examples of a Hugging Face dataset in parallel
     and return all words as a single list.
@@ -45,7 +45,7 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               cache_dir="./pythia-70m-deduped/step3000",
                                             )
 
-dataset_size=8192 #1048576
+dataset_size=65536 #1048576
 
 dataset=load_from_disk(dataset_path)
 
