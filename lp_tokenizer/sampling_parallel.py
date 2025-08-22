@@ -4,8 +4,8 @@ from datasets import  load_from_disk,load_dataset, Dataset
 import os
 import csv
 from tqdm import tqdm
-import numpy as np
-from functools import partial
+
+import itertools
 
 def collect_pretokenized_words(dataset, pretokenizer, t: int, num_proc: int = 1):
     """
@@ -30,8 +30,9 @@ def collect_pretokenized_words(dataset, pretokenizer, t: int, num_proc: int = 1)
         num_proc=num_proc,
     )
 
-    # flatten all lists of words into one list
-    all_words = sum(processed["words"], [])
+    all_words = list(itertools.chain.from_iterable(
+        tqdm(processed["words"], desc="Flattening words", total=len(processed))
+        ))
 
     return all_words
 
