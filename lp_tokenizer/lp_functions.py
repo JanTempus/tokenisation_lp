@@ -342,18 +342,14 @@ def create_vocab(inputStringList: list[str],
 
     start = time.time()
     lpProblem.solve(
-        solver=cp.GLOP,
+        solver=cp.PDLP,
         verbose=True,
+        solver_opts={
+            "eps_optimal_absolute": 1.0e-6,
+            "num_threads": 8,
+            "num_shards": 32
+        }
     )
-    # lpProblem.solve(
-    #     solver=cp.PDLP,
-    #     verbose=True,
-    #     solver_opts={
-    #         "eps_optimal_absolute": 1.0e-6,
-    #         "num_threads": 8,
-    #         "num_shards": 32
-    #     }
-    # )
     end = time.time()
 
     # Stop memory tracking
