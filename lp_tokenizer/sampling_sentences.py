@@ -34,14 +34,8 @@ dataset_size=8192 #1048576
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
 
-if os.path.exists(dataset_path):
-    dataset_raw=load_from_disk(dataset_path)
-else:
-    dataset_raw=load_dataset(dataset_url)
-    dataset_raw.save_to_disk(dataset_path)
 
-dataset=dataset_raw['train']
-
+dataset=load_from_disk(dataset_path)
 
 corpus=[]
 
