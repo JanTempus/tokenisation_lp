@@ -35,9 +35,6 @@ def collect_pretokenized_words(dataset, pretokenizer, t: int, num_proc: int = 1)
 
     return all_words
 
-
-num_proc = 8
-
 datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
