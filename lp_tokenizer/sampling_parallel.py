@@ -49,7 +49,7 @@ dataset_size=65536 #1048576
 
 dataset=load_from_disk(dataset_path)
 
-all_words = collect_pretokenized_words(dataset, pretokenizer, t=8192, num_proc=4)
+all_words = collect_pretokenized_words(dataset, pretokenizer, dataset_size, num_proc=4)
 print(len(all_words), "words collected")
 print(all_words[:50])
 
