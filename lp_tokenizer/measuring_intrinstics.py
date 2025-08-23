@@ -72,8 +72,8 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
 #dataset_size_max=1500000
 
 #~/token_lp/tokenisation_lp/lp_tokenizer/vocabs/vocab_tinystories_data_0_32768.json
-dataset_size=8192 #1048576
-vocab_sizes=[4096,8192,16384]
+dataset_sizes=[32768,65536,131072,262144,524288] #1048576
+vocab_sizes=[32768]
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
@@ -92,52 +92,13 @@ dataset=dataset_raw['train']
 true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars(dataset_raw,true_dataset_size)
 unique_chars_size=len(unique_chars)
+for dataset_size in dataset_sizes:
+    for vocab_size in vocab_sizes:
+        tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
+        input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
 
-for vocab_size in vocab_sizes:
-    tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
-    input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
-
-    tokenizer.make_vocab(input_strings=input_strings,
-                            input_strings_frequencies=input_strings_frequencies, 
-                            unique_chars=unique_chars )
-    
-   
-
-# while dataset_size<dataset_size_max:
-    
-#     vocab_size_dif=20
-#     vocab_size=unique_chars_size+vocab_size_dif
-#     while vocab_size<vocab_size_max:
-#         print(f"Curr vocab size {vocab_size}, Curr dataset size {dataset_size}")
-
-#         tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
-#         input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
-
-#         tokenizer.make_vocab(input_strings=input_strings,
-#                              input_strings_frequencies=input_strings_frequencies, 
-#                              unique_chars=unique_chars )
+        tokenizer.make_vocab(input_strings=input_strings,
+                                input_strings_frequencies=input_strings_frequencies, 
+                                unique_chars=unique_chars )
         
-#         #vocab=tokenizer.get_vocab()
-#         # process_fn = partial(process, vocab=vocab, tokenizer=tokenizer)
-
-#         # # tokenize the merged_dataset
-            
-#         # tokenized = merged_dataset.map(
-#         #     process_fn,
-#         #     remove_columns=['text'],
-#         #     desc="tokenizing the splits",
-#         #     num_proc=num_proc
-#         # )
-
-
-
-#         # # Sum all lengths to get total number of token IDs
-#         # compression = np.sum(tokenized['len'], dtype=np.uint64)
-
-#         # print(f"dataset_size {dataset_size } vocab size {vocab_size} compression {compression}  ")
-#         # save_data(intristics_path,dataset_size,vocab_size,compression)
-#         vocab_size=vocab_size*2
-
-#     dataset_size=dataset_size*2
-    
-    
+  
