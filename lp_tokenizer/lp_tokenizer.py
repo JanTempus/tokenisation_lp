@@ -124,7 +124,36 @@ class Tokenizer:
                 json.dump(vocab, f)
         self.vocab=vocab
 
-    
+
+    def generate_vocab_nonzero(self,input_strings,input_strings_frequencies,unique_chars):
+      
+        special_char_count=0
+        special_tokens=[]
+
+        if self.unk_token is None:
+            special_tokens.append("[UNK]")
+            self.unk_token="[UNK]"
+            special_char_count+=1
+
+        if self.eot_token is None:
+            special_tokens.append("<|endoftext|>")
+            self.eot_token="<|endoftext|>" 
+            special_char_count+=1
+
+        lp_budget=self.vocab_size-len(unique_chars)-special_char_count # Minus 2 for the special tokens unknown and end of text
+        
+        if lp_budget <= 0:
+            raise ValueError("Vocab size is too small, entire vocab already unique characters")
+
+
+        possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget,self.vocab_size)
+
+        tokens_flat=[token.token for token in possible_tokens]
+        
+        return tokens_flat
+
+
+
     def pretokenize_and_prepare_dataset(self, dataset_size,dataset,input_strings=None, save:bool=True):
         base_name = f"word_freqs_testing{self.saved_dataset_path}{dataset_size}"
         strings_file = base_name + "_strings.npy"

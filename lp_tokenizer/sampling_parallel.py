@@ -62,7 +62,7 @@ dataset_size=10000000
 
 dataset=load_from_disk(dataset_path)
 
-all_words = collect_pretokenized_words(dataset, pretokenizer, dataset_size, num_proc=4)
+all_words = collect_pretokenized_words(dataset, pretokenizer, dataset_size, num_proc=8)
 
 num_words=8025163 #number of words to sample
    
