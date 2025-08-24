@@ -196,8 +196,7 @@ class Tokenizer:
 
         input_strings=[]
         words_with_offsets=self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(corpus)
-        new_words = [word for word, offset in words_with_offsets]
-        print(new_words)
+        input_strings= [word for word, offset in words_with_offsets]
 
         #for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
         # for text in corpus:
