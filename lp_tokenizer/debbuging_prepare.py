@@ -68,8 +68,8 @@ def merge_into_chunks(dataset, t: int,):
     return dataset_merged
 
 # --- Example usage ---
-start_idx = 7950*2000
-end_idx = 8000*2000
+start_idx = 7900*2000
+end_idx = 7950*2000
 
 
 
