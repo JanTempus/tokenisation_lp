@@ -200,6 +200,7 @@ class Tokenizer:
         for text in corpus:
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
+            print(new_words)
             input_strings+=new_words
     
         print(input_strings)
