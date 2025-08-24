@@ -9,8 +9,11 @@ file_path = "vocab_finewebedu_data_32768.json"
 with open(file_path, 'r', encoding='utf-8') as f:
     vocab = json.load(f)
 
+for i, (k, v) in enumerate(vocab.items()):
+    print(k, v)
+    if i >= 49:
+        break
 
-print(vocab[0:50])
 tokenizer = Tokenizer(vocab_size=32768, vocab=vocab, unk_token="[UNK]")
 
 
