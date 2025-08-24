@@ -47,15 +47,19 @@ if __name__ == '__main__':
     
     def process(example):
         ids = tokenizer.encode(example['text'], vocab)
-        # ensure Python list, even if scalar or numpy array
+
+        # normalize into a list
         if isinstance(ids, (int, np.integer)):
             ids = [int(ids)]
-        else:
+        elif isinstance(ids, (list, np.ndarray)):
             ids = list(ids)
+        else:
+            # catch weird cases (None, str, etc.)
+            print("⚠️ Unexpected type:", type(ids), "value:", ids, "text:", example['text'][:100])
+            ids = [] if ids is None else [ids]
 
         ids.append(1)  # EOT token
 
-        ids.append(1)    # end of text token
         return {
             "ids": ids,
             "len": len(ids),
