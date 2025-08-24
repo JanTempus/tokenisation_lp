@@ -60,7 +60,7 @@ if __name__ == '__main__':
     corpus=[]
     
     for i in tqdm(range(len(subset_dataset)),desc="Appending text to the corpus"):
-                corpus.append(dataset['train'][i]['text'])
+                corpus.append(dataset[i]['text'])
     tokenizer.encode(corpus,vocab)
 
     # dataset_merged_into_chunks=merge_into_chunks(dataset,2000)
