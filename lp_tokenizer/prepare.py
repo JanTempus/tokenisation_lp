@@ -28,6 +28,8 @@ if __name__ == '__main__':
    
     dataset = load_from_disk("finewebedu_data")['train']
 
+    midpoint = len(dataset) // 2
+    second_half = dataset.select(range(midpoint, len(dataset)))
     def merge_into_chunks(dataset, t: int,):
         merged_texts = []
         # Go through dataset in steps of t
@@ -40,10 +42,7 @@ if __name__ == '__main__':
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
 
-    dataset_merged=merge_into_chunks(dataset,2000)
-
-    midpoint = len(dataset_merged) // 2
-    second_half = dataset_merged.select(range(midpoint, len(dataset_merged)))
+    dataset_merged=merge_into_chunks(second_half,2000)
 
 
     
