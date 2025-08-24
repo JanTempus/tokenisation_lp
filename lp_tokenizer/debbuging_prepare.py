@@ -62,8 +62,8 @@ def debug_tokenization(dataset_slice, tokenizer, vocab):
             break
 
 # --- Example usage ---
-start_idx = 7980
-end_idx = 8000
+start_idx = 7980*2000
+end_idx = 8000*2000
 subset_dataset = slice_dataset_by_indices(dataset, start_idx, end_idx)
 print(f"Selected dataset indices: {start_idx} to {end_idx}")
 
