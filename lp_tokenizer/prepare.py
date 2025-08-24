@@ -18,11 +18,11 @@ num_proc_load_dataset = num_proc
 
 
 
-file_path="vocab_finewebedu_data32000.json"
+file_path="vocab_finewebedu_data32768.json"
 with open(file_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
 
-tokenizer=Tokenizer(vocab_size=32000,vocab=vocab,unk_token="[UNK]")
+tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
 if __name__ == '__main__':
    
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     # we now want to tokenize the dataset. first define the encoding function (gpt2 bpe)
     def process(example):
-        ids = tokenizer.encode(example['text']) # encode_ordinary ignores any special tokens
+        ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
         ids.append(31999) # add the end of text token, 3199 for 
         # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
         out = {'ids': ids, 'len': len(ids)}
