@@ -9,6 +9,8 @@ file_path = "vocab_finewebedu_data_32768.json"
 with open(file_path, 'r', encoding='utf-8') as f:
     vocab = json.load(f)
 
+
+print(vocab[0:50])
 tokenizer = Tokenizer(vocab_size=32768, vocab=vocab, unk_token="[UNK]")
 
 
