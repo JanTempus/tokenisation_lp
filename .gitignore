@@ -5,3 +5,4 @@ strings_with_frequency.npz
 tinystories_data
 vocabs/
 tokenizers_jsons/
+lp_tokenizer/memory_usage
