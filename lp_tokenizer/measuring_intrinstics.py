@@ -1,56 +1,51 @@
 from lp_tokenizer import Tokenizer
-from transformers import AutoTokenizer
 from datasets import  load_from_disk,load_dataset, Dataset
 import os
 import csv
 from tqdm import tqdm
 import numpy as np
 from functools import partial
+from tokenizers import Tokenizer as tokTokenizer
+from tokenizers.models import WordLevel
+from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+from transformers import PreTrainedTokenizerFast, AutoTokenizer
+import json
+from pathlib import Path
 
-def save_data(csv_path: str, num1: float, num2: float, num3:int):
+def bytelevel_vocab_to_tokenizer(vocab, vocab_size:int, raw_dataset_path, save_dir: str):
     """
-    Opens (or creates) a CSV file and appends a row with two numbers.
+    Load a vocab.json (byte-level tokens -> IDs) into a Hugging Face compatible tokenizer.
 
     Args:
-        csv_path (str): Path to the CSV file.
-        num1 (float): First number.
-        num2 (float): Second number.
+        vocab_path (str): Path to the vocab.json file.
+
+    Returns:
+        PreTrainedTokenizerFast: Hugging Face compatible tokenizer.
     """
-    # Check if file exists
-    file_exists = os.path.isfile(csv_path)
 
-    # Open in append mode
-    with open(csv_path, mode="a", newline="") as f:
-        writer = csv.writer(f)
+    pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
+                              revision="step3000",
+                              cache_dir="./pythia-70m-deduped/step3000",
+                                            )
+    # Create WordLevel model (with unk token)
+    tokenizer = tokTokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
 
-        # If file didn't exist, write a header first (optional)
-        if not file_exists:
-            writer.writerow(["Data Set size", "Vocab Size", "Compression"])
+    # Set ByteLevel pre-tokenizer and decoder
+    tokenizer.pre_tokenizer = pretokenizer.backend_tokenizer.pre_tokenizer
+    tokenizer.decoder = ByteLevelDecoder()
 
-        # Write the numbers as a new row
-        writer.writerow([num1, num2, num3])
+    # Wrap with Hugging Face interface
+    hf_tokenizer = PreTrainedTokenizerFast(
+        tokenizer_object=tokenizer,
+        unk_token="[UNK]",
+        eos_token="<|endoftext|>"
+    )
 
-
-def merge_into_chunks(dataset, t: int,):
-
-
-    merged_texts = []
-    # Go through dataset in steps of t
-    for i in range(0, len(dataset), t):
-        chunk = dataset[i : i + t]  # list of texts
-        merged_text = " ".join(chunk)
-        merged_texts.append(merged_text)
-
-    # Create new dataset
-    dataset_merged = Dataset.from_dict({'text': merged_texts})
-    return dataset_merged
-
-
-def process(example, vocab, tokenizer):
-    ids = tokenizer.encode(example['text'], vocab)
-    return {'ids': ids, 'len': len(ids)}
-
-intristics_path="intrinstics.csv"
+    save_path = os.path.join(save_dir, f"lp_{vocab_size}_{raw_dataset_path}")
+    os.makedirs(save_path, exist_ok=True)
+    hf_tokenizer.save_pretrained(save_path)
+    print(f"Saved Hugging Face–compatible tokenizer at {save_path}")
 
 datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
@@ -72,8 +67,8 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
 #dataset_size_max=1500000
 
 #~/token_lp/tokenisation_lp/lp_tokenizer/vocabs/vocab_tinystories_data_0_32768.json
-dataset_sizes=[32768,65536,131072,262144,524288] #1048576
-vocab_sizes=[32768]
+dataset_sizes=[131072] #1048576
+vocab_sizes=[1024,2048,8192,16384,32768,65536,131072]
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
@@ -86,7 +81,7 @@ else:
 
 dataset=dataset_raw['train']
 
-
+save_dir = "tokenizers"
 #merged_dataset=merge_into_chunks(dataset,1000)
 
 true_dataset_size=len(dataset)
@@ -100,5 +95,9 @@ for dataset_size in dataset_sizes:
         tokenizer.make_vocab(input_strings=input_strings,
                                 input_strings_frequencies=input_strings_frequencies, 
                                 unique_chars=unique_chars )
+        
+        vocab=tokenizer.get_vocab()
+
+        bytelevel_vocab_to_tokenizer(vocab,vocab_size,dataset_path,save_dir)
         
   
