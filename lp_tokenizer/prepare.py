@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # we now want to tokenize the dataset. first define the encoding function (gpt2 bpe)
     def process(example):
         ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
-        ids.append(31999) # add the end of text token, 3199 for 
+        ids.append(0) # add the end of text token, 3199 for 
         # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
         out = {'ids': ids, 'len': len(ids)}
         return out

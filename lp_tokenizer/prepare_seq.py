@@ -25,15 +25,17 @@ def merge_into_chunks(dataset, t: int):
 if __name__ == "__main__":
     dataset = load_from_disk("finewebedu_data")['train']
 
-    midpoint = len(dataset) // 2 + 5000000
-    second_half = dataset.select(range(midpoint, len(dataset)))
+    # midpoint = len(dataset) // 2 + 5000000
+    # second_half = dataset.select(range(midpoint, len(dataset)))
 
-    dataset_merged = merge_into_chunks(second_half, 2000)
+    # dataset_merged = merge_into_chunks(second_half, 2000)
 
     # sequential tokenization without map
     tokenized_dict = {"ids": [], "len": []}
-    for example in tqdm(dataset_merged, desc="tokenizing sequentially"):
+    dataset_small=dataset.select(range(1))
+    for example in tqdm(dataset_small, desc="tokenizing sequentially"):
         ids = tokenizer.encode(example['text'], vocab)
+        print(ids)
         ids.append(1)  # add eot
         out={"ids": ids, "len": len(ids)}
         tokenized_dict["ids"].append(out["ids"])
