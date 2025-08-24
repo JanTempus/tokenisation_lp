@@ -271,7 +271,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
             flat_tokens = []
             for sublist in shortest_paths:
                 flat_tokens.extend(sublist)
-            return shortest_paths
+            return flat_tokens
         else:
             return f.value
     else:
