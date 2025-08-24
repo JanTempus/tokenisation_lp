@@ -52,7 +52,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = split_dataset.map(
+    tokenized = dataset_small.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
         dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
         arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
-        total_batches = 1024
+        total_batches = 1
 
         idx = 0
         for batch_idx in tqdm(range(total_batches), desc=f'writing {filename}'):
