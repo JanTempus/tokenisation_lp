@@ -24,44 +24,50 @@ with open(file_path, 'r', encoding='utf-8') as f:
 
 tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
-if __name__ == '__main__':
    
-    dataset = load_from_disk("finewebedu_data")['train']
-    from datasets import Dataset
+from datasets import Dataset
+from datasets import load_from_disk
+from tqdm import tqdm
+from datasets import load_from_disk
+import numpy as np
 
-    def slice_dataset_by_chunks(dataset, start_chunk: int, end_chunk: int, chunk_size: int):
-        """
-        Return a Dataset slice corresponding to merged chunk indices.
+# Load your dataset
+dataset = load_from_disk("finewebedu_data")['train']
 
-        Args:
-            dataset: Original Hugging Face Dataset
-            start_chunk: starting chunk index (inclusive)
-            end_chunk: ending chunk index (exclusive)
-            chunk_size: number of examples per chunk (t)
+def slice_dataset_by_indices(dataset, start_idx: int, end_idx: int):
+    """Return a slice of the dataset from start_idx (inclusive) to end_idx (exclusive)."""
+    end_idx = min(end_idx, len(dataset))
+    return dataset.select(range(start_idx, end_idx))
 
-        Returns:
-            Dataset slice containing all examples in the selected chunks.
-        """
-        start_idx = start_chunk * chunk_size
-        end_idx = min(end_chunk * chunk_size, len(dataset))
-        subset = dataset.select(range(start_idx, end_idx))
-        return subset
+def debug_tokenization(dataset_slice, tokenizer, vocab):
+    """
+    Iterate over the dataset slice, printing successes and failures of tokenizer.encode().
+    """
+    for i, example in enumerate(dataset_slice):
+        idx_in_full_dataset = dataset_slice[i].index if hasattr(dataset_slice[i], 'index') else i
+        text = example['text']
+        try:
+            ids = tokenizer.encode(text, vocab)
+            # Ensure Python list
+            if isinstance(ids, (int, np.integer)):
+                ids = [int(ids)]
+            else:
+                ids = list(ids)
+            ids.append(1)
+            print(f"✅ Success at index {idx_in_full_dataset}")
+        except Exception as e:
+            print(f"❌ Failure at index {idx_in_full_dataset}: {e}")
+            print("Text snippet:", text[:500])
+            # Stop at first failure if you want
+            break
 
-    # Example usage: isolate chunk containing index 7992
-    chunk_size = 2000
-    problem_index = 7992
-    start_chunk = problem_index * chunk_size
-    end_chunk = start_chunk + 1  # just that chunk
+# --- Example usage ---
+start_idx = 7980
+end_idx = 8000
+subset_dataset = slice_dataset_by_indices(dataset, start_idx, end_idx)
+print(f"Selected dataset indices: {start_idx} to {end_idx}")
 
-    subset_dataset = slice_dataset_by_chunks(dataset, start_chunk, end_chunk, chunk_size)
-    print(f"Selected dataset indices: {start_chunk*chunk_size} to {min(end_chunk*chunk_size, len(dataset))}")
-
-
-    corpus=[]
-    
-    for i in tqdm(range(len(subset_dataset)),desc="Appending text to the corpus"):
-                corpus.append(dataset[i]['text'])
-    tokenizer.encode(corpus,vocab)
+debug_tokenization(subset_dataset, tokenizer, vocab)
 
     # dataset_merged_into_chunks=merge_into_chunks(dataset,2000)
 
