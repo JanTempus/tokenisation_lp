@@ -26,20 +26,7 @@ tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
 if __name__ == '__main__':
    
-    dataset = load_from_disk("finewebedu_data")
-    split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
-
-
-    # # owt by default only contains the 'train' split, so create a test split
-    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
-
-
-    # Split into train/val (tiny split just for testing)
-    # split_dataset = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    # split_dataset['val'] = split_dataset.pop('test')
-   
+    dataset = load_from_disk("finewebedu_data")['train']
 
     def merge_into_chunks(dataset, t: int,):
         merged_texts = []
@@ -53,7 +40,21 @@ if __name__ == '__main__':
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
     
-    #dataset_merged=merge_into_chunks(dataset,2000)
+    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
+
+
+    # # owt by default only contains the 'train' split, so create a test split
+    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
+
+
+    # Split into train/val (tiny split just for testing)
+    # split_dataset = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    # split_dataset['val'] = split_dataset.pop('test')
+   
+
+    dataset_merged=merge_into_chunks(dataset,2000)
 
 
 
@@ -66,7 +67,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = split_dataset.map(
+    tokenized = dataset_merged.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
