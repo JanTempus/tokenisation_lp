@@ -57,6 +57,7 @@ def debug_tokenization(dataset_slice, tokenizer, vocab):
 def merge_into_chunks(dataset, t: int,):
     merged_texts = []
     # Go through dataset in steps of t
+    print("merging")
     for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
         chunk = dataset[i : i + t]  # list of texts
         merged_text = " ".join(chunk)
