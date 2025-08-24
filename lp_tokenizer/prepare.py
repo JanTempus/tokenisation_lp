@@ -18,7 +18,7 @@ num_proc_load_dataset = num_proc
 
 
 
-file_path="vocab_finewebedu_data32768.json"
+file_path="vocab_finewebedu_data_32768.json"
 with open(file_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
 
