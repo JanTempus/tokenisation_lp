@@ -53,7 +53,7 @@ if __name__ == '__main__':
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
     
-    dataset_merged=merge_into_chunks(dataset,2000)
+    #dataset_merged=merge_into_chunks(dataset,2000)
 
 
 
