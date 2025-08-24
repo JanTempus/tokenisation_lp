@@ -44,6 +44,9 @@ if __name__ == '__main__':
 
     dataset_merged=merge_into_chunks(second_half,2000)
 
+    split_dataset = dataset_merged.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    split_dataset['val'] = split_dataset.pop('test')
+    
 
     
     def process(example):
@@ -54,7 +57,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = dataset_merged.map(
+    tokenized = split_dataset.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",

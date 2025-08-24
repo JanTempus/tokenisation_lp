@@ -5,7 +5,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 import json
-from datasets import load_dataset,load_from_disk # huggingface datasets
+from datasets import load_dataset,load_from_disk, Dataset # huggingface datasets
 from lp_tokenizer import Tokenizer
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
@@ -15,6 +15,18 @@ num_proc = 8
 # it is better than 1 usually though
 num_proc_load_dataset = num_proc
 
+
+def merge_into_chunks(dataset, t: int,):
+        merged_texts = []
+        # Go through dataset in steps of t
+        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
+            chunk = dataset[i : i + t]  # list of texts
+            merged_text = " ".join(chunk)
+            merged_texts.append(merged_text)
+
+        # Create new dataset
+        dataset_merged = Dataset.from_dict({'text': merged_texts})
+        return dataset_merged
 
 
 file_path="vocab_finewebedu_data_32768.json"
