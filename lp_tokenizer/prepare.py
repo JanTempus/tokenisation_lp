@@ -42,6 +42,8 @@ if __name__ == '__main__':
 
     dataset_merged=merge_into_chunks(dataset,2000)
 
+    midpoint = len(dataset_merged) // 2
+    second_half = dataset_merged.select(range(midpoint, len(dataset_merged)))
 
 
     
@@ -53,7 +55,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = dataset_merged.map(
+    tokenized = second_half.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
