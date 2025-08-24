@@ -22,12 +22,6 @@ def merge_into_chunks(dataset, t: int):
     return dataset_merged
 
 
-def process(example):
-    ids = tokenizer.encode(example['text'], vocab)
-    ids.append(1)  # add eot
-    return {"ids": ids, "len": len(ids)}
-
-
 if __name__ == "__main__":
     dataset = load_from_disk("finewebedu_data")['train']
 
@@ -39,7 +33,9 @@ if __name__ == "__main__":
     # sequential tokenization without map
     tokenized_dict = {"ids": [], "len": []}
     for example in tqdm(dataset_merged, desc="tokenizing sequentially"):
-        out = process(example)
+        ids = tokenizer.encode(example['text'], vocab)
+        ids.append(1)  # add eot
+        out={"ids": ids, "len": len(ids)}
         tokenized_dict["ids"].append(out["ids"])
         tokenized_dict["len"].append(out["len"])
     tokenized = Dataset.from_dict(tokenized_dict)
