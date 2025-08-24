@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # Example usage: isolate chunk containing index 7992
     chunk_size = 2000
     problem_index = 7992
-    start_chunk = problem_index // chunk_size
+    start_chunk = problem_index * chunk_size
     end_chunk = start_chunk + 1  # just that chunk
 
     subset_dataset = slice_dataset_by_chunks(dataset, start_chunk, end_chunk, chunk_size)
