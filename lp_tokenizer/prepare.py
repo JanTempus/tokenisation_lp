@@ -31,7 +31,7 @@ if __name__ == '__main__':
     def merge_into_chunks(dataset, t: int,):
         merged_texts = []
         # Go through dataset in steps of t
-        for i in tqdm(range(0, len(dataset), t)):
+        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
             chunk = dataset[i : i + t]  # list of texts
             merged_text = " ".join(chunk)
             merged_texts.append(merged_text)
