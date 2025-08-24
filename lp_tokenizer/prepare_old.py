@@ -11,13 +11,6 @@ from lp_tokenizer import Tokenizer
 # good number to use is ~order number of cpu cores // 2
 num_proc = 8
 
-# number of workers in load_dataset() call
-# best number might be different from num_proc above as it also depends on NW speed.
-# it is better than 1 usually though
-num_proc_load_dataset = num_proc
-
-
-
 file_path="vocab_finewebedu_data_32768.json"
 with open(file_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
