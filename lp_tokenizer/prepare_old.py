@@ -27,9 +27,6 @@ tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 if __name__ == '__main__':
    
     dataset = load_from_disk("finewebedu_data")['train']
-
-    midpoint = len(dataset) // 2 +3000000
-    second_half = dataset.select(range(midpoint, len(dataset)))
     def merge_into_chunks(dataset, t: int,):
         merged_texts = []
         # Go through dataset in steps of t
@@ -42,7 +39,7 @@ if __name__ == '__main__':
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
 
-    dataset_merged=merge_into_chunks(second_half,2000)
+    dataset_merged=merge_into_chunks(dataset,2000)
 
     split_dataset = dataset_merged.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
