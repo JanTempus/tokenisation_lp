@@ -32,24 +32,11 @@ if __name__ == '__main__':
     # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
 
-    dataset_small = dataset["train"].select(range(5))
 
     # Split into train/val (tiny split just for testing)
-    split_dataset = dataset_small.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    split_dataset['val'] = split_dataset.pop('test')
-        # this results in:
-    # >>> split_dataset
-    # DatasetDict({
-    #     train: Dataset({
-    #         features: ['text'],
-    #         num_rows: 8009762
-    #     })
-    #     val: Dataset({
-    #         features: ['text'],
-    #         num_rows: 4007
-    #     })
-    # })
-
+    # split_dataset = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    # split_dataset['val'] = split_dataset.pop('test')
+   
     
     def process(example):
         ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
@@ -59,7 +46,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = split_dataset.map(
+    tokenized = dataset.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
