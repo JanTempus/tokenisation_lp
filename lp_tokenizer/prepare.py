@@ -39,20 +39,6 @@ if __name__ == '__main__':
         # Create new dataset
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
-    
-    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
-
-
-    # # owt by default only contains the 'train' split, so create a test split
-    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
-
-
-    # Split into train/val (tiny split just for testing)
-    # split_dataset = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    # split_dataset['val'] = split_dataset.pop('test')
-   
 
     dataset_merged=merge_into_chunks(dataset,2000)
 
@@ -60,11 +46,13 @@ if __name__ == '__main__':
 
     
     def process(example):
-        ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
-        ids.append(1) # add the end of text token, 3199 for 
-        # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
-        out = {'ids': ids, 'len': len(ids)}
-        return out
+        ids = tokenizer.encode(example['text'], vocab)
+        ids = list(ids)  # make sure it's always a Python list
+        ids.append(1)    # end of text token
+        return {
+            "ids": ids,
+            "len": len(ids),
+        }
 
     # tokenize the dataset
     tokenized = dataset_merged.map(
