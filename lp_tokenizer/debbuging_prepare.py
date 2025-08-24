@@ -75,7 +75,7 @@ end_idx = 8000*2000
 subset_dataset = slice_dataset_by_indices(dataset, start_idx, end_idx)
 
 
-dataset_merged=merge_into_chunks(subset_dataset,400)
+dataset_merged=merge_into_chunks(subset_dataset,2000)
 
 print(f"Selected dataset indices: {start_idx} to {end_idx}")
 
