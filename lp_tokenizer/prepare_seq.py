@@ -35,7 +35,6 @@ if __name__ == "__main__":
     dataset_small=dataset.select(range(1))
     for example in tqdm(dataset_small, desc="tokenizing sequentially"):
         ids = tokenizer.encode(example['text'], vocab)
-        print(ids)
         ids.append(1)  # add eot
         out={"ids": ids, "len": len(ids)}
         tokenized_dict["ids"].append(out["ids"])

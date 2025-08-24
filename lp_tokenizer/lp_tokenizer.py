@@ -189,8 +189,6 @@ class Tokenizer:
         return input_strings, input_strings_frequencies
 
     def encode(self,corpus:list[str], vocab):
-        
-        print(corpus)
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
 
