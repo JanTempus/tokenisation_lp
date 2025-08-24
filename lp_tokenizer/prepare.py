@@ -27,18 +27,15 @@ tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 if __name__ == '__main__':
    
     dataset = load_from_disk("finewebedu_data")['train']
-
-    def merge_into_chunks(dataset, t: int,):
+    
+    
+    def merge_into_chunks(dataset, start: int, end: int):
         merged_texts = []
-        # Go through dataset in steps of t
-        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
-            chunk = dataset[i : i + t]  # list of texts
-            merged_text = " ".join(chunk)
-            merged_texts.append(merged_text)
-
-        # Create new dataset
+        for i in tqdm(range(start, end), desc=f"Merging texts {start} to {end}"):
+            merged_texts.append(dataset[i]['text'])  # directly take the text
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
+
 
     dataset_merged=merge_into_chunks(dataset,2000)
 
