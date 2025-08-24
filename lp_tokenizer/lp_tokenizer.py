@@ -213,10 +213,11 @@ class Tokenizer:
         for i in range(num_strings):
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
-            edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,0)#0 is the unkown ID
-            edges_list.append(edges_corrected)
-            num_vertices.append(string_len+1)
-        
+            #edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,0)#0 is the unkown ID
+            if len(edges)>0: 
+                edges_list.append(edges)
+                num_vertices.append(string_len+1)
+            
         edges_list_weight=np.ones(len(edges_list),dtype=float)
         tokenized_data=tokenize(edges_list,edges_list_weight,num_vertices)
 
