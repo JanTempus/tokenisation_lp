@@ -63,7 +63,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = dataset_merged.map(
+    tokenized = dataset.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
