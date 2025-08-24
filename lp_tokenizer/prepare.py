@@ -47,7 +47,14 @@ if __name__ == '__main__':
     
     def process(example):
         ids = tokenizer.encode(example['text'], vocab)
-        ids = list(ids)  # make sure it's always a Python list
+        # ensure Python list, even if scalar or numpy array
+        if isinstance(ids, (int, np.integer)):
+            ids = [int(ids)]
+        else:
+            ids = list(ids)
+
+        ids.append(1)  # EOT token
+
         ids.append(1)    # end of text token
         return {
             "ids": ids,
