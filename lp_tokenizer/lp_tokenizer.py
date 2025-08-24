@@ -214,6 +214,7 @@ class Tokenizer:
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
             #edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,0)#0 is the unkown ID
+            print(len(edges))
             if len(edges)>0: 
                 edges_list.append(edges)
                 num_vertices.append(string_len+1)
