@@ -25,7 +25,7 @@ def merge_into_chunks(dataset, t: int):
 if __name__ == "__main__":
     dataset = load_from_disk("finewebedu_data")['train']
 
-    midpoint = len(dataset) // 2 + 3000000
+    midpoint = len(dataset) // 2 + 5000000
     second_half = dataset.select(range(midpoint, len(dataset)))
 
     dataset_merged = merge_into_chunks(second_half, 2000)
