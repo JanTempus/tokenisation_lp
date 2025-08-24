@@ -67,7 +67,7 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
 #dataset_size_max=1500000
 
 #~/token_lp/tokenisation_lp/lp_tokenizer/vocabs/vocab_tinystories_data_0_32768.json
-dataset_sizes=[131072] #1048576
+dataset_sizes=[65536] #1048576
 vocab_sizes=[1024,2048,8192,16384,32768,65536,131072]
 
 if dataset_url is None and dataset_path is None:
