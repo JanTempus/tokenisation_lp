@@ -5,7 +5,7 @@ import os
 from tqdm import tqdm
 import numpy as np
 import json
-from datasets import load_dataset,load_from_disk # huggingface datasets
+from datasets import load_dataset,load_from_disk, Dataset # huggingface datasets
 from lp_tokenizer import Tokenizer
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
@@ -37,6 +37,23 @@ if __name__ == '__main__':
     # split_dataset = dataset.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
     # split_dataset['val'] = split_dataset.pop('test')
    
+
+    def merge_into_chunks(dataset, t: int,):
+        merged_texts = []
+        # Go through dataset in steps of t
+        for i in range(0, len(dataset), t):
+            chunk = dataset[i : i + t]  # list of texts
+            merged_text = " ".join(chunk)
+            merged_texts.append(merged_text)
+
+        # Create new dataset
+        dataset_merged = Dataset.from_dict({'text': merged_texts})
+        return dataset_merged
+    
+    dataset_merged=merge_into_chunks(dataset,2000)
+
+
+
     
     def process(example):
         ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
@@ -46,7 +63,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = dataset.map(
+    tokenized = dataset_merged.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
