@@ -188,7 +188,7 @@ class Tokenizer:
 
         return input_strings, input_strings_frequencies
 
-    def encode(self,corpus:list[str], vocab, just_size:bool=False):
+    def encode(self,corpus:list[str], vocab):
         
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
@@ -213,7 +213,7 @@ class Tokenizer:
         for i in range(num_strings):
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
-            edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
+            edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,0)#0 is the unkown ID
             edges_list.append(edges_corrected)
             num_vertices.append(string_len+1)
         
