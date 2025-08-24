@@ -34,6 +34,7 @@ def debug_tokenization(dataset_slice, tokenizer, vocab):
     """
     Iterate over the dataset slice, printing successes and failures of tokenizer.encode().
     """
+    print(len(dataset_slice))
     for i, example in enumerate(dataset_slice):
         idx_in_full_dataset = dataset_slice[i].index if hasattr(dataset_slice[i], 'index') else i
         text = example['text']
