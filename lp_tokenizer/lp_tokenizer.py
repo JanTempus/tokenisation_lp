@@ -213,8 +213,8 @@ class Tokenizer:
         for i in range(num_strings):
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
-            #edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
-            edges_list.append(edges)
+            edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,unk_id)
+            edges_list.append(edges_corrected)
             num_vertices.append(string_len+1)
         
         edges_list_weight=np.ones(len(edges_list),dtype=float)
