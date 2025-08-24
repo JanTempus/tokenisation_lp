@@ -26,7 +26,10 @@ tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
 if __name__ == '__main__':
    
-    dataset = load_from_disk("finewebedu_data")['train']
+    dataset = load_from_disk("finewebedu_data")
+    split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
+
 
     # # owt by default only contains the 'train' split, so create a test split
     # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
@@ -63,7 +66,7 @@ if __name__ == '__main__':
         return out
 
     # tokenize the dataset
-    tokenized = dataset.map(
+    tokenized = split_dataset.map(
         process,
         remove_columns=['text'],
         desc="tokenizing the splits",
