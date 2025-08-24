@@ -27,21 +27,17 @@ tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 if __name__ == '__main__':
    
     dataset = load_from_disk("finewebedu_data")['train']
-    def merge_into_chunks(dataset, t: int,):
+    def merge_into_chunks(dataset, t: int):
         merged_texts = []
-        # Go through dataset in steps of t
-        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
-            chunk = dataset[i : i + t]  # list of texts
+        for i in tqdm(range(0, len(dataset), t), desc="Making into larger chunks"):
+            chunk = [x['text'] for x in dataset[i:i+t]]  # extract text
             merged_text = " ".join(chunk)
             merged_texts.append(merged_text)
-
-        # Create new dataset
-        dataset_merged = Dataset.from_dict({'text': merged_texts})
-        return dataset_merged
+        return Dataset.from_dict({'text': merged_texts})
 
     dataset_merged=merge_into_chunks(dataset,2000)
 
-    split_dataset = dataset_merged.train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    split_dataset = dataset_merged.train_test_split(test_size=0.005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
     
 
@@ -65,16 +61,12 @@ if __name__ == '__main__':
     for split, dset in tokenized.items():
         arr_len = np.sum(dset['len'], dtype=np.uint64)
         filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
-        dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
+        dtype = np.uint16
         arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
-        total_batches = min(1024, len(dset))
-
+        
         idx = 0
-        for batch_idx in tqdm(range(total_batches), desc=f'writing {filename}'):
-            # Batch together samples for faster write
-            batch = dset.shard(num_shards=total_batches, index=batch_idx, contiguous=True).with_format('numpy')
-            arr_batch = np.concatenate(batch['ids'])
-            # Write into mmap
-            arr[idx : idx + len(arr_batch)] = arr_batch
+        for example in tqdm(dset, desc=f'writing {filename}'):
+            arr_batch = np.array(example['ids'], dtype=dtype)
+            arr[idx:idx + len(arr_batch)] = arr_batch
             idx += len(arr_batch)
         arr.flush()
