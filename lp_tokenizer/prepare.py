@@ -10,24 +10,6 @@ from lp_tokenizer import Tokenizer
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
 num_proc = 8
-# number of workers in load_dataset() call
-# best number might be different from num_proc above as it also depends on NW speed.
-# it is better than 1 usually though
-num_proc_load_dataset = num_proc
-
-
-def merge_into_chunks(dataset, t: int,):
-        merged_texts = []
-        # Go through dataset in steps of t
-        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
-            chunk = dataset[i : i + t]  # list of texts
-            merged_text = " ".join(chunk)
-            merged_texts.append(merged_text)
-
-        # Create new dataset
-        dataset_merged = Dataset.from_dict({'text': merged_texts})
-        return dataset_merged
-
 
 file_path="vocab_finewebedu_data_32768.json"
 with open(file_path, 'r', encoding='utf-8') as f:
@@ -35,29 +17,31 @@ with open(file_path, 'r', encoding='utf-8') as f:
 
 tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
-
-
-
-
 if __name__ == '__main__':
    
     dataset = load_from_disk("finewebedu_data")['train']
+    def merge_into_chunks(dataset, t: int,):
+            merged_texts = []
+            # Go through dataset in steps of t
+            for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
+                chunk = dataset[i : i + t]  # list of texts
+                merged_text = " ".join(chunk)
+                merged_texts.append(merged_text)
 
-    # # owt by default only contains the 'train' split, so create a test split
-    # split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
-    # split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
+            # Create new dataset
+            dataset_merged = Dataset.from_dict({'text': merged_texts})
+            return dataset_merged
 
-    #dataset_small = dataset["train"].select(range(5))
+    dataset_merged=merge_into_chunks(dataset,2000)
 
-    # Split into train/val (tiny split just for testing)
-    split_dataset = dataset.train_test_split(test_size=0.4, seed=2357, shuffle=True)
+    split_dataset = dataset_merged.train_test_split(test_size=0.005, seed=2357, shuffle=True)
     split_dataset['val'] = split_dataset.pop('test')
     
 
-    # we now want to tokenize the dataset. first define the encoding function (gpt2 bpe)
+    
     def process(example):
         ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
-        ids.append(0) # add the end of text token, 3199 for 
+        ids.append(1) # add the end of text token, 3199 for 
         # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
         out = {'ids': ids, 'len': len(ids)}
         return out
@@ -74,16 +58,12 @@ if __name__ == '__main__':
     for split, dset in tokenized.items():
         arr_len = np.sum(dset['len'], dtype=np.uint64)
         filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
-        dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
+        dtype = np.uint16
         arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
-        total_batches = 1
-
+        
         idx = 0
-        for batch_idx in tqdm(range(total_batches), desc=f'writing {filename}'):
-            # Batch together samples for faster write
-            batch = dset.shard(num_shards=total_batches, index=batch_idx, contiguous=True).with_format('numpy')
-            arr_batch = np.concatenate(batch['ids'])
-            # Write into mmap
-            arr[idx : idx + len(arr_batch)] = arr_batch
+        for example in tqdm(dset, desc=f'writing {filename}'):
+            arr_batch = np.array(example['ids'], dtype=dtype)
+            arr[idx:idx + len(arr_batch)] = arr_batch
             idx += len(arr_batch)
         arr.flush()
