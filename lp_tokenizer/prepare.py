@@ -17,53 +17,53 @@ with open(file_path, 'r', encoding='utf-8') as f:
 
 tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
-if __name__ == '__main__':
-   
-    dataset = load_from_disk("finewebedu_data")['train']
-    def merge_into_chunks(dataset, t: int,):
-            merged_texts = []
-            # Go through dataset in steps of t
-            for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
-                chunk = dataset[i : i + t]  # list of texts
-                merged_text = " ".join(chunk)
-                merged_texts.append(merged_text)
 
-            # Create new dataset
-            dataset_merged = Dataset.from_dict({'text': merged_texts})
-            return dataset_merged
+dataset = load_from_disk("finewebedu_data")['train']
+print(len(dataset))
+def merge_into_chunks(dataset, t: int,):
+        merged_texts = []
+        # Go through dataset in steps of t
+        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
+            chunk = dataset[i : i + t]  # list of texts
+            merged_text = " ".join(chunk)
+            merged_texts.append(merged_text)
 
-    dataset_merged=merge_into_chunks(dataset,2000)
+        # Create new dataset
+        dataset_merged = Dataset.from_dict({'text': merged_texts})
+        return dataset_merged
 
-    split_dataset = dataset_merged.train_test_split(test_size=0.005, seed=2357, shuffle=True)
-    split_dataset['val'] = split_dataset.pop('test')
+dataset_merged=merge_into_chunks(dataset,2000)
+
+split_dataset = dataset_merged.train_test_split(test_size=0.005, seed=2357, shuffle=True)
+split_dataset['val'] = split_dataset.pop('test')
+
+
+
+def process(example):
+    ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
+    ids.append(1) # add the end of text token, 3199 for 
+    # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
+    out = {'ids': ids, 'len': len(ids)}
+    return out
+
+# tokenize the dataset
+tokenized = split_dataset.map(
+    process,
+    remove_columns=['text'],
+    desc="tokenizing the splits",
+    num_proc=num_proc,
+)
+
+# concatenate all the ids in each dataset into one large file we can use for training
+for split, dset in tokenized.items():
+    arr_len = np.sum(dset['len'], dtype=np.uint64)
+    filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
+    dtype = np.uint16
+    arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
     
-
-    
-    def process(example):
-        ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
-        ids.append(1) # add the end of text token, 3199 for 
-        # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
-        out = {'ids': ids, 'len': len(ids)}
-        return out
-
-    # tokenize the dataset
-    tokenized = split_dataset.map(
-        process,
-        remove_columns=['text'],
-        desc="tokenizing the splits",
-        num_proc=num_proc,
-    )
-
-    # concatenate all the ids in each dataset into one large file we can use for training
-    for split, dset in tokenized.items():
-        arr_len = np.sum(dset['len'], dtype=np.uint64)
-        filename = os.path.join(os.path.dirname(__file__), f'{split}.bin')
-        dtype = np.uint16
-        arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
-        
-        idx = 0
-        for example in tqdm(dset, desc=f'writing {filename}'):
-            arr_batch = np.array(example['ids'], dtype=dtype)
-            arr[idx:idx + len(arr_batch)] = arr_batch
-            idx += len(arr_batch)
-        arr.flush()
+    idx = 0
+    for example in tqdm(dset, desc=f'writing {filename}'):
+        arr_batch = np.array(example['ids'], dtype=dtype)
+        arr[idx:idx + len(arr_batch)] = arr_batch
+        idx += len(arr_batch)
+    arr.flush()
