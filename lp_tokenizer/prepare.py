@@ -19,7 +19,6 @@ tokenizer=Tokenizer(vocab_size=32768,vocab=vocab,unk_token="[UNK]")
 
 
 dataset = load_from_disk("finewebedu_data")['train']
-print(len(dataset))
 def merge_into_chunks(dataset, t: int,):
         merged_texts = []
         # Go through dataset in steps of t
