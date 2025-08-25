@@ -10,7 +10,7 @@ import csv
 num_proc = 8
 
 dataset_size=65536
-vocab_size=32768
+vocab_size=1024
 
 
 file_path=f"vocabs/vocab_finewebedu_data_{vocab_size}.json"
