@@ -7,3 +7,7 @@ vocabs/
 tokenizers_jsons/
 lp_tokenizer/memory_usage
 new_tokenizers/
+.venv/
+lp_tokenizer/finewebedu_data
+word_freqs*.npy
+unique*.npy
