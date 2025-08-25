@@ -13,7 +13,7 @@ dataset_size=65536
 vocab_size=1024
 
 
-file_path=f"vocabs/vocab_finewebedu_data_{vocab_size}.json"
+file_path=f"vocabs/vocab_finewebedu_data_0_{vocab_size}.json"
 
 with open(file_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
