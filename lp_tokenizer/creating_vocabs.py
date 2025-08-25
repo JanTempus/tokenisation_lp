@@ -7,37 +7,11 @@ from tqdm import tqdm
 import numpy as np
 from functools import partial
 
-
-def merge_into_chunks(dataset, t: int,):
-
-
-    merged_texts = []
-    # Go through dataset in steps of t
-    for i in range(0, len(dataset), t):
-        chunk = dataset[i : i + t]  # list of texts
-        merged_text = " ".join(chunk)
-        merged_texts.append(merged_text)
-
-    # Create new dataset
-    dataset_merged = Dataset.from_dict({'text': merged_texts})
-    return dataset_merged
-
-
-def process(example, vocab, tokenizer):
-    ids = tokenizer.encode(example['text'], vocab)
-    return {'ids': ids, 'len': len(ids)}
-
-intristics_path="intrinstics.csv"
-
 datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
 num_proc=12
-
-# datasetname="tinystories"
-# dataset_url="roneneldan/TinyStories"
-# dataset_path="tinystories_data"
 
 tokenizer=Tokenizer(saved_dataset_path=dataset_path)
 
@@ -61,8 +35,6 @@ else:
 
 dataset=dataset_raw['train']
 
-
-#merged_dataset=merge_into_chunks(dataset,1000)
 
 true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars_parallel(dataset_raw,true_dataset_size,pretokenizer,num_proc=num_proc)

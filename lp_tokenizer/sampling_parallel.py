@@ -5,47 +5,26 @@ from tqdm import tqdm
 import numpy as np
 import itertools
 
-def collect_pretokenized_words(dataset, pretokenizer, t: int, num_proc: int):
+
+def sample_hf_dataset(dataset: Dataset, t: int, seed: int | None = None) -> Dataset:
     """
-    Pretokenize the first t examples of a Hugging Face dataset in parallel
-    and return all words as a single list.
+    Sample exactly t documents without replacement from a Hugging Face dataset.
+
+    Args:
+        dataset: Hugging Face Dataset to sample from.
+        t: Number of documents to sample (0 <= t <= len(dataset)).
+        seed: Optional random seed for reproducibility.
+
+    Returns:
+        Hugging Face Dataset with t rows.
     """
+    m = len(dataset)
+    if t > m:
+        raise ValueError(f"Cannot sample {t} documents from dataset of size {m}")
 
-    # restrict dataset to the first t examples
-    dataset = dataset['train'].select(range(t))
-
-    # define a per-example processing function
-    def process(example):
-        words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(example['text'])
-        new_words = [word for word, offset in words_with_offsets]
-        return {"words": new_words}
-
-    # run map in parallel
-    processed = dataset.map(
-        process,
-        remove_columns=dataset.column_names,
-        desc="Pretokenizing",
-        num_proc=num_proc,
-    )
-
-    all_words = list(itertools.chain.from_iterable(
-        tqdm(processed["words"], desc="Flattening words", total=len(processed))
-        ))
-
-    return all_words
-
-def sample_words_large(all_words: list[str], m: int, seed: int | None = None) -> list[str]:
-    """
-    Efficiently sample `m` words from `all_words` without replacement.
-    Works well for very large lists by operating on indices only.
-    """
-    if m > len(all_words):
-        raise ValueError("Cannot sample more elements than available without replacement")
-    
     rng = np.random.default_rng(seed)
-    indices = rng.choice(len(all_words), size=m, replace=False)
-    return [all_words[i] for i in indices]
-
+    indices = rng.choice(m, size=t, replace=False)
+    return dataset.select(indices.tolist())
 
 
 

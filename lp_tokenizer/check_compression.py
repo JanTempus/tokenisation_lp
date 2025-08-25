@@ -34,16 +34,13 @@ def merge_into_chunks(dataset, t: int,):
         dataset_merged = Dataset.from_dict({'text': merged_texts})
         return dataset_merged
 
-
-dataset_merged=merge_into_chunks(dataset,2000)
-
 def process(example):
     ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
     out = {'ids': ids, 'len': len(ids)}
     return out
 
 # tokenize the dataset
-tokenized = dataset_merged.map(
+tokenized = dataset.map(
     process,
     remove_columns=['text'],
     desc="tokenizing the splits",
