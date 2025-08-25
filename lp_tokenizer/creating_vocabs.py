@@ -7,29 +7,6 @@ from tqdm import tqdm
 import numpy as np
 from functools import partial
 
-def save_data(csv_path: str, num1: float, num2: float, num3:int):
-    """
-    Opens (or creates) a CSV file and appends a row with two numbers.
-
-    Args:
-        csv_path (str): Path to the CSV file.
-        num1 (float): First number.
-        num2 (float): Second number.
-    """
-    # Check if file exists
-    file_exists = os.path.isfile(csv_path)
-
-    # Open in append mode
-    with open(csv_path, mode="a", newline="") as f:
-        writer = csv.writer(f)
-
-        # If file didn't exist, write a header first (optional)
-        if not file_exists:
-            writer.writerow(["Data Set size", "Vocab Size", "Compression"])
-
-        # Write the numbers as a new row
-        writer.writerow([num1, num2, num3])
-
 
 def merge_into_chunks(dataset, t: int,):
 
@@ -69,10 +46,7 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
                               cache_dir="./pythia-70m-deduped/step3000",
                                             )
-#vocab_size_max=32000
-#dataset_size_max=1500000
 
-#~/token_lp/tokenisation_lp/lp_tokenizer/vocabs/vocab_tinystories_data_0_32768.json
 dataset_size=16384 #1048576
 vocab_sizes=[4096,8192,16384,32768]
 
