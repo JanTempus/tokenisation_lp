@@ -13,6 +13,8 @@ dataset_size=65536
 vocab_size=1024
 
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
 file_path=f"vocabs/vocab_finewebedu_data_0_{vocab_size}.json"
 
 with open(file_path, 'r', encoding='utf-8') as f:
