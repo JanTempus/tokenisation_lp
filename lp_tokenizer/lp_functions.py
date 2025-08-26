@@ -25,7 +25,7 @@ from contextlib import contextmanager
 
 @contextmanager
 def suppress_stdout_stderr():
-    """Suppress all stdout and stderr (works for multithreaded solvers like cuOpt)."""
+    """Suppress stdout and stderr (e.g., for noisy C++/CUDA libraries)."""
     with open(os.devnull, "w") as devnull:
         old_stdout, old_stderr = sys.stdout, sys.stderr
         sys.stdout, sys.stderr = devnull, devnull
@@ -269,7 +269,8 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
     with suppress_stdout_stderr():
-         problem.solve(solver=cp.CUOPT)
+         problem.solve(solver=cp.CUOPT,verbose=True)
+         
     flow_values = f.value 
     shortest_paths = []
     offset = 0
