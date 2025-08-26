@@ -38,25 +38,26 @@ def merge_every_n_rows(dataset, n: int):
         merged_rows.append({"text": merged_text})
 
     return Dataset.from_list(merged_rows)
+def process(batch):
+    # Merge the batch of texts into a single string
+    merged_text = "<|endoftext|>".join(batch["text"])
+    
+    # Tokenize the merged string
+    ids = tokenizer.encode(merged_text, vocab)
+    
+    # Return lists matching the batch size (one item per batch)
+    return {
+        "ids": [ids],             # a list with one element (the merged token list)
+        "len": [len(ids)],        # a list with one element
+    }
 
-def process(example):
-
-    if isinstance(example["text"], list):
-        text = "<|endoftext|>".join(example["text"])
-    else:
-        text = example["text"]
-    ids = tokenizer.encode(text,vocab) # encode_ordinary ignores any special tokens
-    out = {'ids': ids, 'len': len(ids)}
-    return out
-
-
-# tokenize the dataset
+# Example call
 tokenized = dataset.map(
     process,
-    remove_columns=['text'],
+    remove_columns=["text"],
     desc="tokenizing the splits",
     batched=True,
-    batch_size=20,
+    batch_size=20,  # all 20 rows will be merged
     num_proc=num_proc,
 )
 
