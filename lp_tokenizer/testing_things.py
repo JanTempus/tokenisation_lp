@@ -19,6 +19,17 @@ datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
+dataset_size=65536
+vocab_size=32768
+
+file_path=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
+
+with open(file_path, 'r', encoding='utf-8') as f:
+        vocab = json.load(f)
+
+tokenizer=Tokenizer(vocab_size=vocab_size,vocab=vocab,unk_token="[UNK]")
+
+
 pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
                               cache_dir="./pythia-70m-deduped/step3000",
@@ -49,11 +60,20 @@ def merge_every_n_rows(dataset, n: int):
 
 merged=merge_every_n_rows(chunk,2)
 
-tokenizer=Tokenizer(vocab_size=vocab_size,vocab=vocab,unk_token="[UNK]")
 
-tokenizer.encode_combinatorial(example['text'],vocab)
-print(dataset_0['text'])
-print("-----------------")
-print(dataset_1)
-print("-----------------")
-print(merged[0]['text'])
+tokens_a=tokenizer.encode_matrix(dataset_0['text'],vocab)
+
+tokens_b=tokenizer.encode(dataset_0['text'],vocab)
+
+print(tokens_a)
+print(tokens_b)
+
+if tokens_a == tokens_b:
+    print("✅ Outputs are identical")
+else:
+    print("❌ Outputs differ!")
+    # show where they differ
+    for i, (a, b) in enumerate(zip(tokens_a, tokens_b)):
+        if a != b:
+            print(f"Mismatch at position {i}: {a} vs {b}")
+            break
