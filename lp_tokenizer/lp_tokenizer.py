@@ -242,7 +242,7 @@ class Tokenizer:
 
         # Compute shortest tokenization paths
         tokenized_paths = tokenize_matrix(edges_list, num_vertices, return_token_index=False)
-
+        print(tokenized_paths)
         # Flatten into a single list of token strings
         return [token.token for token in tokenized_paths]
 
