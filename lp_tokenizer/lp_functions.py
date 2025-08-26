@@ -12,15 +12,12 @@ import psutil
 import os
 import threading
 import matplotlib.pyplot as plt
-import cudf
-import cugraph
+#import cudf
+#import cugraph
 
 
 from datastructures import tokenInstance, possibleToken
 import helper_functions as hf
-
-
-
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -197,8 +194,8 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
 
-    problem.solve(solver=cp.GLOP)
-
+    #problem.solve(solver=cp.GLOP)
+    problem.solve(solver=cp.CUOPT)
     flow_values = f.value 
     shortest_paths = []
     offset = 0
