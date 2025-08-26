@@ -62,5 +62,4 @@ merged=merge_every_n_rows(chunk,2)
 
 tokens_b=tokenizer.encode(dataset_0['text'],vocab)
 
-
 print(tokens_b)
