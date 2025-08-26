@@ -487,7 +487,6 @@ def tokenize_matrix(edges_list, num_vertices_list, return_token_index=True):
     edges_df = cudf.DataFrame({
         'src': src_list,
         'dst': dst_list,
-        'weight': weight_list,
         'token': token_list,
         'graph_id': graph_id_list
     })
@@ -525,10 +524,6 @@ def tokenize_matrix(edges_list, num_vertices_list, return_token_index=True):
     # Step 4: Flatten paths
     flat_paths = [token for path in all_paths for token in path]
     return flat_paths
-
-# Example usage:
-# flat_token_path = compute_shortest_paths(edges_list, num_vertices_list, return_token_index=True)
-
 
 def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,vocab_size:int):
     if(vocab_size<len(unique_chars)):

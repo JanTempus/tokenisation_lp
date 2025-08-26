@@ -221,35 +221,31 @@ class Tokenizer:
       
 
 
-    def encode_matrix(self,corpus:list[str], vocab):
+    def encode_matrix(self, corpus: list[str], vocab):
         if self.unk_token is None:
-            raise KeyError("Please assign a token to the unkown token")
+            raise KeyError("Please assign a token to the unknown token")
 
-        input_strings=[]
-        words_with_offsets=self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(corpus)
-        input_strings= [word for word, offset in words_with_offsets]
+        # Pretokenize using the internal tokenizer
+        words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(corpus)
+        input_strings = [word for word, offset in words_with_offsets]
 
-     
-        num_strings=len(input_strings)
+        edges_list = []
+        num_vertices = []
 
-        edges_list=[]
-        num_vertices=[]
-
-
-        # for i in tqdm(range(num_strings), desc="Processing strings"):
-        for i in range(num_strings):
-            string_len=len(input_strings[i])
-            edges=hf.get_strings_from_vocab(input_strings[i],vocab)
-            #edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,0)#0 is the unkown ID
-            if len(edges)>0: 
+        # Build edges for each string
+        for s in input_strings:
+            string_len = len(s)
+            edges = hf.get_strings_from_vocab(s, vocab)
+            if len(edges) > 0:
                 edges_list.append(edges)
-                num_vertices.append(string_len+1)
-            
-       
-        tokenized_data=tokenize_matrix(edges_list,num_vertices)
-        flattened_tokens = [token for path in tokenized_data for token in path]
+                num_vertices.append(string_len + 1)
 
-        return flattened_tokens
+        # Compute shortest tokenization paths
+        tokenized_paths = tokenize_matrix(edges_list, num_vertices, return_token_index=False)
+
+        # Flatten into a single list of token strings
+        return [token.token for token in tokenized_paths]
+
 
             
     def get_unique_chars(self, dataset,dataset_size):
