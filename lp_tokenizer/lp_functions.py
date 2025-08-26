@@ -251,7 +251,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
  
-    problem.solve(solver=cp.CUOPT,CUOPT_LOG_TO_CONSOLE=True)
+    problem.solve(solver=cp.CUOPT,cuopt_params={"log_to_console": True})
  
     flow_values = f.value 
     shortest_paths = []
