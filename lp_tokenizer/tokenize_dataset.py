@@ -9,16 +9,16 @@ from multiprocessing import Pool, cpu_count
 
 # Config
 dataset_path = "finewebedu_data"
-dataset_size = 65536
+#dataset_size = 
 vocab_size = 32768
-num_proc = 4        # processes inside Dataset.map()
+num_proc = 8       # processes inside Dataset.map()
 batch_size = 100
 shard_size = 10000  # examples per shard
 out_dir = "tokenized_shards"
-num_workers = min(cpu_count(), 8)  # parallel shard workers
+num_workers = min(cpu_count(), 16)  # parallel shard workers
 
 # Load dataset
-dataset = load_from_disk(dataset_path)['train'].select(range(dataset_size))
+dataset = load_from_disk(dataset_path)['train']
 
 # Load vocab
 file_path = f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
