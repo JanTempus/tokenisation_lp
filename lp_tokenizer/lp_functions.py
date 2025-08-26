@@ -21,18 +21,6 @@ import helper_functions as hf
 import sys
 import os
 import cvxpy as cp
-from contextlib import contextmanager
-
-@contextmanager
-def suppress_stdout_stderr():
-    """Suppress stdout and stderr (e.g., for noisy C++/CUDA libraries)."""
-    with open(os.devnull, "w") as devnull:
-        old_stdout, old_stderr = sys.stdout, sys.stderr
-        sys.stdout, sys.stderr = devnull, devnull
-        try:
-            yield
-        finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
 
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
@@ -268,9 +256,9 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     objective=cp.Minimize(BigNonFreewVector.T@f)
 
     problem = cp.Problem(objective, constraints)
-    with suppress_stdout_stderr():
-         problem.solve(solver=cp.CUOPT,verbose=True)
-         
+
+    problem.solve(solver=cp.CUOPT,verbose=True)
+
     flow_values = f.value 
     shortest_paths = []
     offset = 0

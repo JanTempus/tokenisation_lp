@@ -11,7 +11,7 @@ import csv
 # ------------------------------
 dataset_size = 65536
 vocab_size = 1024
-chunk_size = 200  # how many examples to merge together
+chunk_size = 20000  # how many examples to merge together
 
 dataset_path = "finewebedu_data"
 vocab_file = f"vocabs/vocab_finewebedu_data_0_{vocab_size}.json"
@@ -45,7 +45,7 @@ for i in tqdm(range(0, len(dataset), chunk_size), desc="Merging texts"):
 all_ids = []
 all_lens = []
 
-for text in tqdm(merged_texts, desc="Tokenizing"):
+for text in merged_texts:
     ids = tokenizer.encode(text, vocab)
     all_ids.append(ids)
     all_lens.append(len(ids))
