@@ -40,7 +40,12 @@ def merge_every_n_rows(dataset, n: int):
     return Dataset.from_list(merged_rows)
 
 def process(example):
-    ids = tokenizer.encode_matrix(example['text'],vocab) # encode_ordinary ignores any special tokens
+
+    if isinstance(example["text"], list):
+        text = "<|endoftext|>".join(example["text"])
+    else:
+        text = example["text"]
+    ids = tokenizer.encode_matrix(text,vocab) # encode_ordinary ignores any special tokens
     out = {'ids': ids, 'len': len(ids)}
     return out
 
@@ -50,8 +55,6 @@ tokenized = dataset.map(
     process,
     remove_columns=['text'],
     desc="tokenizing the splits",
-     batched=True,
-    batch_size=512,
     num_proc=num_proc,
 )
 
