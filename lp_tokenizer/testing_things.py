@@ -62,13 +62,10 @@ merged=merge_every_n_rows(chunk,2)
 
 
 
-tokens_b=tokenizer.encode(dataset_0['text'],vocab)
+tokens_b=tokenizer.encode("<|endoftext>",vocab)
 
 print(tokens_b)
 
-
-tokens_a=tokenizer.encode_matrix(dataset_0['text'],vocab)
-print(tokens_a)
 
 # if tokens_a == tokens_b:
 #     print("✅ Outputs are identical")
