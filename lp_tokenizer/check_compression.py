@@ -46,7 +46,7 @@ def process(batch):
     merged_text = "".join(texts)
     
     # Tokenize
-    merged_ids = tokenizer.encode(merged_text, vocab)
+    merged_ids = tokenizer.encode_matrix(merged_text, vocab)
 
     
     # Split on token 1
@@ -71,7 +71,7 @@ tokenized = dataset.map(
     remove_columns=["text"],
     desc="tokenizing the splits",
     batched=True,
-    batch_size=20,
+    batch_size=100,
     num_proc=num_proc,
 )
 
