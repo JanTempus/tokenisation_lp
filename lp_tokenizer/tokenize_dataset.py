@@ -11,7 +11,7 @@ from multiprocessing import Pool, cpu_count
 dataset_path = "finewebedu_data"
 #dataset_size = 
 vocab_size = 32768
-num_proc = 8       # processes inside Dataset.map()
+num_proc = 4       # processes inside Dataset.map()
 batch_size = 100
 shard_size = 10000  # examples per shard
 out_dir = "tokenized_shards"
