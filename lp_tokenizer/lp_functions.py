@@ -17,6 +17,24 @@ import matplotlib.pyplot as plt
 from datastructures import tokenInstance, possibleToken
 import helper_functions as hf
 
+
+import sys
+import os
+import cvxpy as cp
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_stdout_stderr():
+    """Suppress all stdout and stderr (works for multithreaded solvers like cuOpt)."""
+    with open(os.devnull, "w") as devnull:
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout, sys.stderr = devnull, devnull
+        try:
+            yield
+        finally:
+            sys.stdout, sys.stderr = old_stdout, old_stderr
+
+
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
             tokens: list[possibleToken], 
@@ -250,9 +268,8 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     objective=cp.Minimize(BigNonFreewVector.T@f)
 
     problem = cp.Problem(objective, constraints)
- 
-    problem.solve(solver=cp.CUOPT,cuopt_params={"CUOPT_LOG_TO_CONSOLE": True})
- 
+    with suppress_stdout_stderr():
+         problem.solve(solver=cp.CUOPT)
     flow_values = f.value 
     shortest_paths = []
     offset = 0
