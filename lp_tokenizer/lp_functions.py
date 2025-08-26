@@ -454,8 +454,82 @@ def edges_list_to_cudf(edges_list, num_vertices):
     })
     return edges_df
 
-
 def tokenize_matrix(edges_list, num_vertices_list, return_token_index=True):
+    """
+    Compute shortest path through ALL tokenization graphs chained together,
+    using a single BFS traversal.
+
+    edges_list: list of lists of edges for each graph
+                Each edge is an object with `start`, `end`, `token_index` or `token`
+    num_vertices_list: list of number of vertices per graph
+    return_token_index: if True, returns token indices, else returns token strings
+
+    Returns: flattened token path across all graphs
+    """
+
+    # Step 1: Compute offsets
+    offsets = np.cumsum([0] + num_vertices_list[:-1])
+
+    src_list, dst_list, weight_list, token_list = [], [], [], []
+
+    for g_idx, edges in enumerate(edges_list):
+        offset = offsets[g_idx]
+        for edge in edges:
+            src_list.append(edge.start + offset)
+            dst_list.append(edge.end + offset)
+            weight_list.append(1)
+            token_list.append(edge.token_index if return_token_index else edge.token)
+
+        # Add chaining edge from sink of graph g to source of graph g+1
+        if g_idx < len(num_vertices_list) - 1:
+            sink = offset + num_vertices_list[g_idx] - 1
+            next_src = offsets[g_idx + 1]
+            src_list.append(sink)
+            dst_list.append(next_src)
+            weight_list.append(0)        # chaining edge has weight 0
+            token_list.append(None)      # no token for artificial chaining
+
+    # Build DataFrame of all edges
+    edges_df = cudf.DataFrame({
+        'src': src_list,
+        'dst': dst_list,
+        'weight': weight_list,
+        'token': token_list,
+    })
+
+    # Build graph
+    G = cugraph.Graph(directed=True)
+    G.from_cudf_edgelist(edges_df, source='src', destination='dst', edge_attr='weight', renumber=False)
+
+    # Global start and end
+    start = 0
+    end = offsets[-1] + num_vertices_list[-1] - 1
+
+    # Run BFS once
+    sp_df = cugraph.bfs(G, start)
+
+    # Build predecessor mapping
+    predecessors = sp_df.set_index('vertex')['predecessor'].to_pandas()
+
+    # Build mapping (src,dst) → token
+    edge_to_token = edges_df.set_index(['src','dst'])['token'].to_pandas().to_dict()
+
+    # Reconstruct full path
+    path_tokens = []
+    current = end
+    while current != start:
+        pred = predecessors[current]
+        tok = edge_to_token.get((pred, current))
+        if tok is not None:  # skip chaining edges
+            path_tokens.append(tok)
+        current = pred
+    path_tokens.reverse()
+
+    return path_tokens
+
+
+
+def tokenize_matrix_slow(edges_list, num_vertices_list, return_token_index=True):
     """
     Compute shortest paths for multiple tokenization graphs using cuGraph on GPU.
 
