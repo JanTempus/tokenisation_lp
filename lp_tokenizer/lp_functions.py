@@ -502,7 +502,7 @@ def tokenize_matrix(edges_list, num_vertices_list, return_token_index=True):
         graph_edges = edges_df[edges_df.graph_id == g_idx][['src','dst','weight','token']]
         
         # Build cuGraph Graph
-        G = cugraph.DiGraph()
+        G = cugraph.Graph(directed=True)
         G.from_cudf_edgelist(graph_edges, source='src', destination='dst', edge_attr='weight', renumber=False)
         
         # Compute shortest path from start to end
