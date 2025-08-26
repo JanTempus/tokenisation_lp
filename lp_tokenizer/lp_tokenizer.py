@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk
+from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk, shortest_tokenization_path
 from datastructures import tokenInstance
 import numpy as np
 import os
@@ -219,7 +219,39 @@ class Tokenizer:
      
         return tokenized_data
       
-                    
+
+
+    def encode_combinatorial(self,corpus:list[str], vocab):
+        if self.unk_token is None:
+            raise KeyError("Please assign a token to the unkown token")
+
+        input_strings=[]
+        words_with_offsets=self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(corpus)
+        input_strings= [word for word, offset in words_with_offsets]
+
+     
+        num_strings=len(input_strings)
+
+        edges_list=[]
+        num_vertices=[]
+
+
+        # for i in tqdm(range(num_strings), desc="Processing strings"):
+        for i in range(num_strings):
+            string_len=len(input_strings[i])
+            edges=hf.get_strings_from_vocab(input_strings[i],vocab)
+            #edges_corrected=fill_missing_edges_with_unk(edges,string_len+1,self.unk_token,0)#0 is the unkown ID
+            if len(edges)>0: 
+                edges_list.append(edges)
+                num_vertices.append(string_len+1)
+            
+       
+        tokenized_data=shortest_tokenization_path(edges_list,num_vertices)
+
+     
+        return tokenized_data
+      
+
             
     def get_unique_chars(self, dataset,dataset_size):
         """

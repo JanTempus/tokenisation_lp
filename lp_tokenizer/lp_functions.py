@@ -18,9 +18,10 @@ from datastructures import tokenInstance, possibleToken
 import helper_functions as hf
 
 
-import sys
-import os
-import cvxpy as cp
+
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import shortest_path
+
 
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
@@ -137,64 +138,6 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
 
     return problem
 
-def tokenize_single(edges: list[tokenInstance], edge_weight: int, num_vertices: int):
-    """
-    Solve a single shortest path LP with flow constraints.
-    
-    Args:
-        edges (list[tokenInstance]): List of edges (each with .start, .end, .token_index).
-        edge_weight (int): Weight for all edges.
-        num_vertices (int): Number of vertices in the graph.
-
-    Returns:
-        list[int]: Token indices of edges used in the shortest path.
-    """
-    num_edges = len(edges)
-
-    # Build flow constraint matrix A
-    A_rows, A_cols, A_data = [], [], []
-    for idx, edge in enumerate(edges):
-        A_rows.append(edge.start)
-        A_cols.append(idx)
-        A_data.append(1)
-
-        A_rows.append(edge.end)
-        A_cols.append(idx)
-        A_data.append(-1)
-
-    A = sp.coo_matrix((A_data, (A_rows, A_cols)), shape=(num_vertices, num_edges)).tocsr()
-
-    # Build b vector (source = 1, sink = -1)
-    b = np.zeros(num_vertices, dtype=int)
-    b[0] = 1
-    b[num_vertices - 1] = -1
-
-    # Edge weights vector
-    w = np.full(num_edges, edge_weight)
-
-    # CVXPY variables and problem
-    f = cp.Variable(num_edges, nonneg=True)
-    constraints = [A @ f == b]
-    objective = cp.Minimize(w.T @ f)
-    problem = cp.Problem(objective, constraints)
-
-    start = time.time()
-    problem.solve(solver=cp.GLOP)
-    end = time.time()
-
-    print(f"Solved in {end - start:.4f} seconds")
-
-    # Extract used edges
-    flow_values = f.value
-    if flow_values is None:
-
-
-        raise ValueError("No feasible solution found.")
-
-    used_edges = [edges[j].token_index for j in range(num_edges) if flow_values[j] > 1e-6]
-
-    return used_edges
-
 
 
 def tokenize(edgesList: list[list[tokenInstance]] , 
@@ -257,7 +200,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
 
     problem = cp.Problem(objective, constraints)
 
-    problem.solve(solver=cp.CUOPT,verbose=True)
+    problem.solve(solver=cp.GLOP)
 
     flow_values = f.value 
     shortest_paths = []
@@ -497,7 +440,53 @@ def create_vocab_old(inputStringList: list[str],
     
     return possibleTokens
 
-   
+def shortest_tokenization_path(edges_list, num_vertices_list, return_tokens="index"):
+    """
+    Compute shortest tokenization paths for a batch of strings.
+    
+    edges_list: list of lists of Edge objects with attributes `start`, `end`, `token`, `token_index`
+    num_vertices_list: list of integers, length of each string + 1
+    return_tokens: "index" to return token_index, "token" to return token string
+    """
+    tokenized_paths = []
+
+    for edges, num_vertices in zip(edges_list, num_vertices_list):
+        if len(edges) == 0:
+            tokenized_paths.append([])
+            continue
+
+        rows = [e.start for e in edges]
+        cols = [e.end for e in edges]
+        data = np.ones(len(edges), dtype=int)
+
+        adj = coo_matrix((data, (rows, cols)), shape=(num_vertices, num_vertices))
+
+        # shortest path from start (0) to end (num_vertices-1)
+        _, pred = shortest_path(csgraph=adj, directed=True, return_predecessors=True, indices=0)
+
+        # reconstruct path in terms of edges
+        path_edges = []
+        node = num_vertices - 1
+        while node != 0:
+            prev = pred[node]
+            if prev == -9999:  # no path
+                path_edges = []
+                break
+            # find edge connecting prev -> node
+            for e in edges:
+                if e.start == prev and e.end == node:
+                    path_edges.append(e)
+                    break
+            node = prev
+
+        path_edges.reverse()
+
+        if return_tokens == "index":
+            tokenized_paths.append([e.token_index for e in path_edges])
+        else:  # return_tokens == "token"
+            tokenized_paths.append([e.token for e in path_edges])
+
+    return tokenized_paths
 
 def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,vocab_size:int):
     if(vocab_size<len(unique_chars)):
