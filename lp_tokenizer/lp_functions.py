@@ -455,75 +455,80 @@ def edges_list_to_cudf(edges_list, num_vertices):
     return edges_df
 
 
-
-
 def tokenize_matrix(edges_list, num_vertices_list, return_token_index=True):
     """
     Compute shortest paths for multiple tokenization graphs using cuGraph on GPU.
-    
+
     edges_list: list of lists of edges for each graph
-                Each edge is an object with `start`, `end`, `token_index` attributes
+                Each edge is an object with `start`, `end`, `token_index` or `token`
     num_vertices_list: list of number of vertices per graph
     return_token_index: if True, returns token indices, else returns token strings
-    
+
     Returns: list of lists, flattened token paths for each graph
     """
-    
-    # Step 1: Compute offsets for vertex IDs
+
+    # Step 1: Compute offsets so we can merge graphs into one space
     offsets = np.cumsum([0] + num_vertices_list[:-1])
-    
-    # Step 2: Merge all edges into a single cuDF DataFrame
+
     src_list, dst_list, weight_list, token_list, graph_id_list = [], [], [], [], []
-    
+
     for g_idx, edges in enumerate(edges_list):
         offset = offsets[g_idx]
         for edge in edges:
             src_list.append(edge.start + offset)
             dst_list.append(edge.end + offset)
-            weight_list.append(1)  # or edge.weight if weighted
+            weight_list.append(1)  # unweighted → all 1
             token_list.append(edge.token_index if return_token_index else edge.token)
             graph_id_list.append(g_idx)
-    
+
+    # Build DataFrame of all edges
     edges_df = cudf.DataFrame({
         'src': src_list,
         'dst': dst_list,
+        'weight': weight_list,
         'token': token_list,
         'graph_id': graph_id_list
     })
-    
-    # Step 3: Compute shortest paths
+
     all_paths = []
+
+    # Step 2: Solve each graph separately
     for g_idx, num_v in enumerate(num_vertices_list):
         start = offsets[g_idx]
         end = start + num_v - 1
-        
-        # Filter edges for this graph
+
+        # Subset edges for this graph
         graph_edges = edges_df[edges_df.graph_id == g_idx][['src','dst','weight','token']]
-        
-        # Build cuGraph Graph
+
+        # Build graph
         G = cugraph.Graph(directed=True)
         G.from_cudf_edgelist(graph_edges, source='src', destination='dst', edge_attr='weight', renumber=False)
-        
-        # Compute shortest path from start to end
+
+        # BFS from start
         sp_df = cugraph.bfs(G, start)
-        
-        # Reconstruct path
-        path_vertices = []
-        current = end
+
+        # Build predecessor mapping
         predecessors = sp_df.set_index('vertex')['predecessor'].to_pandas()
-        tokens = graph_edges.set_index(['src','dst'])['token'].to_pandas()
-        
+
+        # Build mapping (src,dst) → token
+        edge_to_token = graph_edges.set_index(['src','dst'])['token'].to_pandas().to_dict()
+
+        # Reconstruct shortest path tokens
+        path_tokens = []
+        current = end
         while current != start:
             pred = predecessors[current]
-            path_vertices.append(tokens[(pred, current)])
+            path_tokens.append(edge_to_token[(pred, current)])
             current = pred
-        path_vertices.append(tokens[(start, sp_df.loc[sp_df.vertex==start, 'vertex'].iloc[0])])
-        
-        all_paths.append(path_vertices[::-1])  # reverse to go from start -> end
+        path_tokens.reverse()
 
-    # Step 4: Flatten paths
+        all_paths.append(path_tokens)
+
+    # Flatten across all graphs
     flat_paths = [token for path in all_paths for token in path]
     return flat_paths
+
+
 
 def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,vocab_size:int):
     if(vocab_size<len(unique_chars)):
