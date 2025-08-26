@@ -50,6 +50,8 @@ tokenized = dataset.map(
     process,
     remove_columns=['text'],
     desc="tokenizing the splits",
+     batched=True,
+    batch_size=512,
     num_proc=num_proc,
 )
 
