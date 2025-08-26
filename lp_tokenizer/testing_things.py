@@ -68,12 +68,12 @@ tokens_b=tokenizer.encode(dataset_0['text'],vocab)
 print(tokens_a)
 print(tokens_b)
 
-if tokens_a == tokens_b:
-    print("✅ Outputs are identical")
-else:
-    print("❌ Outputs differ!")
-    # show where they differ
-    for i, (a, b) in enumerate(zip(tokens_a, tokens_b)):
-        if a != b:
-            print(f"Mismatch at position {i}: {a} vs {b}")
-            break
+# if tokens_a == tokens_b:
+#     print("✅ Outputs are identical")
+# else:
+#     print("❌ Outputs differ!")
+#     # show where they differ
+#     for i, (a, b) in enumerate(zip(tokens_a, tokens_b)):
+#         if a != b:
+#             print(f"Mismatch at position {i}: {a} vs {b}")
+#             break
