@@ -40,7 +40,7 @@ def merge_every_n_rows(dataset, n: int):
     return Dataset.from_list(merged_rows)
 def process(batch):
     # Append <|endoftext|> to every string
-    texts = [t + "<|endoftext|>" for t in batch["text"]]
+    texts = [t + "endoftextbehere" for t in batch["text"]]
     
     # Merge
     merged_text = "".join(texts)
