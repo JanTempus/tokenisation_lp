@@ -12,6 +12,7 @@ datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
+num_proc=8
 
 pynvml.nvmlInit()
 handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # GPU 0
