@@ -221,7 +221,7 @@ class Tokenizer:
       
 
 
-    def encode_combinatorial(self,corpus:list[str], vocab):
+    def encode_matrix(self,corpus:list[str], vocab):
         if self.unk_token is None:
             raise KeyError("Please assign a token to the unkown token")
 
@@ -246,11 +246,10 @@ class Tokenizer:
                 num_vertices.append(string_len+1)
             
        
-        tokenized_data=shortest_tokenization_path(edges_list,num_vertices)
+        tokenized_data=tokenize_matrix(edges_list,num_vertices)
+        flattened_tokens = [token for path in tokenized_data for token in path]
 
-     
-        return tokenized_data
-      
+        return flattened_tokens
 
             
     def get_unique_chars(self, dataset,dataset_size):

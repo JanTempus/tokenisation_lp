@@ -12,15 +12,13 @@ import psutil
 import os
 import threading
 import matplotlib.pyplot as plt
+import cudf
+import cugraph
 
 
 from datastructures import tokenInstance, possibleToken
 import helper_functions as hf
 
-
-
-from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import shortest_path
 
 
 
@@ -139,7 +137,6 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
     return problem
 
 
-
 def tokenize(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
             numVerticesList:list[int],
@@ -212,7 +209,7 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
                 edges = edgesList[i]
                 numEdges = len(edges)
                 flows = flow_values[offset:offset+numEdges]
-                used_edges = [edges[j].token_index for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
+                used_edges = [edges[j].token for j in range(numEdges) if flows[j] > 1e-6]  # tolerance for numerical noise
                 shortest_paths.append(used_edges)
                 offset += numEdges
 
@@ -440,53 +437,98 @@ def create_vocab_old(inputStringList: list[str],
     
     return possibleTokens
 
-def shortest_tokenization_path(edges_list, num_vertices_list, return_tokens="index"):
+
+def edges_list_to_cudf(edges_list, num_vertices):
+    srcs = []
+    dsts = []
+    for edges in edges_list:
+        for e in edges:
+            srcs.append(e.start)
+            dsts.append(e.end)
+
+    # unweighted → weight=1
+    edges_df = cudf.DataFrame({
+        "src": srcs,
+        "dst": dsts,
+        "weight": [1.0] * len(srcs)
+    })
+    return edges_df
+
+
+
+
+def tokenize_matrix(edges_list, num_vertices_list, return_token_index=True):
     """
-    Compute shortest tokenization paths for a batch of strings.
+    Compute shortest paths for multiple tokenization graphs using cuGraph on GPU.
     
-    edges_list: list of lists of Edge objects with attributes `start`, `end`, `token`, `token_index`
-    num_vertices_list: list of integers, length of each string + 1
-    return_tokens: "index" to return token_index, "token" to return token string
+    edges_list: list of lists of edges for each graph
+                Each edge is an object with `start`, `end`, `token_index` attributes
+    num_vertices_list: list of number of vertices per graph
+    return_token_index: if True, returns token indices, else returns token strings
+    
+    Returns: list of lists, flattened token paths for each graph
     """
-    tokenized_paths = []
+    
+    # Step 1: Compute offsets for vertex IDs
+    offsets = np.cumsum([0] + num_vertices_list[:-1])
+    
+    # Step 2: Merge all edges into a single cuDF DataFrame
+    src_list, dst_list, weight_list, token_list, graph_id_list = [], [], [], [], []
+    
+    for g_idx, edges in enumerate(edges_list):
+        offset = offsets[g_idx]
+        for edge in edges:
+            src_list.append(edge.start + offset)
+            dst_list.append(edge.end + offset)
+            weight_list.append(1)  # or edge.weight if weighted
+            token_list.append(edge.token_index if return_token_index else edge.token)
+            graph_id_list.append(g_idx)
+    
+    edges_df = cudf.DataFrame({
+        'src': src_list,
+        'dst': dst_list,
+        'weight': weight_list,
+        'token': token_list,
+        'graph_id': graph_id_list
+    })
+    
+    # Step 3: Compute shortest paths
+    all_paths = []
+    for g_idx, num_v in enumerate(num_vertices_list):
+        start = offsets[g_idx]
+        end = start + num_v - 1
+        
+        # Filter edges for this graph
+        graph_edges = edges_df[edges_df.graph_id == g_idx][['src','dst','weight','token']]
+        
+        # Build cuGraph Graph
+        G = cugraph.DiGraph()
+        G.from_cudf_edgelist(graph_edges, source='src', destination='dst', edge_attr='weight', renumber=False)
+        
+        # Compute shortest path from start to end
+        sp_df = cugraph.bfs(G, start)
+        
+        # Reconstruct path
+        path_vertices = []
+        current = end
+        predecessors = sp_df.set_index('vertex')['predecessor'].to_pandas()
+        tokens = graph_edges.set_index(['src','dst'])['token'].to_pandas()
+        
+        while current != start:
+            pred = predecessors[current]
+            path_vertices.append(tokens[(pred, current)])
+            current = pred
+        path_vertices.append(tokens[(start, sp_df.loc[sp_df.vertex==start, 'vertex'].iloc[0])])
+        
+        all_paths.append(path_vertices[::-1])  # reverse to go from start -> end
 
-    for edges, num_vertices in zip(edges_list, num_vertices_list):
-        if len(edges) == 0:
-            tokenized_paths.append([])
-            continue
+    # Step 4: Flatten paths
+    flat_paths = [token for path in all_paths for token in path]
+    return flat_paths
 
-        rows = [e.start for e in edges]
-        cols = [e.end for e in edges]
-        data = np.ones(len(edges), dtype=int)
+# Example usage:
+# flat_token_path = compute_shortest_paths(edges_list, num_vertices_list, return_token_index=True)
 
-        adj = coo_matrix((data, (rows, cols)), shape=(num_vertices, num_vertices))
-
-        # shortest path from start (0) to end (num_vertices-1)
-        _, pred = shortest_path(csgraph=adj, directed=True, return_predecessors=True, indices=0)
-
-        # reconstruct path in terms of edges
-        path_edges = []
-        node = num_vertices - 1
-        while node != 0:
-            prev = pred[node]
-            if prev == -9999:  # no path
-                path_edges = []
-                break
-            # find edge connecting prev -> node
-            for e in edges:
-                if e.start == prev and e.end == node:
-                    path_edges.append(e)
-                    break
-            node = prev
-
-        path_edges.reverse()
-
-        if return_tokens == "index":
-            tokenized_paths.append([e.token_index for e in path_edges])
-        else:  # return_tokens == "token"
-            tokenized_paths.append([e.token for e in path_edges])
-
-    return tokenized_paths
 
 def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,vocab_size:int):
     if(vocab_size<len(unique_chars)):
