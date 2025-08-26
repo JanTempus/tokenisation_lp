@@ -40,7 +40,7 @@ def merge_every_n_rows(dataset, n: int):
     return Dataset.from_list(merged_rows)
 
 def process(example):
-    ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
+    ids = tokenizer.encode_matrix(example['text'],vocab) # encode_ordinary ignores any special tokens
     out = {'ids': ids, 'len': len(ids)}
     return out
 
