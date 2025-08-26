@@ -46,7 +46,7 @@ def process(batch):
     merged_text = "".join(texts)
     
     # Tokenize
-    merged_ids = tokenizer.encode_matrix(merged_text, vocab)
+    merged_ids = tokenizer.encode(merged_text, vocab)
 
     
     # Split on token 1
