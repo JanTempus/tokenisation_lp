@@ -7,7 +7,7 @@ from lp_tokenizer import Tokenizer
 import csv
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
-num_proc = 8
+num_proc = 1
 
 dataset_size=65536
 vocab_size=32768
