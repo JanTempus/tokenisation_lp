@@ -11,7 +11,7 @@ import csv
 # ------------------------------
 dataset_size = 65536
 vocab_size = 1024
-chunk_size = 20  # how many examples to merge together
+chunk_size = 200  # how many examples to merge together
 
 dataset_path = "finewebedu_data"
 vocab_file = f"vocabs/vocab_finewebedu_data_0_{vocab_size}.json"
