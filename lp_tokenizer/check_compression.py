@@ -7,39 +7,43 @@ from lp_tokenizer import Tokenizer
 import csv
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
-num_proc = 8
+num_proc = 12
 
 dataset_size=65536
-vocab_size=1024
+vocab_size=32768
 
+dataset = load_from_disk("finewebedu_data")['train'].select(range(65536))
 
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-
-file_path=f"vocabs/vocab_finewebedu_data_0_{vocab_size}.json"
+file_path=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
 
 with open(file_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
 
 tokenizer=Tokenizer(vocab_size=vocab_size,vocab=vocab,unk_token="[UNK]")
 
-dataset = load_from_disk("finewebedu_data")['train'].select(range(65536))
+def merge_every_n_rows(dataset, n: int):
+    """
+    Merge every n rows of a Hugging Face Dataset into one row,
+    concatenating the 'text' fields into a single string per merged row.
+    Returns a Hugging Face Dataset compatible with .map().
+    """
+    merged_rows = []
 
-def merge_into_chunks(dataset, t: int,):
-        merged_texts = []
-        # Go through dataset in steps of t
-        for i in tqdm(range(0, len(dataset), t),desc="Making into larger chunks"):
-            chunk = dataset[i : i + t]  # list of texts
-            merged_text = " ".join(chunk)
-            merged_texts.append(merged_text)
+    for i in tqdm(range(0, len(dataset), n), total=(len(dataset) + n - 1) // n, desc="Merging texts"):
+        # Select the next n rows and convert to list of dicts
+        chunk = dataset.select(range(i, min(i+n, len(dataset)))).to_dict()["text"]
+        # Concatenate the 'text' values with a separator
+        merged_text = "<|endoftext|>".join(chunk)
+        # Append as a dict
+        merged_rows.append({"text": merged_text})
 
-        # Create new dataset
-        dataset_merged = Dataset.from_dict({'text': merged_texts})
-        return dataset_merged
+    return Dataset.from_list(merged_rows)
 
 def process(example):
     ids = tokenizer.encode(example['text'],vocab) # encode_ordinary ignores any special tokens
     out = {'ids': ids, 'len': len(ids)}
     return out
+
 
 # tokenize the dataset
 tokenized = dataset.map(
