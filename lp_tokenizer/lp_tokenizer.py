@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk, shortest_tokenization_path
+from lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk
 from datastructures import tokenInstance
 import numpy as np
 import os
