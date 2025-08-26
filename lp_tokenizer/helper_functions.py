@@ -27,10 +27,10 @@ def get_strings_from_vocab(input_string: str, vocab: defaultdict[str, int]) -> l
         raise(ValueError)
     
     token_instances = []
-    max_len = max(len(tok) for tok in vocab) if vocab else 0
+    
 
     for start in range(len(input_string)):
-        for end in range(start + 1, min(len(input_string) + 1, start + max_len + 1)):
+        for end in range(start + 1,len(input_string) + 1):
             substring = input_string[start:end]
             if substring in vocab:
                 ti = tokenInstance(

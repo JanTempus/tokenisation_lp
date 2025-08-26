@@ -22,7 +22,7 @@ dataset_path="finewebedu_data"
 dataset_size=65536
 vocab_size=32768
 
-file_path=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
+file_path=f"vocab_finewebedu_data_{vocab_size}.json"
 
 with open(file_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
@@ -60,11 +60,8 @@ def merge_every_n_rows(dataset, n: int):
 
 merged=merge_every_n_rows(chunk,2)
 
+tokens_b=tokenizer.encode("endoftextbehere",vocab)
 
-
-tokens_b=tokenizer.encode("<|endoftext>",vocab)
-
-print(tokens_b)
 
 
 # if tokens_a == tokens_b:
