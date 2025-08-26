@@ -355,7 +355,7 @@ def create_vocab(inputStringList: list[str],
 
     internal_time=lpProblem.solver_stats.solve_time
     my_time= end - start
-    output_file="computation_time.csv "
+    output_file="computation_time.csv"
     with open(output_file, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([f"Interal Time {internal_time}"])

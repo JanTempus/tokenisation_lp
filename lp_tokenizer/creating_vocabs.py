@@ -40,7 +40,7 @@ true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars_parallel(dataset_raw,true_dataset_size,pretokenizer,num_proc=num_proc)
 unique_chars_size=len(unique_chars)
 
-output_file="computation_time.csv "
+output_file="computation_time.csv"
 file_exists = os.path.exists(output_file)
 
 with open(output_file, "a", newline="", encoding="utf-8") as f:
