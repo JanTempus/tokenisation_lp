@@ -71,7 +71,7 @@ tokenized = dataset.map(
     remove_columns=["text"],
     desc="tokenizing the splits",
     batched=True,
-    batch_size=20,
+    batch_size=2,
     num_proc=num_proc,
 )
 
