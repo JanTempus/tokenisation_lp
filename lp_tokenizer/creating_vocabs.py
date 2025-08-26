@@ -21,8 +21,8 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               cache_dir="./pythia-70m-deduped/step3000",
                                             )
 
-dataset_size=16384 #1048576
-vocab_sizes=[4096,8192,16384,32768]
+dataset_size=65536 #1048576
+vocab_sizes=[1024,2048,4096,8192,16384,32768,65536,131072]
 
 if dataset_url is None and dataset_path is None:
     raise ValueError("Must include either dataset_url or dataset_path")
@@ -40,13 +40,28 @@ true_dataset_size=len(dataset)
 unique_chars = tokenizer.get_unique_chars_parallel(dataset_raw,true_dataset_size,pretokenizer,num_proc=num_proc)
 unique_chars_size=len(unique_chars)
 
+output_file="computation_time.csv "
+file_exists = os.path.exists(output_file)
+
+with open(output_file, "a", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+    writer.writerow([f"Dataset size {dataset_size}"])
+
+
+
+ 
 for vocab_size in vocab_sizes:
+
+    with open(output_file, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([f"Vocab size {vocab_size}"])
+
     tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
     input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
 
     tokenizer.make_vocab(input_strings=input_strings,
                             input_strings_frequencies=input_strings_frequencies, 
-                            unique_chars=unique_chars )
+                            unique_chars=unique_chars,save_vocab=False )
     
    
 

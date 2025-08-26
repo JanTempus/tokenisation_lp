@@ -13,6 +13,7 @@ import pickle
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 from tqdm.contrib.concurrent import process_map  # or thread_map
+import csv
 
 
 class Tokenizer:
@@ -114,9 +115,9 @@ class Tokenizer:
             
         if save_vocab:
             vocab_length = len(all_tokens)
-            file_name = f"vocab_{self.saved_dataset_path}_{self.dataset_size}_{vocab_length}.json"
+            file_name = f"vocab_{self.saved_dataset_path}_{vocab_length}.json"
 
-            folder_name = "vocabs"
+            folder_name = "vocabs_new"
             os.makedirs(folder_name, exist_ok=True)
 
             file_path = os.path.join(folder_name, file_name)

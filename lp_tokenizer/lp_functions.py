@@ -7,7 +7,7 @@ from tqdm import tqdm
 import time
 from numpy.typing import NDArray
 import random
-
+import csv
 import psutil
 import os
 import threading
@@ -250,10 +250,9 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     objective=cp.Minimize(BigNonFreewVector.T@f)
 
     problem = cp.Problem(objective, constraints)
-    start = time.time()
+ 
     problem.solve(solver=cp.GLOP)
-    end=time.time()
-
+ 
     flow_values = f.value 
     shortest_paths = []
     offset = 0
@@ -323,23 +322,23 @@ def create_vocab(inputStringList: list[str],
     numAllowedTokensParam = lpProblem.parameters()[0]
     numAllowedTokensParam.value = numAllowedTokens
 
-    # --- Memory tracking setup ---
-    process = psutil.Process(os.getpid())
-    memory_samples = []
-    timestamps = []
-    stop_flag = False
+    # # --- Memory tracking setup ---
+    # process = psutil.Process(os.getpid())
+    # memory_samples = []
+    # timestamps = []
+    # stop_flag = False
 
-    def track_memory(interval=0.05):
-        start_time = time.time()
-        while not stop_flag:
-            mem = process.memory_info().rss / (1024**2)  # in MB
-            memory_samples.append(mem)
-            timestamps.append(time.time() - start_time)
-            time.sleep(interval)
+    # def track_memory(interval=0.05):
+    #     start_time = time.time()
+    #     while not stop_flag:
+    #         mem = process.memory_info().rss / (1024**2)  # in MB
+    #         memory_samples.append(mem)
+    #         timestamps.append(time.time() - start_time)
+    #         time.sleep(interval)
 
-    tracker_thread = threading.Thread(target=track_memory, daemon=True)
-    tracker_thread.start()
-    # --- End memory tracking setup ---
+    # tracker_thread = threading.Thread(target=track_memory, daemon=True)
+    # tracker_thread.start()
+    # # --- End memory tracking setup ---
 
     start = time.time()
     lpProblem.solve(solver=cp.CUOPT,verbose=True)
@@ -354,24 +353,33 @@ def create_vocab(inputStringList: list[str],
     # )
     end = time.time()
 
+    internal_time=lpProblem.solver_stats.solve_time
+    my_time= end - start
+    output_file="computation_time.csv "
+    with open(output_file, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([f"Interal Time {internal_time}"])
+        writer.writerow([f"My Time {my_time}"])
+
+
     # Stop memory tracking
     stop_flag = True
-    tracker_thread.join()
+    # tracker_thread.join()
 
-    print(f"The LP solve took {end - start:.4f} seconds")
-    print(f"Peak memory: {max(memory_samples):.2f} MB, Average memory: {sum(memory_samples)/len(memory_samples):.2f} MB")
+    print(f"The LP solve took {my_time:.4f} seconds")
+    # print(f"Peak memory: {max(memory_samples):.2f} MB, Average memory: {sum(memory_samples)/len(memory_samples):.2f} MB")
 
-    # Save memory usage plot
-    plt.figure(figsize=(10, 5))
-    plt.plot(timestamps, memory_samples, label="RSS Memory (MB)")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Memory (MB)")
-    plt.title("Memory Usage During LP Solve")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f"lp_memory_usage_{vocab_size}.png")
-    print(f"Memory usage plot saved to lp_memory_usage_{vocab_size}.png")
+    # # Save memory usage plot
+    # plt.figure(figsize=(10, 5))
+    # plt.plot(timestamps, memory_samples, label="RSS Memory (MB)")
+    # plt.xlabel("Time (s)")
+    # plt.ylabel("Memory (MB)")
+    # plt.title("Memory Usage During LP Solve")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+    # plt.savefig(f"lp_memory_usage_{vocab_size}.png")
+    # print(f"Memory usage plot saved to lp_memory_usage_{vocab_size}.png")
 
     lpVariables = lpProblem.variables()
     tVar = lpVariables[2].value
