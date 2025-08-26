@@ -6,12 +6,17 @@ import csv
 from tqdm import tqdm
 import numpy as np
 from functools import partial
+import pynvml
 
 datasetname="finewebedu"
 dataset_url="pietrolesci/finewebedu-20B"
 dataset_path="finewebedu_data"
 
-num_proc=12
+
+pynvml.nvmlInit()
+handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # GPU 0
+
+
 
 tokenizer=Tokenizer(saved_dataset_path=dataset_path)
 
@@ -48,22 +53,27 @@ with open(output_file, "a", newline="", encoding="utf-8") as f:
     writer.writerow([f"Dataset size {dataset_size}"])
 
 
+pynvml.nvmlInit()
+handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # GPU 0
 
- 
 for vocab_size in vocab_sizes:
+    tokenizer = Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
+    input_strings, input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size, dataset_raw, save=False)
+
+    tokenizer.make_vocab(
+        input_strings=input_strings,
+        input_strings_frequencies=input_strings_frequencies,
+        unique_chars=unique_chars,
+        save_vocab=False
+    )
+
+    mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+
+    print(f"Vocab size: {vocab_size}, GPU memory used: {mem_info.used / 1024**2:.2f} MB, GPU utilization: {util.gpu}%")
 
     with open(output_file, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow([f"Vocab size {vocab_size}"])
+        writer.writerow([vocab_size, mem_info.used, util.gpu])
 
-    tokenizer=Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
-    input_strings,  input_strings_frequencies = tokenizer.pretokenize_and_prepare_dataset(dataset_size,dataset_raw,save=False)
-
-    tokenizer.make_vocab(input_strings=input_strings,
-                            input_strings_frequencies=input_strings_frequencies, 
-                            unique_chars=unique_chars,save_vocab=False )
-    
-   
-
-
-    
+pynvml.nvmlShutdown()
