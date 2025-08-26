@@ -7,7 +7,7 @@ from lp_tokenizer import Tokenizer
 import csv
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
-num_proc = 1
+num_proc = 8
 
 dataset_size=65536
 vocab_size=32768
@@ -65,24 +65,12 @@ def process(batch):
         "len": [len(x) for x in split_ids],
     }
 
-# Tokenize with batching
 tokenized = dataset.map(
     process,
     remove_columns=["text"],
     desc="tokenizing the splits",
     batched=True,
     batch_size=100,
-    num_proc=num_proc,
-)
-
-
-# Example call
-tokenized = dataset.map(
-    process,
-    remove_columns=["text"],
-    desc="tokenizing the splits",
-    batched=True,
-    batch_size=20,  # all 20 rows will be merged
     num_proc=num_proc,
 )
 
