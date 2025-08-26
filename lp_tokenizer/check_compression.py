@@ -45,7 +45,7 @@ def process(example):
         text = "<|endoftext|>".join(example["text"])
     else:
         text = example["text"]
-    ids = tokenizer.encode_matrix(text,vocab) # encode_ordinary ignores any special tokens
+    ids = tokenizer.encode(text,vocab) # encode_ordinary ignores any special tokens
     out = {'ids': ids, 'len': len(ids)}
     return out
 
