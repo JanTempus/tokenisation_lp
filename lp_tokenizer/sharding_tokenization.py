@@ -109,7 +109,7 @@ def process_specific_shards(dataset, shard_size, shard_indices, k):
 
 # --- Main ---
 if __name__ == "__main__":
-    shards_to_run = [112,113,114,115,116,117,118,119,120,121,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138] 
+    shards_to_run = list(range(139,196))
     shard_paths = process_specific_shards(dataset, shard_size, shards_to_run, num_workers)
 
     print("Selected shards written to disk:")
