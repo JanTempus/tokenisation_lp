@@ -12,7 +12,7 @@ num_proc = 8
 dataset_size=65536
 vocab_size=1024
 
-dataset = load_from_disk("finewebedu_data")['train'].dataset = load_from_disk("finewebedu_data")['train'].select(range(dataset_size, 2*dataset_size))
+dataset = load_from_disk("finewebedu_data")['train'].select(range(dataset_size, 2*dataset_size))
 
 file_path=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
 

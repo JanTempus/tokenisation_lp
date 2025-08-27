@@ -11,3 +11,4 @@ new_tokenizers/
 lp_tokenizer/finewebedu_data
 word_freqs*.npy
 unique*.npy
+bpe_tokenizers/

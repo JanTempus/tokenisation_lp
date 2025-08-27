@@ -2,7 +2,7 @@ from datasets import load_from_disk
 from transformers import AutoTokenizer
 from tqdm import tqdm
 
-def total_chars_in_dataset(dataset_path: str, dataset_size: int) -> int:
+def total_unique_tokens_in_dataset(dataset_path: str, dataset_size: int) -> int:
     """
     Loads a Hugging Face dataset, pre-tokenizes it using EleutherAI/pythia-70m-deduped
     tokenizer, and returns the total number of characters across the texts.
@@ -17,18 +17,17 @@ def total_chars_in_dataset(dataset_path: str, dataset_size: int) -> int:
         cache_dir="./pythia-70m-deduped/step3000",
     )
     
-    total_chars = 0
+    unique_tokens = set()
     
     for row in tqdm(dataset, desc="Pre-tokenizing dataset"):
-        # pretokenizer can do pre_tokenize_str or encode depending on usage
         pre_tokens = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(row["text"])
-        # Sum lengths of all pre-tokenized pieces
-        total_chars += sum(len(piece) for piece, _ in pre_tokens)
+        for token_str, _ in pre_tokens:
+            unique_tokens.add(token_str)
     
-    return total_chars
+    return len(unique_tokens)
 
 # Example usage
 dataset_path = "finewebedu_data"
 dataset_size = 65536
-total_chars = total_chars_in_dataset(dataset_path, dataset_size)
+total_chars = total_unique_tokens_in_dataset(dataset_path, dataset_size)
 print(f"Total characters in dataset: {total_chars}")

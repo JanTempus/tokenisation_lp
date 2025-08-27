@@ -1,0 +1,9 @@
+tokenizer_name,total_tokens,vocab_size,dataset_size
+bpe_1024_finewebedu,127298703,1024,65536
+bpe_131072_finewebedu,65434969,131072,65536
+bpe_4096_finewebedu,94000859,4096,65536
+bpe_16384_finewebedu,75335536,16384,65536
+bpe_32768_finewebedu,70286495,32768,65536
+bpe_8192_finewebedu,83045180,8192,65536
+bpe_65536_finewebedu,67199170,65536,65536
+bpe_2048_finewebedu,108604473,2048,65536
