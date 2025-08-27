@@ -13,7 +13,7 @@ vocab_size = 32768
 num_proc = 16      # processes inside Dataset.map()
 batch_size = 100
 shard_size = 100000 # examples per shard
-out_dir = "tokenized_shards_big"
+out_dir = "tokenized_shards"
 num_workers = 6
 
 # Load dataset
@@ -109,7 +109,7 @@ def process_specific_shards(dataset, shard_size, shard_indices, k):
 
 # --- Main ---
 if __name__ == "__main__":
-    shards_to_run = [112,113,114,115,116,117,118,119,120,121,123,124,125] 
+    shards_to_run = [112,113,114,115,116,117,118,119,120,121,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138] 
     shard_paths = process_specific_shards(dataset, shard_size, shards_to_run, num_workers)
 
     print("Selected shards written to disk:")
