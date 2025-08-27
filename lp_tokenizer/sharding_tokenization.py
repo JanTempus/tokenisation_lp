@@ -10,11 +10,11 @@ from multiprocessing import Pool, cpu_count
 # Config
 dataset_path = "finewebedu_data"
 vocab_size = 32768
-num_proc = 4      # processes inside Dataset.map()
+num_proc = 16      # processes inside Dataset.map()
 batch_size = 100
-shard_size = 400000 # examples per shard
+shard_size = 100000 # examples per shard
 out_dir = "tokenized_shards_big"
-num_workers = 4
+num_workers = 6
 
 # Load dataset
 dataset = load_from_disk(dataset_path)['train']
@@ -80,7 +80,6 @@ def tokenize_shard(args):
             num_proc=num_proc,
             remove_columns=["text"],
             desc=f"Tokenizing shard {shard_idx}",
-            load_from_cache_file=False,
             writer_batch_size=1000
         )
         tokenized_shard.save_to_disk(tmpdir)
@@ -110,8 +109,7 @@ def process_specific_shards(dataset, shard_size, shard_indices, k):
 
 # --- Main ---
 if __name__ == "__main__":
-    # 👇 Pick which shards to run
-    shards_to_run = [47,48, 49, 50]   # example: only shards 3, 7, and 12
+    shards_to_run = [112,113,114,115,116,117,118,119,120,121,123,124,125] 
     shard_paths = process_specific_shards(dataset, shard_size, shards_to_run, num_workers)
 
     print("Selected shards written to disk:")
