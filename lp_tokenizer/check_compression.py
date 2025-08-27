@@ -10,9 +10,9 @@ import csv
 num_proc = 8
 
 dataset_size=65536
-vocab_size=32768
+vocab_size=1024
 
-dataset = load_from_disk("finewebedu_data")['train'].select(range(65536))
+dataset = load_from_disk("finewebedu_data")['train'].dataset = load_from_disk("finewebedu_data")['train'].select(range(dataset_size, 2*dataset_size))
 
 file_path=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
 
@@ -78,7 +78,7 @@ tokenized = dataset.map(
 
 total_tokens = int(np.sum(tokenized["len"]))
 
-output_file = "dataset_stats.csv"
+output_file = "dataset_stats_out_of_distribuition.csv"
 stats = {
         "total_tokens": total_tokens,
         "vocab_size": vocab_size,
