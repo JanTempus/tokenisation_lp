@@ -17,7 +17,7 @@ out_dir = "tokenized_shards"
 num_workers = min(cpu_count(), 12)  # parallel shard workers (k=12)
 
 # Load dataset
-dataset = load_from_disk(dataset_path)['train'].to_iterable_dataset()
+dataset = load_from_disk(dataset_path)['train']
 
 # Load vocab
 file_path = f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
@@ -81,29 +81,33 @@ def tokenize_shard(args):
     return shard_folder
 
 # --- Parallel sharding (k shards at a time) ---
-def shard_and_tokenize(dataset_iter, shard_size, k):
+def shard_and_tokenize_parallel(dataset, shard_size, k):
     os.makedirs(out_dir, exist_ok=True)
+    num_shards = (len(dataset) + shard_size - 1) // shard_size
+
+    shard_args = []
+    for i in range(num_shards):
+        start = i * shard_size
+        end = min((i + 1) * shard_size, len(dataset))
+        shard_dataset = dataset.select(range(start, end))
+        shard_args.append((i, shard_dataset))
+
     shard_paths = []
+    for i in range(0, len(shard_args), k):   # process k shards at a time
+        batch = shard_args[i:i+k]
+        with Pool(k) as pool:
+            batch_paths = list(tqdm(pool.imap(tokenize_shard, batch), total=len(batch)))
+        shard_paths.extend([p for p in batch_paths if p])
 
-    examples_iter = iter(dataset_iter)
-    shard_idx = 0
-    while True:
-        batch_iter = (next(examples_iter) for _ in range(shard_size))
-        try:
-            # Try pulling one full shard_size examples
-            shard_folder = tokenize_shard(shard_idx, batch_iter)
-        except StopIteration:
-            break
-        if shard_folder:
-            shard_paths.append(shard_folder)
-        shard_idx += 1
-
-    # save manifest
+    # Save manifest (list of shard paths)
     manifest_file = os.path.join(out_dir, "manifest.json")
     with open(manifest_file, "w") as f:
         json.dump(shard_paths, f, indent=2)
+
     return shard_paths
 
+# --- Main ---
 if __name__ == "__main__":
-    shard_paths = shard_and_tokenize(dataset, shard_size, num_workers)
+    shard_paths = shard_and_tokenize_parallel(dataset, shard_size, num_workers)
     print("All shards written to disk.")
+    print("Manifest saved at:", os.path.join(out_dir, "manifest.json"))
