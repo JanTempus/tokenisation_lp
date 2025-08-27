@@ -8,7 +8,7 @@ def total_unique_tokens_in_dataset(dataset_path: str, dataset_size: int) -> int:
     tokenizer, and returns the total number of characters across the texts.
     """
     # Load dataset
-    dataset = load_from_disk(dataset_path)['train'].select(range(dataset_size))
+    dataset = load_from_disk(dataset_path)['train'].select(range(dataset_size, 2*dataset_size))
     
     # Load pre-tokenizer
     pretokenizer = AutoTokenizer.from_pretrained(
@@ -17,14 +17,15 @@ def total_unique_tokens_in_dataset(dataset_path: str, dataset_size: int) -> int:
         cache_dir="./pythia-70m-deduped/step3000",
     )
     
-    unique_tokens = set()
+    total_chars = 0
     
     for row in tqdm(dataset, desc="Pre-tokenizing dataset"):
+        # pretokenizer can do pre_tokenize_str or encode depending on usage
         pre_tokens = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(row["text"])
-        for token_str, _ in pre_tokens:
-            unique_tokens.add(token_str)
+        # Sum lengths of all pre-tokenized pieces
+        total_chars += len(pre_tokens)
     
-    return len(unique_tokens)
+    return total_chars
 
 # Example usage
 dataset_path = "finewebedu_data"

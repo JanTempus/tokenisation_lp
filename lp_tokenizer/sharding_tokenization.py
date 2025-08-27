@@ -10,10 +10,10 @@ from multiprocessing import Pool, cpu_count
 # Config
 dataset_path = "finewebedu_data"
 vocab_size = 32768
-num_proc = 10       # processes inside Dataset.map()
+num_proc = 4      # processes inside Dataset.map()
 batch_size = 100
 shard_size = 400000 # examples per shard
-out_dir = "tokenized_shards"
+out_dir = "tokenized_shards_big"
 num_workers = 4
 
 # Load dataset
@@ -28,22 +28,32 @@ tokenizer = Tokenizer(vocab_size=vocab_size, vocab=vocab, unk_token="[UNK]")
 
 # --- Processing function ---
 def process(batch):
-    merged_text = "endoftextbehere".join(batch["text"])
+    # Append <|endoftext|> to every string
+    texts = [t + "endoftextbehere" for t in batch["text"]]
+    
+    # Merge
+    merged_text = "".join(texts)
+    
+    # Tokenize
     merged_ids = tokenizer.encode(merged_text, vocab)
 
+    
+    # Split on token 1
     split_ids = []
     current = []
     for token in merged_ids:
-        if token == 1:  # <|endoftext|>
-            if current:
-                split_ids.append(current)
-                current = []
+        if token == 1:
+            split_ids.append(current)
+            current = []
         else:
             current.append(token)
-    if current:
-        split_ids.append(current)
+    
+    # Return
+    return {
+        "ids": split_ids,
+        "len": [len(x) for x in split_ids],
+    }
 
-    return {"ids": split_ids, "len": [len(x) for x in split_ids]}
 
 # --- Tokenize a single shard ---
 def tokenize_shard(args):

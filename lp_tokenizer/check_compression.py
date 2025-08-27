@@ -10,7 +10,7 @@ import csv
 num_proc = 8
 
 dataset_size=65536
-vocab_size=1024
+vocab_size=32768
 
 dataset = load_from_disk("finewebedu_data")['train'].select(range(dataset_size, 2*dataset_size))
 

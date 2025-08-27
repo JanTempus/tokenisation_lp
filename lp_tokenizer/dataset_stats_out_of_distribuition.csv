@@ -1,0 +1,3 @@
+total_tokens,vocab_size,dataset_size
+68670458,16384,65536
+64625338,32768,65536
