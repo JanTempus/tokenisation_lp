@@ -49,11 +49,18 @@ def plot_ratio(length_in_characters, optimal_length_in_tokens, length_in_tokens_
 # Example usage:
 
 labels = ['1024','2048','4096','8192','16384','32768','65536','131072']
-length_in_characters = 321532328
-optimal_length_in_tokens = 63540117
+length_in_characters = 300473343
+optimal_length_in_tokens = 59137915
 
-length_list1 = [131480702,106045791,91009417,80784151,73686126,69244651,66614105,65115513]
-length_list2 = [127298703,108604473,94000859,83045180,75335536,70286495,67199170,65434969]
+#length_list1 = [131480702,106045791,91009417,80784151,73686126,69244651,66614105,65115513]
+#length_list2 = [127298703,108604473,94000859,83045180,75335536,70286495,67199170,65434969]
+
+
+length_list1 = [121902480,98341232,84520045,75184926,68670458,64625338,62281055,60992497]
+length_list2 = [118024471,100617185,87213091,77181972,70157403,65545202,62778151,61233441]
+
+
+
 
 ratios = plot_ratio(
     length_in_characters,
@@ -61,10 +68,7 @@ ratios = plot_ratio(
     [length_list1, length_list2],
     labels=labels,
     list_labels=["LP Tokenizer", "BPE Tokenizer"],
-    save_path="token_ratio_two_lists.png"
+    save_path="token_ratio_two_val.png"
 )
-
-
-
 
 
