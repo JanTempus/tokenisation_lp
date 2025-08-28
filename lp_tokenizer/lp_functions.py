@@ -12,8 +12,8 @@ import psutil
 import os
 import threading
 import matplotlib.pyplot as plt
-import cudf
-import cugraph
+#import cudf
+#import cugraph
 
 
 from datastructures import tokenInstance, possibleToken
