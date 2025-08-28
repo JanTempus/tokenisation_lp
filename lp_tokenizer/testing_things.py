@@ -38,29 +38,22 @@ dataset=load_from_disk(dataset_path)['train']
 
 dataset_0=dataset[0]
 dataset_1=dataset[1]
-chunk=dataset.select(range(2))
-def merge_every_n_rows(dataset, n: int):
-    """
-    Merge every n rows of a Hugging Face Dataset into one row,
-    concatenating the 'text' fields into a single string per merged row.
-    Returns a Hugging Face Dataset compatible with .map().
-    """
-    merged_rows = []
+from transformers import PreTrainedTokenizerFast
 
-    for i in tqdm(range(0, len(dataset), n), total=(len(dataset) + n - 1) // n, desc="Merging texts"):
-        # Select the next n rows and convert to list of dicts
-        chunk = dataset.select(range(i, min(i+n, len(dataset)))).to_dict()["text"]
-        # Concatenate the 'text' values with a separator
-        merged_text = "<|endoftext|>".join(chunk)
-        # Append as a dict
-        merged_rows.append({"text": merged_text})
+# Path to the folder where you saved it
+tokenizer_path = "tokenizers_lp/lp_1024_finewebedu_data"
 
-    return Dataset.from_list(merged_rows)
+# Load the tokenizer
+tokenizer = PreTrainedTokenizerFast.from_pretrained(tokenizer_path)
 
+# Example usage
+#text = "Hello world, this is a test."
+tokens = tokenizer.encode(dataset_0)
+decoded = tokenizer.decode(tokens)
 
-merged=merge_every_n_rows(chunk,2)
-
-tokens_b=tokenizer.encode("endoftextbehere",vocab)
+print("Original text:", dataset_0)
+print("Token IDs:", tokens)
+print("Decoded text:", decoded)
 
 
 
