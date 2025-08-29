@@ -23,7 +23,7 @@ pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               cache_dir="./pythia-70m-deduped/step3000",
                                             )
 
-dataset_size=65536 #1048576
+dataset_size=32768 #1048576
 vocab_size=32768
 
 
