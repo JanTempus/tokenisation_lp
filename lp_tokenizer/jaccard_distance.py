@@ -61,8 +61,8 @@ dist_matrix = np.zeros((n, n))
 
 
 def jaccard_distance(a, b):
-    inter = len(a & b)
-    union = len(a | b)
+    inter = len(set(a) & set(b))
+    union = len(set(a) | set(b))
     return 1 - inter / union if union > 0 else 0.0
 
 for i in range(n):
