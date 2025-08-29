@@ -154,6 +154,25 @@ class Tokenizer:
         return tokens_flat
 
 
+    def pretokenize_direct(self, dataset):
+        corpus=[]
+        dataset_size=len(dataset)
+        for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
+            corpus.append(dataset[i]['text'])
+
+        word_freqs = defaultdict(int)
+        
+        for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+            new_words = [word for word, offset in words_with_offsets]
+            for word in new_words:
+                word_freqs[word] += 1
+
+        input_strings=list(word_freqs.keys())
+        input_strings_frequencies=list(word_freqs.values())
+
+        return input_strings, input_strings_frequencies
+
 
     def pretokenize_and_prepare_dataset(self, dataset_size,dataset,input_strings=None, save:bool=True):
         base_name = f"word_freqs_testing{self.saved_dataset_path}{dataset_size}"
