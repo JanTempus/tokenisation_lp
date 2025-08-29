@@ -1,1 +1,4 @@
-{}
+{
+  "eos_token": "endoftextbehere",
+  "unk_token": "[UNK]"
+}
