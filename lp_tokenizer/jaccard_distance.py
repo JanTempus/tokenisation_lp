@@ -44,7 +44,7 @@ for seed in seeds:
     dataset=dataset_raw['train'].shuffle(seed=seed).select(range(vocab_size))
 
     tokenizer = Tokenizer(saved_dataset_path=dataset_path, vocab_size=vocab_size)
-    input_strings, input_strings_frequencies = tokenizer.pretokenize_direct(dataset_size, dataset_raw)
+    input_strings, input_strings_frequencies = tokenizer.pretokenize_direct(dataset)
 
     raw_tokens=tokenizer.generate_vocab_nonzero(
         input_strings=input_strings,
