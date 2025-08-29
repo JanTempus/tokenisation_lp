@@ -47,21 +47,36 @@ def bytelevel_vocab_to_tokenizer(vocab_path: str,vocab_size:int, raw_dataset_pat
 
     # --- Attach pre-tokenizer (replace with your own if different) ---
     tokenizer.pre_tokenizer = pretokenizer.backend_tokenizer.pre_tokenizer
-
+    special_tokens = {
+        "unk_token": "[UNK]",           # unknown token
+        "eos_token": "endoftextbehere",  # end-of-sequence token
+    }
 
     save_path = os.path.join(save_dir, f"lp_{vocab_size}_{raw_dataset_path}")
     os.makedirs(save_path, exist_ok=True)
    
-    fast_tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer)
+    fast_tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer,
+                                             **special_tokens
+                                            )
+
+    # make sure eos_token_id is correctly set
+    if fast_tokenizer.eos_token_id is None:
+        fast_tokenizer.add_special_tokens({"eos_token": "endoftextbehere"})
+    
+    
+    if fast_tokenizer.unk_token_id is None:
+        fast_tokenizer.add_special_tokens({"unk_token": "[UNK]"})
+
     fast_tokenizer.save_pretrained(save_path)
     print(f"Saved Hugging Face–compatible tokenizer at {save_path}")
+
 
 
 if __name__ == '__main__':
     
     datasetname="finewebedu"
     dataset_path="finewebedu_data"
-    vocab_sizes=[2048,4096,8192,16384,32768,65536,131072]
+    vocab_sizes=[1024,2048,4096,8192,16384,32768,65536,131072]
     for vocab_size in vocab_sizes:
         vocab=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
 
