@@ -35,7 +35,7 @@ dataset_raw=load_from_disk(dataset_path)
 unique_chars = np.load("unique_charsfinewebedu_data20200000.npy", allow_pickle=True)
 unique_chars = unique_chars.tolist()  # convert to Python list if needed
 
-seeds=[977,837,081,430,946,234,100]
+seeds=[977,837,281,430,946,234,100]
 
 token_sets=[]
 token_set_length=[]
