@@ -1,83 +1,71 @@
-import os
-from datasets import load_from_disk, DatasetDict, concatenate_datasets
-from transformers import PreTrainedTokenizerFast
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
-import shutil
+from datasets import load_from_disk, DatasetDict, load_dataset,Sequence,Value,Features
+from transformers import AutoTokenizer
+import numpy as np
+
 
 # --- Config ---
-dataset_path = "finewebedu_data"
+dataset_path = "pietrolesci/finewebedu-20B"  # let HF do the caching for you
 out_dir = "tokenized_dataset"
-tokenizer_path = "tokenizers_lp/lp_1024_finewebedu_data"
+tokenizer_path = "tokenizers_lp/lp_32768_finewebedu_data"
 batch_size = 1000
-num_proc = 16            # parallel workers for Dataset.map
-shard_size = 100000      # examples per shard to avoid memory issues
+num_proc = 8            # parallel workers for Dataset.map
 val_frac = 0.1
-test_frac = 0.1
-eos_token = "endoftextbehere"
 
-# --- Load dataset ---
-dataset = load_from_disk(dataset_path)
-if "train" in dataset:  # flatten DatasetDict if necessary
-    dataset = dataset["train"]
 
-# --- Train/val/test split ---
-all_indices = list(range(len(dataset)))
-train_val_ids, test_ids = train_test_split(all_indices, test_size=test_frac, random_state=42)
-train_ids, val_ids = train_test_split(train_val_ids, test_size=val_frac/(1-test_frac), random_state=42)
-
-splits = {
-    "train": dataset.select(train_ids),
-    "validation": dataset.select(val_ids),
-    "test": dataset.select(test_ids)
-}
-
-# --- Load tokenizer ---
-tokenizer = PreTrainedTokenizerFast.from_pretrained(tokenizer_path)
 
 # --- Tokenization function ---
-def process(batch):
-    merged_text = eos_token.join(batch["text"])
-    merged_ids = tokenizer.encode(merged_text)
+# def process(batch: dict) -> dict:
+#     input_ids = tokenizer(batch["text"])
+#     return {"input_ids": input_ids, "len": [len(x) for x in input_ids]}
+def process(batch: dict) -> dict:
+    tokens = tokenizer(batch["text"])["input_ids"]
+    return {"input_ids": tokens,
+        "len": [len(x) for x in tokens]
+    }
 
-    split_ids = []
-    current = []
-    for token in merged_ids:
-        if token == tokenizer.eos_token_id:
-            if current:
-                split_ids.append(current)
-                current = []
-        else:
-            current.append(token)
-    if current:
-        split_ids.append(current)
 
-    return {"ids": split_ids, "len": [len(x) for x in split_ids]}
 
-# --- Memory-efficient parallel shard processing ---
-def tokenize_and_save_split(split_name, split_dataset):
-    split_out = os.path.join(out_dir, split_name)
-    os.makedirs(split_out, exist_ok=True)
-    num_shards = (len(split_dataset) + shard_size - 1) // shard_size
+# NOTE: (best practice) use this when multiproc functions are called
+if __name__ == "__main__":
 
-    for shard_idx in tqdm(range(num_shards), desc=f"Tokenizing {split_name}"):
-        start = shard_idx * shard_size
-        end = min((shard_idx + 1) * shard_size, len(split_dataset))
-        shard_dataset = split_dataset.select(range(start, end))
-        tokenized_shard = shard_dataset.map(
-            process,
-            batched=True,
-            batch_size=batch_size,
-            num_proc=num_proc,
-            remove_columns=["text"]
-        )
-        shard_folder = os.path.join(split_out, f"shard_{shard_idx}")
-        if os.path.exists(shard_folder):
-            shutil.rmtree(shard_folder)
-        tokenized_shard.save_to_disk(shard_folder)
+    # --- Load dataset ---
+    dataset = load_dataset(dataset_path)  # let HF do the caching for you
+    if isinstance(dataset, DatasetDict):
+        dataset = dataset["train"]  # flatten
 
-# --- Run tokenization for all splits ---
-for split_name, split_dataset in splits.items():
-    tokenize_and_save_split(split_name, split_dataset)
+    dataset = dataset.select_columns(["id", "text"])  # keep only the required columns
 
-print(f"Tokenized dataset saved in shards at: {out_dir}")
+
+    # --- Train/val/test split ---
+    # Read the docs: https://huggingface.co/docs/datasets/en/process#split
+    # NOTE: here we want a DatasetDict because it's more convenient
+    ds_dict = dataset.train_test_split(test_size=2_000_000, seed=42)
+
+    # NOTE: However, we want to rename "test" to "validation"
+    ds_dict["validation"] = ds_dict.pop("test")
+
+
+    # --- Load tokenizer ---
+    # NOTE: use the AutoTokenizer instead of PreTrainedTokeniserFast
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+
+
+    # --- Tokenize ---
+    # NOTE: read the docs https://huggingface.co/docs/datasets/v4.0.0/en/package_reference/main_classes#datasets.DatasetDict.map
+    ds_dict = ds_dict.map(
+        process,
+        batched=True,
+        batch_size=batch_size,
+        num_proc=num_proc,
+        remove_columns=["text"],
+        desc="Tokenizing"
+    )
+
+    # --- Save ---
+    # NOTE: read the docs https://huggingface.co/docs/datasets/v4.0.0/en/package_reference/main_classes#datasets.DatasetDict.map
+    ds_dict.save_to_disk(out_dir, max_shard_size="3GB")
+
+    # optionally, you can save on HF
+    # NOTE: read the docs https://huggingface.co/docs/datasets/v4.0.0/en/package_reference/main_classes#datasets.IterableDataset.push_to_hub
+    # ds_dict.push_to_hub(repo_id, tokenizer_path)
+    # This create a repo under username/repo_id/tokenizer_path. Note that it's cool to pass tokenizer_path because it creates a subfolder so you can in principle have all tokenized version of this dataset under one repo_id
