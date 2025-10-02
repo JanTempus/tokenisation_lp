@@ -5,7 +5,7 @@ import numpy as np
 
 # --- Config ---
 dataset_path = "pietrolesci/finewebedu-20B"  # let HF do the caching for you
-out_dir = "tokenized_dataset"
+out_dir = "tokenized_dataset_uv"
 tokenizer_path = "tokenizers_lp/lp_32768_finewebedu_data"
 batch_size = 1000
 num_proc = 8            # parallel workers for Dataset.map

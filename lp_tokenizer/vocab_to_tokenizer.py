@@ -76,10 +76,10 @@ if __name__ == '__main__':
     
     datasetname="finewebedu"
     dataset_path="finewebedu_data"
-    vocab_sizes=[1024,2048,4096,8192,16384,32768,65536,131072]
+    vocab_sizes=[32768]
     for vocab_size in vocab_sizes:
         vocab=f"new_vocab/vocab_finewebedu_data_0_{vocab_size}.json"
 
-        save_dir="tokenizers_lp"
+        save_dir="tokenizers_lp_uv"
         bytelevel_vocab_to_tokenizer(vocab,vocab_size,dataset_path, save_dir)
     
