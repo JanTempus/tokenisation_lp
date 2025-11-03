@@ -9,14 +9,14 @@ from transformers import PreTrainedTokenizerFast, AutoTokenizer
 
 def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,dataset_url,save_dir: str):
     # Load dataset
-    if os.path.exists(raw_dataset_path):
-        print("Loading dataset from disk...")
-        dataset = load_from_disk(raw_dataset_path)
-    else:
-        print("Downloading dataset...")
-        dataset = load_dataset(dataset_url)
-        dataset.save_to_disk(raw_dataset_path)
-
+    # if os.path.exists(raw_dataset_path):
+    #     print("Loading dataset from disk...")
+    #     dataset = load_from_disk(raw_dataset_path)
+    # else:
+    #     print("Downloading dataset...")
+    #     dataset = load_dataset(dataset_url)
+    #     dataset.save_to_disk(raw_dataset_path)
+    dataset=load_dataset(dataset_url)
     pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
                               cache_dir="./pythia-70m-deduped/step3000",
@@ -35,7 +35,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,d
     tokenizer.pre_tokenizer = pretokenizer.backend_tokenizer.pre_tokenizer
 
     # Special tokens (GPTNeoX-style)
-    special_tokens = ["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"]
+    special_tokens = ["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]","endoftextbehere"]
     trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=special_tokens)
 
     tokenizer.train_from_iterator(corpus, trainer=trainer)
@@ -43,6 +43,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,d
     # Wrap for HF compatibility
     hf_tokenizer = PreTrainedTokenizerFast(
         tokenizer_object=tokenizer,
+        eos_token="endoftextbehere",
         unk_token="[UNK]",
         pad_token="[PAD]",
         cls_token="[CLS]",
