@@ -7,27 +7,17 @@ from tokenizers.pre_tokenizers import ByteLevel
 from transformers import PreTrainedTokenizerFast, AutoTokenizer
 
 
-def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,dataset_url,save_dir: str):
-    # Load dataset
-    # if os.path.exists(raw_dataset_path):
-    #     print("Loading dataset from disk...")
-    #     dataset = load_from_disk(raw_dataset_path)
-    # else:
-    #     print("Downloading dataset...")
-    #     dataset = load_dataset(dataset_url)
-    #     dataset.save_to_disk(raw_dataset_path)
-    dataset=load_dataset(dataset_url)
+def train_bpe_tokenizer(vocab_size:int,dataset ,save_dir: str, version):
+   
     pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
                               cache_dir="./pythia-70m-deduped/step3000",
                                             )
-
     # Create training corpus
+    dataset_size=len(dataset)
+    corpus = [dataset[i]["text"] for i in range(dataset_size)]
 
-    corpus = [dataset["train"][i]["text"] for i in range(dataset_size)]
-
-    print("Created the corpus")
-
+    
     # Build tokenizer from scratch with BPE model
     tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
 
@@ -35,7 +25,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,d
     tokenizer.pre_tokenizer = pretokenizer.backend_tokenizer.pre_tokenizer
 
     # Special tokens (GPTNeoX-style)
-    special_tokens = ["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]","endoftextbehere"]
+    special_tokens = ["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]","[EOS]"]
     trainer = BpeTrainer(vocab_size=vocab_size, special_tokens=special_tokens)
 
     tokenizer.train_from_iterator(corpus, trainer=trainer)
@@ -43,7 +33,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,d
     # Wrap for HF compatibility
     hf_tokenizer = PreTrainedTokenizerFast(
         tokenizer_object=tokenizer,
-        eos_token="endoftextbehere",
+        eos_token="[EOS]",
         unk_token="[UNK]",
         pad_token="[PAD]",
         cls_token="[CLS]",
@@ -52,7 +42,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset_size:int, raw_dataset_path: str,d
     )
     
     # Save in HF format
-    save_path = os.path.join(save_dir, f"bpe_{vocab_size}_finewebedu")
+    save_path = os.path.join(save_dir, f"bpe_{vocab_size}_{version}")
     os.makedirs(save_path, exist_ok=True)
     hf_tokenizer.save_pretrained(save_path)
     print(f"Saved Hugging Face–compatible tokenizer at {save_path}")

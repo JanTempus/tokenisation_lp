@@ -1,4 +1,4 @@
-from datastructures import tokenInstance, possibleToken
+from lp_tokenizer.datastructures import tokenInstance, possibleToken
 from collections import defaultdict
 import json,pickle
 

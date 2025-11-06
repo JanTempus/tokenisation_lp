@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 #import cugraph
 
 
-from datastructures import tokenInstance, possibleToken
-import helper_functions as hf
+from lp_tokenizer.datastructures import tokenInstance, possibleToken
+import lp_tokenizer.helper_functions as hf
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -309,7 +309,7 @@ def create_vocab(inputStringList: list[str],
     stop_flag = True
     # tracker_thread.join()
 
-    print(f"The LP solve took {my_time:.4f} seconds")
+    #print(f"The LP solve took {my_time:.4f} seconds")
     # print(f"Peak memory: {max(memory_samples):.2f} MB, Average memory: {sum(memory_samples)/len(memory_samples):.2f} MB")
 
     # # Save memory usage plot
@@ -440,6 +440,23 @@ def deterministic_rounding(possible_tokens:list[possibleToken],unique_chars:list
     if(vocab_size<len(unique_chars)):
         raise(ValueError( "Number of unique characters is greater than vocab size "))
     sorted_tokens=sorted(possible_tokens, key=lambda obj: obj.lp_value, reverse=True)
+
+    tokens_to_choose=vocab_size-len(unique_chars)
+
+    chosen_tokens=[token.token for token in sorted_tokens[0:tokens_to_choose]]
+
+    tokens=list(set(unique_chars+chosen_tokens))
+
+
+    return tokens
+
+
+def biased_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,vocab_size:int):
+    if(vocab_size<len(unique_chars)):
+        raise(ValueError( "Number of unique characters is greater than vocab size "))
+
+    tokens_to_consider=[token for token in possible_tokens if token.lp_value>0]
+    sorted_tokens=sorted(tokens_to_consider, key=lambda obj: obj.lp_value/len(obj.token), reverse=True)
 
     tokens_to_choose=vocab_size-len(unique_chars)
 
