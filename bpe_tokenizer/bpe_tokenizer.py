@@ -7,7 +7,7 @@ from tokenizers.pre_tokenizers import ByteLevel
 from transformers import PreTrainedTokenizerFast, AutoTokenizer
 
 
-def train_bpe_tokenizer(vocab_size:int,dataset ,save_dir: str, version):
+def train_bpe_tokenizer(vocab_size:int,dataset,save_dir: str):
    
     pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
                               revision="step3000",
@@ -42,7 +42,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset ,save_dir: str, version):
     )
     
     # Save in HF format
-    save_path = os.path.join(save_dir, f"bpe_{vocab_size}_{version}")
+    save_path = os.path.join(save_dir, f"bpe_{vocab_size}")
     os.makedirs(save_path, exist_ok=True)
     hf_tokenizer.save_pretrained(save_path)
     print(f"Saved Hugging Face–compatible tokenizer at {save_path}")
@@ -53,13 +53,11 @@ def train_bpe_tokenizer(vocab_size:int,dataset ,save_dir: str, version):
 
 if __name__ == '__main__':
     
-    datasetname="finewebedu"
     dataset_url="pietrolesci/finewebedu-20B"
-    dataset_path="/local/home/jtempus/token_lp/tokenisation_lp/lp_tokenizer/finewebedu_data"
     
-    save_dir = "bpe_tokenizers"
+    save_dir = "bpe_tokenizers_new"
     vocab_sizes = [1024,2048,4096,8192,16384,32768,65536,131072]
-    dataset_size = 65536
-
+    dataset_size = 60000
+    dataset=load_dataset(dataset_url)['train'].select(range(dataset_size))
     for vs in vocab_sizes:
-        train_bpe_tokenizer(vs, dataset_size, dataset_path, dataset_url, save_dir)
+        train_bpe_tokenizer(vs, dataset, save_dir)
