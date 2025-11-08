@@ -1,1 +1,1 @@
-name 'vocab' is not defined
+'tokenizers.models.Unigram' object has no attribute 'set_unk_token'

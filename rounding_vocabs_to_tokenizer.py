@@ -51,7 +51,8 @@ def bytelevel_vocab_to_tokenizer(vocab, save_dir: str,rnd_scheme:str):
         "sep_token":"[SEP]",
         "mask_token":"[MASK]"
     }
-
+    tokenizer.add_special_tokens(list(special_tokens.values()))
+    
     save_path = os.path.join(save_dir, f"lp_{vocab_size}_{rnd_scheme}")
     os.makedirs(save_path, exist_ok=True)
    
