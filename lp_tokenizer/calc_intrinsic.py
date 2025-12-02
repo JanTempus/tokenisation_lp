@@ -1,22 +1,22 @@
 import os
 from tqdm import tqdm
 import numpy as np
-from datasets import load_from_disk
+from datasets import load_dataset
 from transformers import PreTrainedTokenizerFast
 import csv
 
 # ---------- Config ----------
 num_proc = 8
 dataset_size = 65536
-dataset_path = "finewebedu_data"
-tokenizers_dir = "/local/home/jtempus/token_lp/tokenisation_lp/bpe_tokenizer/bpe_tokenizers"
-output_file = "dataset_stats_bpe.csv"
-append_eot = "endoftextbehere"  # keep consistent with your previous runs
-batch_size_map = 100
+dataset_url="pietrolesci/finewebedu-20B"
+tokenizers_dir = "/local/home/jtempus/tokenisation_lp/rounded_tokenizers"
+output_file = "dataset_stats_lp_2.csv"
+append_eot = "[EOS]"  # keep consistent with your previous runs
+batch_size_map = 10000
 batch_size_vocab = 1024  # batching for vocab utilization pass
 
 # ---------- Data ----------
-dataset = load_from_disk(dataset_path)["train"].select(range(dataset_size, 2 * dataset_size))
+dataset = load_dataset(dataset_url)["train"].select(range(dataset_size, 2 * dataset_size))
 
 # ---------- Map pass: length & fertility ----------
 def process_stats(batch, tokenizer):
@@ -47,7 +47,12 @@ def compute_vocab_utilization(ds, tokenizer, step=batch_size_vocab):
 # ---------- Main loop over tokenizers ----------
 for tokenizer_name in os.listdir(tokenizers_dir):
     tokenizer_path = os.path.join(tokenizers_dir, tokenizer_name)
-    if not os.path.isdir(tokenizer_path):
+
+    # only keep directories ending in "det" or "bias" (case-insensitive)
+    if not (
+        os.path.isdir(tokenizer_path)
+        and tokenizer_name.lower().endswith(("det", "bias"))
+    ):
         continue
 
     print(f"\nProcessing tokenizer: {tokenizer_name}")
@@ -71,7 +76,7 @@ for tokenizer_name in os.listdir(tokenizers_dir):
 
     stats = {
         "tokenizer": tokenizer_name,
-        "avg_length": avg_length,
+        "avg_compression": avg_length,
         "avg_fertility": avg_fertility,
         "vocab_utilization": vocab_utilization,
         "vocab_size": len(tokenizer),

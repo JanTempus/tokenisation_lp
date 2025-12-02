@@ -1,0 +1,8 @@
+{
+  "cls_token": "CLStokenbehere",
+  "eos_token": "EOStokenbehere",
+  "mask_token": "MASKtokenbehere",
+  "pad_token": "PADtokenbehere",
+  "sep_token": "SEPtokenbehere",
+  "unk_token": "UNKtokenbehere"
+}
