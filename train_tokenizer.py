@@ -1,5 +1,5 @@
 from lp_tokenizer.lp_tokenizer import Tokenizer
-from transformers import Autotokenizer
+from transformers import AutoTokenizer
 from datasets import load_dataset
 import pickle
 import os
