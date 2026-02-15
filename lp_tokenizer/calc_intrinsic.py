@@ -71,7 +71,7 @@ for tokenizer_name in os.listdir(tokenizers_dir):
 
     stats = {
         "tokenizer": tokenizer_name,
-        "avg_length": avg_length,
+        "avg_compression": avg_length,
         "avg_fertility": avg_fertility,
         "vocab_utilization": vocab_utilization,
         "vocab_size": len(tokenizer),
