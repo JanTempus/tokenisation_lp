@@ -5,13 +5,33 @@ import pickle
 import os
 
 
-def train_lp_tokenizer(dataset,vocab_size,save_dir):
-    dataset_size=len(dataset)
-    corpus = [dataset[i]["text"] for i in range(dataset_size)]
+num_proc=16
+batch_size=10000
+pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
+                                            revision="step3000"
+                                            )
 
+
+def get_unique_chars_batch(batch):
+    unique_chars = set()
+
+    for text in batch["text"]:
+        words_with_offsets = ppretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+        tokens = [word for word, _ in words_with_offsets]
+        for token in tokens:
+            unique_chars.update(token)
+
+    return {"unique_chars": [list(unique_chars)]}
+
+
+
+def train_lp_tokenizer(dataset,unique_chars,vocab_size,save_dir):
+    dataset_size=len(dataset)
+    corpus_all = [dataset[i]["text"] for i in range(dataset_size)]
 
     tokenizer=Tokenizer(corpus=corpus,
                     vocab_size=vocab_size,
+                    unique_chars=unique_chars,
                     unk_token="[UNK]",
                     eos_token="[EOS]",
                     pad_token="[PAD]",
@@ -28,7 +48,14 @@ def train_lp_tokenizer(dataset,vocab_size,save_dir):
 
 if __name__== "__main__":
      
-   
+    dataset=load_dataset(dataset_url)['train']
+    unique_chars = dataset.map(
+        get_unique_chars_batch(batch),
+        batched=True,
+        batch_size=batch_size,
+        num_proc=num_proc
+        desc="Finding unique characters"
+        )   
     dataset_url="pietrolesci/finewebedu-20B"
     vocab_size = [1024,2048,4096,8192,16384,32768,65536,131072]
     dataset_size = 60000

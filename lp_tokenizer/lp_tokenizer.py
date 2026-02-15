@@ -35,6 +35,7 @@ class Tokenizer:
                  max_dataset_size=0,
                  vocab_size=0,
                  vocab=None,
+                 unique_chars=None,
                  unk_token=None,
                  eos_token=None,
                  cls_token=None,
@@ -50,7 +51,11 @@ class Tokenizer:
                                                             cache_dir="./pythia-70m-deduped/step3000",
                                             )
         else:
-            self.pretokenizer=pretokenizer                                                                                                                
+            self.pretokenizer=pretokenizer  
+
+        if unique_chars is not None:
+            self.unique_chars=unique_chars
+
         self.corpus=corpus
         self.vocab=vocab
         self.vocab_size=vocab_size
@@ -75,7 +80,9 @@ class Tokenizer:
 
         input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
 
-        unique_chars = self.get_unique_chars_corpus(self.corpus)
+        if self.unique_chars is not None:
+            print("Finding unique chars")
+            self.unique_chars = self.get_unique_chars_corpus(self.corpus)
       
         special_char_count=0
         special_tokens=[]
@@ -100,7 +107,7 @@ class Tokenizer:
             special_tokens.append(self.mask_token)
             special_char_count+=1
         
-        lp_budget=self.vocab_size-len(unique_chars)-special_char_count
+        lp_budget=self.vocab_size-len(self.unique_chars)-special_char_count
         
         if lp_budget <= 0:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
@@ -113,7 +120,7 @@ class Tokenizer:
         # Change this depending on what behaviour one would like
         # Minus special_char_count as we add two special tokens
       
-        return {"possible_tokens": possible_tokens,"unique_chars":unique_chars,"special_tokens":special_tokens}
+        return {"possible_tokens": possible_tokens,"unique_chars":self.unique_chars,"special_tokens":special_tokens}
         # self.vocab_size=min(len(possible_tokens)+len(unique_chars)-special_char_count,self.vocab_size)  
         
         # rounded_tokens=deterministic_rounding(possible_tokens,unique_chars,self.vocab_size-special_char_count)

@@ -1,0 +1,62 @@
+{
+  "added_tokens_decoder": {
+    "131066": {
+      "content": "UNKtokenbehere",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "131067": {
+      "content": "EOStokenbehere",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "131068": {
+      "content": "PADtokenbehere",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "131069": {
+      "content": "CLStokenbehere",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "131070": {
+      "content": "SEPtokenbehere",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "131071": {
+      "content": "MASKtokenbehere",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    }
+  },
+  "clean_up_tokenization_spaces": false,
+  "cls_token": "CLStokenbehere",
+  "eos_token": "EOStokenbehere",
+  "extra_special_tokens": {},
+  "mask_token": "MASKtokenbehere",
+  "model_max_length": 1000000000000000019884624838656,
+  "pad_token": "PADtokenbehere",
+  "sep_token": "SEPtokenbehere",
+  "tokenizer_class": "PreTrainedTokenizer",
+  "unk_token": "UNKtokenbehere"
+}
