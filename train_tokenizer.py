@@ -61,9 +61,9 @@ if __name__== "__main__":
     unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
 
     
-    vocab_size = [1024,2048,4096,8192,16384,32768,65536,131072]
+    vocab_size = [131072]
     dataset_size = 60000
     dataset=load_dataset(dataset_url)['train'].select(range(dataset_size))
-    save_dir="rounding_vocabs/"
+    save_dir="rounding_vocabs_cscs/"
     for vs in vocab_size:
        train_lp_tokenizer(dataset, unique_chars, vs, save_dir)
