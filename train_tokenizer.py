@@ -210,7 +210,7 @@ if __name__ == "__main__":
     TARGET_ROWS = int(os.environ.get("TARGET_ROWS", "60000"))
     SEED = int(os.environ.get("SEED", "42"))
     vocab_size = [131072]
-    save_dir = "rounding_vocabs_cscs/"
+    save_dir = "rounding_vocabs_apertus_2/"
 
     source_to_files = discover_parquet_files(DATASET_BASE_DIR, SOURCE_DIRS)
     dataset, source_counts, sampling_manifest = sample_dataset(
