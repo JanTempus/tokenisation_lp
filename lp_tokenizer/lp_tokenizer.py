@@ -53,16 +53,15 @@ class Tokenizer:
         else:
             self.pretokenizer=pretokenizer  
 
-        if unique_chars is not None:
-            self.unique_chars=unique_chars
+     
+        self.unique_chars=unique_chars
 
         self.corpus=corpus
         self.vocab=vocab
         self.vocab_size=vocab_size
         self.dataset_size = dataset_size
         self.max_dataset_size=max_dataset_size
-        
-        self.corpus
+    
         self.debug=False
         
         self.unk_token=unk_token
@@ -80,7 +79,7 @@ class Tokenizer:
 
         input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
 
-        if self.unique_chars is not None:
+        if self.unique_chars is None:
             print("Finding unique chars")
             self.unique_chars = self.get_unique_chars_corpus(self.corpus)
       
