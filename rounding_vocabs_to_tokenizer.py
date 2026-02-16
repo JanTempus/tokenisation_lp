@@ -1,162 +1,229 @@
-import pickle
-import numpy as np
-from lp_tokenizer.lp_functions import deterministic_rounding, biased_rounding,probabilistic_rounding
-import lp_tokenizer.lp_tokenizer as LP_TOK
-from datasets import load_dataset
-from tokenizers import Tokenizer
-from tokenizers.pre_tokenizers import ByteLevel
-from tokenizers.decoders import ByteLevel as ByteLevelDecoder
-from transformers import AutoTokenizer
-import json
-from pathlib import Path
 import os
-from transformers import PreTrainedTokenizerFast
+import pickle
+import re
+from pathlib import Path
+
+from tokenizers import Tokenizer
 from tokenizers.models import Unigram
-from datasets import Dataset, load_dataset
-from tqdm import tqdm
+from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 
-def bytelevel_vocab_to_tokenizer(vocab, save_dir: str,rnd_scheme:str):
-    """
-    Load a vocab.json (byte-level tokens -> IDs) into a Hugging Face compatible tokenizer.
+SPECIAL_TOKEN_MAP = {
+    "unk_token": "[UNK]",
+    "eos_token": "[EOS]",
+    "pad_token": "[PAD]",
+    "cls_token": "[CLS]",
+    "sep_token": "[SEP]",
+    "mask_token": "[MASK]",
+}
 
-    Args:
-        vocab_path (str): Path to the vocab.json file.
+ROUNDING_SCHEMES = ("all_ones", "det", "bias", "prob")
 
-    Returns:
-        PreTrainedTokenizerFast: Hugging Face compatible tokenizer.
-    """
-
-    pretokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m-deduped",
-                              revision="step3000"
-                                            )
-    
-    
-    #vocab_dict # {token: id}
-
-    # --- Convert to Unigram format: [(token, score), ...] ---
-    unigram_vocab = [(token, -1.0) for token in vocab]
-
-    # --- Create Unigram tokenizer ---
-    tokenizer = Tokenizer(Unigram(unigram_vocab))
-
-    # --- Attach pre-tokenizer (replace with your own if different) ---
-    tokenizer.pre_tokenizer = pretokenizer.backend_tokenizer.pre_tokenizer
-    special_tokens = {
-        "unk_token": "UNKtokenbehere",           # unknown token
-        "eos_token": "EOStokenbehere",  # end-of-sequence token
-        "pad_token": "PADtokenbehere",
-        "cls_token": "CLStokenbehere",
-        "sep_token": "SEPtokenbehere",
-        "mask_token":"MASKtokenbehere"
-    }
-    tokenizer.add_special_tokens(list(special_tokens.values()))
-
-
-    vocab_size=len(vocab)+len(special_tokens)
-    save_path = os.path.join(save_dir, f"lp_{vocab_size}_{rnd_scheme}")
-    os.makedirs(save_path, exist_ok=True)
-   
-    fast_tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer,
-                                             **special_tokens
-                                            )
-    print("Number of tokens in fast_tokenizer:", len(fast_tokenizer))
-    fast_tokenizer.save_pretrained(save_path)
-    print(f"Saved Hugging Face–compatible tokenizer at {save_path}")
-
-
-
-def round_vocabs(vocab_size,raw_tokens,unique_chars):
-    with open(raw_tokens, "rb") as f:
-        tokens = pickle.load(f)
-  
-    num_special_chars=len(tokens["special_tokens"])+1
-    print(f"Num special characters: {num_special_chars}")
-
-    det_tokens=deterministic_rounding(tokens["possible_tokens"],unique_chars,vocab_size-num_special_chars)
-    bias_tokens=biased_rounding(tokens["possible_tokens"],unique_chars,vocab_size-num_special_chars)
-    prob_tokens=probabilistic_rounding(tokens["possible_tokens"],unique_chars,vocab_size-num_special_chars)    
-    tokens_ones = [token.token for token in tokens["possible_tokens"] if token.lp_value >= 0.99]
-    
-    det_tokens  = list(set(det_tokens))
-    bias_tokens = list(set(bias_tokens))
-    prob_tokens = list(set(prob_tokens))
-    tokens_ones = list(set(tokens_ones+unique_chars))
-        
-    
-    return {"all_ones":tokens_ones,"det":det_tokens,"bias":bias_tokens,"prob":prob_tokens}
-
-
-pretokenizer = AutoTokenizer.from_pretrained(
+PRETOKENIZER = AutoTokenizer.from_pretrained(
     "EleutherAI/pythia-70m-deduped",
     revision="step3000",
     cache_dir="./pythia-70m-deduped/step3000",
 )
 
-# ---- Batch processing function ----
-def extract_unique_chars(batch):
-    """
-    batch["text"] is a list[str]
-    returns a dictionary of lists, since HF cannot store sets natively
-    """
-    batch_chars = set()
 
-    for text in batch["text"]:
-        words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-        tokens = [tok for tok, _ in words_with_offsets]
-        for tok in tokens:
-            batch_chars.update(tok)
+def dedupe_tokens(tokens):
+    seen = set()
+    out = []
+    for token in tokens:
+        if not isinstance(token, str):
+            continue
+        if token == "":
+            continue
+        if token in seen:
+            continue
+        seen.add(token)
+        out.append(token)
+    return out
 
-    return {"unique_chars": list(batch_chars)}
+
+def parse_vocab_size_from_path(path):
+    match = re.search(r"lp_tokens_(\d+)\.pkl$", Path(path).name)
+    if not match:
+        raise ValueError(f"Could not infer vocab size from file name: {path}")
+    return int(match.group(1))
 
 
-# ---- Run .map with batching ----
-def get_all_unique_chars(dataset, text_column="text", batch_size=10000, num_proc=16):
-    """
-    dataset: HuggingFace Dataset object
-    text_column: name of the text column
-    batch_size: size per map batch
-    num_proc: number of CPU processes
-    """
-    # Map returns a dataset with a new column "unique_chars",
-    # each entry is a *list* of characters for that batch.
-    mapped = dataset.map(
-        extract_unique_chars,
-        batched=True,
-        batch_size=batch_size,
-        num_proc=num_proc,
-        remove_columns=dataset.column_names,
-        desc="Extracting chars with pretokenizer"
+def list_raw_vocab_files(raw_vocab_dir):
+    raw_dir = Path(raw_vocab_dir)
+    if not raw_dir.exists():
+        raise FileNotFoundError(f"Raw vocab directory not found: {raw_vocab_dir}")
+
+    files = sorted(raw_dir.glob("lp_tokens_*.pkl"))
+    if not files:
+        files = sorted(raw_dir.glob("*.pkl"))
+    if not files:
+        raise FileNotFoundError(f"No .pkl files found in: {raw_vocab_dir}")
+    return [str(path) for path in files]
+
+
+def include_special_tokens(vocab_tokens):
+    special_tokens = list(SPECIAL_TOKEN_MAP.values())
+    return dedupe_tokens(special_tokens + vocab_tokens)
+
+
+def build_tokenizer(vocab_tokens):
+    all_tokens = include_special_tokens(vocab_tokens)
+    unk_token = SPECIAL_TOKEN_MAP["unk_token"]
+    unk_id = all_tokens.index(unk_token)
+
+    unigram_vocab = [(token, -1.0) for token in all_tokens]
+    tokenizer = Tokenizer(Unigram(unigram_vocab, unk_id=unk_id))
+
+    # Keep pretokenization consistent with training.
+    tokenizer.pre_tokenizer = PRETOKENIZER.backend_tokenizer.pre_tokenizer
+    tokenizer.decoder = PRETOKENIZER.backend_tokenizer.decoder
+
+    fast_tokenizer = PreTrainedTokenizerFast(
+        tokenizer_object=tokenizer,
+        **SPECIAL_TOKEN_MAP,
+    )
+    return fast_tokenizer
+
+
+def save_tokenizer(tokenizer, save_dir, target_vocab_size, rnd_scheme):
+    save_path = os.path.join(save_dir, f"lp_{target_vocab_size}_{rnd_scheme}")
+    os.makedirs(save_path, exist_ok=True)
+    tokenizer.save_pretrained(save_path)
+    print(f"Saved tokenizer: {save_path} (len={len(tokenizer)})")
+    return save_path
+
+
+def round_vocabs(raw_tokens_path, vocab_size):
+    from lp_tokenizer.lp_functions import biased_rounding, deterministic_rounding, probabilistic_rounding
+
+    with open(raw_tokens_path, "rb") as file:
+        tokens = pickle.load(file)
+
+    if "possible_tokens" not in tokens:
+        raise KeyError(f"'possible_tokens' missing in {raw_tokens_path}")
+    if "unique_chars" not in tokens:
+        raise KeyError(f"'unique_chars' missing in {raw_tokens_path}")
+
+    unique_chars = dedupe_tokens(tokens["unique_chars"])
+    num_special_tokens = len(SPECIAL_TOKEN_MAP)
+    lp_budget = vocab_size - len(unique_chars) - num_special_tokens
+    if lp_budget <= 0:
+        raise ValueError(
+            f"Vocab size {vocab_size} too small for unique chars ({len(unique_chars)}) "
+            f"+ special tokens ({num_special_tokens})"
+        )
+
+    possible_tokens = tokens["possible_tokens"]
+
+    det_tokens = deterministic_rounding(possible_tokens, unique_chars, lp_budget)
+    bias_tokens = biased_rounding(possible_tokens, unique_chars, lp_budget)
+    prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, lp_budget)
+    tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
+
+    return {
+        "all_ones": dedupe_tokens(tokens_ones + unique_chars),
+        "det": dedupe_tokens(det_tokens + unique_chars),
+        "bias": dedupe_tokens(bias_tokens + unique_chars),
+        "prob": dedupe_tokens(prob_tokens + unique_chars),
+    }
+
+
+def test_special_tokens(tokenizer):
+    for field, token in SPECIAL_TOKEN_MAP.items():
+        configured = getattr(tokenizer, field, None)
+        if configured != token:
+            return False
+
+        token_id = tokenizer.convert_tokens_to_ids(token)
+        if token_id is None or token_id < 0:
+            return False
+        if tokenizer.convert_ids_to_tokens(token_id) != token:
+            return False
+
+        ids = tokenizer(token, add_special_tokens=False)["input_ids"]
+        if len(ids) != 1 or ids[0] != token_id:
+            return False
+
+    return True
+
+
+def test_text_samples(tokenizer):
+    samples = [
+        "hello world",
+        "Apertus tokenizer test.",
+        "print('hello')",
+        "x + y = z",
+    ]
+    for sample in samples:
+        ids = tokenizer(sample, add_special_tokens=True)["input_ids"]
+        if len(ids) == 0:
+            return False
+    return True
+
+
+def test_single_byte_strings(tokenizer):
+    success = 0
+    total = 256
+
+    for byte_value in range(total):
+        char_as_string = bytes([byte_value]).decode("latin-1")
+        try:
+            ids = tokenizer(char_as_string, add_special_tokens=False)["input_ids"]
+            if len(ids) > 0:
+                success += 1
+        except Exception:
+            pass
+
+    return success == total, success, total
+
+
+def run_tokenizer_tests(tokenizer_name, tokenizer):
+    special_ok = test_special_tokens(tokenizer)
+    text_ok = test_text_samples(tokenizer)
+    bytes_ok, byte_success, byte_total = test_single_byte_strings(tokenizer)
+
+    overall_ok = special_ok and text_ok and bytes_ok
+    status = "PASS" if overall_ok else "FAIL"
+    print(
+        f"[TEST] {tokenizer_name}: {status} | "
+        f"special={special_ok} text={text_ok} byte_chars={byte_success}/{byte_total}"
+    )
+    return overall_ok
+
+
+if __name__ == "__main__":
+    raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
+    save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_fixed")
+    run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
+
+    raw_files = list_raw_vocab_files(raw_vocab_path)
+    print(f"Found {len(raw_files)} raw vocab file(s) in {raw_vocab_path}")
+
+    total_tokenizers = 0
+    passed_tokenizers = 0
+
+    for raw_file in raw_files:
+        vocab_size = parse_vocab_size_from_path(raw_file)
+        print(f"\nProcessing {Path(raw_file).name} (target vocab size={vocab_size})")
+
+        vocabs = round_vocabs(raw_file, vocab_size)
+        for rnd_scheme in ROUNDING_SCHEMES:
+            tokenizer = build_tokenizer(vocabs[rnd_scheme])
+            tokenizer_name = f"lp_{vocab_size}_{rnd_scheme}"
+            save_tokenizer(tokenizer, save_dir, vocab_size, rnd_scheme)
+
+            total_tokenizers += 1
+            if run_tests:
+                if run_tokenizer_tests(tokenizer_name, tokenizer):
+                    passed_tokenizers += 1
+            else:
+                passed_tokenizers += 1
+
+    final_ok = passed_tokenizers == total_tokenizers
+    final_status = "PASS" if final_ok else "FAIL"
+    print(
+        f"\n[SUMMARY] {final_status}: tokenizers_passed={passed_tokenizers}/{total_tokenizers}"
     )
 
-    # Merge all sets
-    final_chars = set()
-    for batch_list in tqdm(mapped["unique_chars"], desc="Merging characters"):
-        final_chars.update(batch_list)
-
-    return sorted(final_chars)
-
-
-
-
-if __name__ == '__main__':
-    save_dir="rounded_tokenizers_fixed"
-    dataset_url="pietrolesci/finewebedu-20B"
-    
-    dataset=load_dataset(dataset_url)['train']
-    unique_chars=get_all_unique_chars(dataset)
-
-
-    vocab_sizes=[1024,2048,4096,8192,16384,32768,65536,131072]
-    raw_vocab_path="/local/home/jtempus/tokenisation_lp/rounding_vocabs"
-
-
-    for vocab_size in vocab_sizes:
-        vocabs_name=f"lp_tokens_{vocab_size}.pkl"
-        raw_tokens=os.path.join(raw_vocab_path,vocabs_name)
-        vocabs=round_vocabs(vocab_size,raw_tokens,unique_chars)
-        bytelevel_vocab_to_tokenizer(vocabs["all_ones"],save_dir,"all_ones")
-        bytelevel_vocab_to_tokenizer(vocabs["det"],save_dir,"det")
-        bytelevel_vocab_to_tokenizer(vocabs["bias"],save_dir,"bias")
-        bytelevel_vocab_to_tokenizer(vocabs["prob"],save_dir,"prob")
-    
+    if not final_ok:
+        raise SystemExit(1)
