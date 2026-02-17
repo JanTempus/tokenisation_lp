@@ -106,18 +106,18 @@ def round_vocabs(raw_tokens_path, vocab_size):
 
     unique_chars = dedupe_tokens(tokens["unique_chars"])
     num_special_tokens = len(SPECIAL_TOKEN_MAP)
-    lp_budget = vocab_size - len(unique_chars) - num_special_tokens
-    if lp_budget <= 0:
+    core_vocab_size = vocab_size - num_special_tokens
+    if core_vocab_size <= 0:
         raise ValueError(
-            f"Vocab size {vocab_size} too small for unique chars ({len(unique_chars)}) "
-            f"+ special tokens ({num_special_tokens})"
+            f"Vocab size {vocab_size} too small for special tokens ({num_special_tokens})"
         )
 
     possible_tokens = tokens["possible_tokens"]
 
-    det_tokens = deterministic_rounding(possible_tokens, unique_chars, lp_budget)
-    bias_tokens = biased_rounding(possible_tokens, unique_chars, lp_budget)
-    prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, lp_budget)
+    # Rounding helpers already account for unique_chars internally.
+    det_tokens = deterministic_rounding(possible_tokens, unique_chars, core_vocab_size)
+    bias_tokens = biased_rounding(possible_tokens, unique_chars, core_vocab_size)
+    prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
     tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
 
     return {
@@ -191,6 +191,17 @@ def run_tokenizer_tests(tokenizer_name, tokenizer):
     return overall_ok
 
 
+def assert_expected_tokenizer_len(tokenizer, tokenizer_name, target_vocab_size, rounding_scheme):
+    if rounding_scheme == "all_ones":
+        return
+    actual = len(tokenizer)
+    if actual != target_vocab_size:
+        raise ValueError(
+            f"{tokenizer_name} has len={actual}, expected {target_vocab_size}. "
+            "For det/bias/prob this should match exactly."
+        )
+
+
 if __name__ == "__main__":
     raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
     save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_apertus_2")
@@ -210,6 +221,7 @@ if __name__ == "__main__":
         for rnd_scheme in ROUNDING_SCHEMES:
             tokenizer = build_tokenizer(vocabs[rnd_scheme])
             tokenizer_name = f"lp_{vocab_size}_{rnd_scheme}"
+            assert_expected_tokenizer_len(tokenizer, tokenizer_name, vocab_size, rnd_scheme)
             save_tokenizer(tokenizer, save_dir, vocab_size, rnd_scheme)
 
             total_tokenizers += 1

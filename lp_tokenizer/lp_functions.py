@@ -459,7 +459,6 @@ def biased_rounding(possible_tokens:list[possibleToken],unique_chars:list[str] ,
     sorted_tokens=sorted(tokens_to_consider, key=lambda obj: obj.lp_value/len(obj.token), reverse=True)
 
     tokens_to_choose=vocab_size-len(unique_chars)
-    print(len(unique_chars))
     chosen_tokens=[token.token for token in sorted_tokens[0:tokens_to_choose]]
 
     tokens=list(set(unique_chars+chosen_tokens))
