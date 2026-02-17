@@ -145,8 +145,8 @@ class Tokenizer:
             special_char_count+=1
 
         if self.eot_token is None:
-            special_tokens.append("<|endoftext|>")
-            self.eot_token="<|endoftext|>" 
+            special_tokens.append("[EOS]")
+            self.eot_token="[EOS]" 
             special_char_count+=1
 
         lp_budget=self.vocab_size-len(unique_chars)-special_char_count # Minus 2 for the special tokens unknown and end of text

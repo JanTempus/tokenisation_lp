@@ -6,7 +6,9 @@ import pickle
 import os
 import json
 import random
+from datetime import datetime
 from pathlib import Path
+from contextlib import redirect_stdout, redirect_stderr
 
 
 num_proc = int(os.environ.get("NUM_PROC", "16"))
@@ -186,6 +188,40 @@ def save_sampling_manifest(save_dir, source_counts, sampling_manifest, target_ro
     print(f"Wrote sampling manifest to {manifest_path}")
 
 
+def train_with_optional_log(
+    dataset,
+    unique_chars,
+    vocab_size,
+    save_dir,
+    write_log_to_file,
+    log_dir,
+    run_context,
+):
+    if not write_log_to_file:
+        train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir)
+        return
+
+    os.makedirs(log_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(log_dir, f"train_lp_tokens_{vocab_size}_{timestamp}.log")
+
+    with open(log_path, "w", encoding="utf-8") as log_file:
+        log_file.write("# LP Tokenizer Training Log\n")
+        log_file.write(f"- timestamp: {datetime.now().isoformat()}\n")
+        log_file.write(f"- vocab_size: {vocab_size}\n")
+        log_file.write(f"- dataset_rows: {len(dataset)}\n")
+        log_file.write(f"- unique_chars: {len(unique_chars)}\n")
+        for key, value in run_context.items():
+            log_file.write(f"- {key}: {value}\n")
+        log_file.write("\n## Captured stdout/stderr\n\n")
+        log_file.flush()
+
+        with redirect_stdout(log_file), redirect_stderr(log_file):
+            train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir)
+
+    print(f"Wrote training log to {log_path}")
+
+
 if __name__ == "__main__":
     DATASET_BASE_DIR = os.environ.get(
         "TOKENIZER_DATASET_BASE",
@@ -209,8 +245,10 @@ if __name__ == "__main__":
     }
     TARGET_ROWS = int(os.environ.get("TARGET_ROWS", "60000"))
     SEED = int(os.environ.get("SEED", "42"))
+    WRITE_TRAIN_LOG_TO_FILE = os.environ.get("WRITE_TRAIN_LOG_TO_FILE", "0") == "1"
     vocab_size = [131072]
     save_dir = "rounding_vocabs_apertus_2/"
+    TRAIN_LOG_DIR = os.environ.get("TRAIN_LOG_DIR", os.path.join(save_dir, "train_logs"))
 
     source_to_files = discover_parquet_files(DATASET_BASE_DIR, SOURCE_DIRS)
     dataset, source_counts, sampling_manifest = sample_dataset(
@@ -232,5 +270,22 @@ if __name__ == "__main__":
 
     unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
 
+    run_context = {
+        "seed": SEED,
+        "target_rows": TARGET_ROWS,
+        "num_proc": num_proc,
+        "batch_size": batch_size,
+        "save_dir": save_dir,
+        "dataset_base_dir": DATASET_BASE_DIR,
+    }
+
     for vs in vocab_size:
-        train_lp_tokenizer(dataset, unique_chars, vs, save_dir)
+        train_with_optional_log(
+            dataset=dataset,
+            unique_chars=unique_chars,
+            vocab_size=vs,
+            save_dir=save_dir,
+            write_log_to_file=WRITE_TRAIN_LOG_TO_FILE,
+            log_dir=TRAIN_LOG_DIR,
+            run_context=run_context,
+        )

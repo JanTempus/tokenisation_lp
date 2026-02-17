@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+from datetime import datetime
 from pathlib import Path
 
 from tokenizers import Tokenizer
@@ -24,6 +25,25 @@ PRETOKENIZER = AutoTokenizer.from_pretrained(
     revision="step3000",
     cache_dir="./pythia-70m-deduped/step3000",
 )
+
+ROUND_TRIP_SAMPLES = [
+    (
+        "whitespace",
+        "  leading space\tand tab\nmultiple   spaces\n\ntrailing space ",
+    ),
+    (
+        "unicode",
+        "naive cafe 中文 Ελληνικα العربية 😀🚀",
+    ),
+    (
+        "code",
+        "def f(x):\n    return x**2  # square\nprint(f(7))\n",
+    ),
+    (
+        "long_text",
+        "Apertus tokenizer stress test. " * 200,
+    ),
+]
 
 
 def dedupe_tokens(tokens):
@@ -161,32 +181,87 @@ def test_text_samples(tokenizer):
     return True
 
 
-def test_single_byte_strings(tokenizer):
+def test_round_trip_samples(tokenizer):
     success = 0
+    total = len(ROUND_TRIP_SAMPLES)
+
+    for _, sample in ROUND_TRIP_SAMPLES:
+        ids = tokenizer(sample, add_special_tokens=False)["input_ids"]
+        decoded = tokenizer.decode(ids, skip_special_tokens=False)
+        if len(ids) > 0 and decoded == sample:
+            success += 1
+
+    return success == total, success, total
+
+
+def test_single_byte_strings(tokenizer, behavior="not_all_unk"):
+    encodable = 0
+    exact_roundtrip = 0
+    all_unk_count = 0
+    exceptions = 0
     total = 256
+    unk_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKEN_MAP["unk_token"])
 
     for byte_value in range(total):
         char_as_string = bytes([byte_value]).decode("latin-1")
         try:
             ids = tokenizer(char_as_string, add_special_tokens=False)["input_ids"]
+            decoded = tokenizer.decode(ids, skip_special_tokens=False)
+
             if len(ids) > 0:
-                success += 1
+                encodable += 1
+
+            if ids and unk_id is not None and all(token_id == unk_id for token_id in ids):
+                all_unk_count += 1
+
+            if decoded == char_as_string:
+                exact_roundtrip += 1
         except Exception:
-            pass
+            exceptions += 1
 
-    return success == total, success, total
+    if behavior == "strict_roundtrip":
+        is_ok = (
+            encodable == total
+            and exact_roundtrip == total
+            and all_unk_count == 0
+            and exceptions == 0
+        )
+    elif behavior == "no_unk":
+        is_ok = encodable == total and all_unk_count == 0 and exceptions == 0
+    elif behavior == "not_all_unk":
+        is_ok = encodable == total and all_unk_count < total and exceptions == 0
+    else:
+        raise ValueError(
+            f"Invalid BYTE_TEST_BEHAVIOR='{behavior}'. "
+            "Expected one of: not_all_unk, no_unk, strict_roundtrip"
+        )
+
+    return is_ok, {
+        "encodable": encodable,
+        "total": total,
+        "exact_roundtrip": exact_roundtrip,
+        "identity_fraction": exact_roundtrip / total,
+        "all_unk_count": all_unk_count,
+        "exceptions": exceptions,
+        "behavior": behavior,
+    }
 
 
-def run_tokenizer_tests(tokenizer_name, tokenizer):
+def run_tokenizer_tests(tokenizer_name, tokenizer, byte_behavior):
     special_ok = test_special_tokens(tokenizer)
     text_ok = test_text_samples(tokenizer)
-    bytes_ok, byte_success, byte_total = test_single_byte_strings(tokenizer)
+    roundtrip_ok, roundtrip_success, roundtrip_total = test_round_trip_samples(tokenizer)
+    bytes_ok, byte_stats = test_single_byte_strings(tokenizer, behavior=byte_behavior)
 
-    overall_ok = special_ok and text_ok and bytes_ok
+    overall_ok = special_ok and text_ok and roundtrip_ok and bytes_ok
     status = "PASS" if overall_ok else "FAIL"
     print(
         f"[TEST] {tokenizer_name}: {status} | "
-        f"special={special_ok} text={text_ok} byte_chars={byte_success}/{byte_total}"
+        f"special={special_ok} text={text_ok} roundtrip={roundtrip_success}/{roundtrip_total} "
+        f"bytes_mode={byte_stats['behavior']} bytes_enc={byte_stats['encodable']}/{byte_stats['total']} "
+        f"bytes_exact={byte_stats['exact_roundtrip']}/{byte_stats['total']} "
+        f"bytes_identity_frac={byte_stats['identity_fraction']:.4f} "
+        f"bytes_all_unk={byte_stats['all_unk_count']} bytes_exceptions={byte_stats['exceptions']}"
     )
     return overall_ok
 
@@ -206,6 +281,8 @@ if __name__ == "__main__":
     raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
     save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_apertus_2")
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
+    byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "not_all_unk")
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     raw_files = list_raw_vocab_files(raw_vocab_path)
     print(f"Found {len(raw_files)} raw vocab file(s) in {raw_vocab_path}")
@@ -216,17 +293,20 @@ if __name__ == "__main__":
     for raw_file in raw_files:
         vocab_size = parse_vocab_size_from_path(raw_file)
         print(f"\nProcessing {Path(raw_file).name} (target vocab size={vocab_size})")
+        vocab_output_dir = os.path.join(save_dir, f"{run_timestamp}_vocab_{vocab_size}")
+        os.makedirs(vocab_output_dir, exist_ok=True)
+        print(f"Saving under: {vocab_output_dir}")
 
         vocabs = round_vocabs(raw_file, vocab_size)
         for rnd_scheme in ROUNDING_SCHEMES:
             tokenizer = build_tokenizer(vocabs[rnd_scheme])
             tokenizer_name = f"lp_{vocab_size}_{rnd_scheme}"
             assert_expected_tokenizer_len(tokenizer, tokenizer_name, vocab_size, rnd_scheme)
-            save_tokenizer(tokenizer, save_dir, vocab_size, rnd_scheme)
+            save_tokenizer(tokenizer, vocab_output_dir, vocab_size, rnd_scheme)
 
             total_tokenizers += 1
             if run_tests:
-                if run_tokenizer_tests(tokenizer_name, tokenizer):
+                if run_tokenizer_tests(tokenizer_name, tokenizer, byte_test_behavior):
                     passed_tokenizers += 1
             else:
                 passed_tokenizers += 1
