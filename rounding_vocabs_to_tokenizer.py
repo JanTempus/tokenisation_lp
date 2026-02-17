@@ -193,7 +193,7 @@ def run_tokenizer_tests(tokenizer_name, tokenizer):
 
 if __name__ == "__main__":
     raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
-    save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_fixed")
+    save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_apertus_2")
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
 
     raw_files = list_raw_vocab_files(raw_vocab_path)
