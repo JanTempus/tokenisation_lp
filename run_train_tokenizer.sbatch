@@ -2,7 +2,7 @@
 #SBATCH -A a139
 #SBATCH -p normal
 #SBATCH --gres=gpu:1
-#SBATCH -t 24:00:00
+#SBATCH -t 01:00:00
 
 set -euo pipefail
 
