@@ -91,16 +91,30 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
 
 
 if __name__ == "__main__":
-    SAMPLED_DATASET_DIR = os.environ.get("SAMPLED_DATASET_DIR", "sampled_tokenizer_data")
+    TRAIN_DATASET_PATH = os.environ.get(
+        "TRAIN_DATASET_PATH",
+        "/capstor/store/cscs/swissai/a139/datasets/tokenizer_training/tokenizer_training_dataset",
+    )
     vocab_size = [int(size) for size in os.environ.get("VOCAB_SIZES", "131072").split(",") if size.strip()]
     save_dir = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2/")
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
-    print(f"Loading sampled dataset from {SAMPLED_DATASET_DIR}")
+    print(f"Loading training dataset from {TRAIN_DATASET_PATH}")
 
-    dataset = load_from_disk(SAMPLED_DATASET_DIR)
+    dataset_obj = load_from_disk(TRAIN_DATASET_PATH)
+    if hasattr(dataset_obj, "keys"):
+        if "train" in dataset_obj:
+            dataset = dataset_obj["train"]
+        else:
+            raise ValueError(
+                f"DatasetDict at {TRAIN_DATASET_PATH} does not contain a 'train' split. "
+                f"Available splits: {list(dataset_obj.keys())}"
+            )
+    else:
+        dataset = dataset_obj
+
     if "text" not in dataset.column_names:
         raise ValueError(
-            f"Sampled dataset at {SAMPLED_DATASET_DIR} must include a 'text' column. "
+            f"Dataset at {TRAIN_DATASET_PATH} must include a 'text' column. "
             f"Columns are: {dataset.column_names}"
         )
     print(f"Loaded {len(dataset)} rows")
