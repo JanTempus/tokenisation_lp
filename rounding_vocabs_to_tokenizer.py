@@ -4,8 +4,10 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from tokenizers import Regex
 from tokenizers import Tokenizer
 from tokenizers.models import Unigram
+from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 
@@ -18,13 +20,54 @@ SPECIAL_TOKEN_MAP = {
     "mask_token": "[MASK]",
 }
 
-ROUNDING_SCHEMES = ("all_ones", "det", "bias", "prob")
+ROUNDING_SCHEMES = ("all_ones", "all_nonzero", "det", "bias", "prob")
 
-PRETOKENIZER = AutoTokenizer.from_pretrained(
-    "EleutherAI/pythia-70m-deduped",
-    revision="step3000",
-    cache_dir="./pythia-70m-deduped/step3000",
+PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "pythia").strip().lower()
+_CUSTOM_SPLIT_PATTERN = (
+    r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
+    r"|[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*"
+    r"|\p{N}"
+    r"| ?[^\s\p{L}\p{N}]+[\r\n/]*"
+    r"|\s*[\r\n]+"
+    r"|\s+(?!\S)"
+    r"|\s+"
 )
+
+
+def build_pretokenizer(mode):
+    tokenizer = AutoTokenizer.from_pretrained(
+        "EleutherAI/pythia-70m-deduped",
+        revision="step3000",
+        cache_dir="./pythia-70m-deduped/step3000",
+    )
+
+    if mode == "pythia":
+        return tokenizer
+
+    if mode in {"split_bytelevel", "custom"}:
+        tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
+            [
+                Split(
+                    pattern=Regex(_CUSTOM_SPLIT_PATTERN),
+                    behavior="isolated",
+                    invert=False,
+                ),
+                ByteLevel(
+                    add_prefix_space=False,
+                    trim_offsets=True,
+                    use_regex=False,
+                ),
+            ]
+        )
+        return tokenizer
+
+    raise ValueError(
+        f"Unsupported PRETOKENIZER_MODE='{mode}'. "
+        "Expected one of: pythia, split_bytelevel, custom"
+    )
+
+
+PRETOKENIZER = build_pretokenizer(PRETOKENIZER_MODE)
 
 ROUND_TRIP_SAMPLES = [
     (
@@ -139,9 +182,11 @@ def round_vocabs(raw_tokens_path, vocab_size):
     bias_tokens = biased_rounding(possible_tokens, unique_chars, core_vocab_size)
     prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
     tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
+    tokens_nonzero = [token.token for token in possible_tokens if token.lp_value > 0.0]
 
     return {
         "all_ones": dedupe_tokens(tokens_ones + unique_chars),
+        "all_nonzero": dedupe_tokens(tokens_nonzero + unique_chars),
         "det": dedupe_tokens(det_tokens + unique_chars),
         "bias": dedupe_tokens(bias_tokens + unique_chars),
         "prob": dedupe_tokens(prob_tokens + unique_chars),
@@ -267,7 +312,7 @@ def run_tokenizer_tests(tokenizer_name, tokenizer, byte_behavior):
 
 
 def assert_expected_tokenizer_len(tokenizer, tokenizer_name, target_vocab_size, rounding_scheme):
-    if rounding_scheme == "all_ones":
+    if rounding_scheme in {"all_ones", "all_nonzero"}:
         return
     actual = len(tokenizer)
     if actual != target_vocab_size:
@@ -285,6 +330,7 @@ if __name__ == "__main__":
     run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     raw_files = list_raw_vocab_files(raw_vocab_path)
+    print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
     print(f"Found {len(raw_files)} raw vocab file(s) in {raw_vocab_path}")
 
     total_tokenizers = 0
