@@ -1,10 +1,11 @@
 from lp_tokenizer.lp_tokenizer import Tokenizer
 from transformers import AutoTokenizer
-from datasets import load_from_disk
+from datasets import concatenate_datasets, load_dataset, load_from_disk
 from tokenizers import Regex
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 import pickle
 import os
+from pathlib import Path
 
 
 num_proc = int(os.environ.get("NUM_PROC", "16"))
@@ -90,6 +91,81 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
         pickle.dump(tokens, f)
 
 
+def infer_text_column(dataset):
+    preferred_columns = ("text", "content", "code")
+    for column in preferred_columns:
+        if column in dataset.column_names:
+            return column
+
+    for name, feature in dataset.features.items():
+        dtype = getattr(feature, "dtype", None)
+        if dtype in {"string", "large_string"}:
+            return name
+
+    raise ValueError(f"Could not infer text column from columns: {dataset.column_names}")
+
+
+def normalize_to_text_column(dataset):
+    text_column = infer_text_column(dataset)
+    if text_column != "text":
+        dataset = dataset.rename_column(text_column, "text")
+    columns_to_remove = [column for column in dataset.column_names if column != "text"]
+    if columns_to_remove:
+        dataset = dataset.remove_columns(columns_to_remove)
+    return dataset
+
+
+def load_training_dataset(path):
+    try:
+        dataset_obj = load_from_disk(path)
+        if hasattr(dataset_obj, "keys"):
+            if "train" in dataset_obj:
+                dataset = dataset_obj["train"]
+            else:
+                raise ValueError(
+                    f"DatasetDict at {path} does not contain a 'train' split. "
+                    f"Available splits: {list(dataset_obj.keys())}"
+                )
+        else:
+            dataset = dataset_obj
+
+        print("Loaded dataset using load_from_disk")
+        return normalize_to_text_column(dataset)
+    except Exception as load_from_disk_error:
+        base_path = Path(path)
+        if not base_path.exists():
+            raise FileNotFoundError(f"Dataset path does not exist: {path}") from load_from_disk_error
+
+        source_dirs = sorted(entry for entry in base_path.iterdir() if entry.is_dir())
+        source_datasets = []
+
+        for source_dir in source_dirs:
+            parquet_files = sorted(str(parquet_path) for parquet_path in source_dir.rglob("*.parquet"))
+            if not parquet_files:
+                continue
+
+            source_dataset = load_dataset("parquet", data_files=parquet_files, split="train")
+            source_dataset = normalize_to_text_column(source_dataset)
+            source_datasets.append(source_dataset)
+            print(
+                f"Loaded source '{source_dir.name}' via parquet "
+                f"({len(parquet_files)} files, {len(source_dataset)} rows)"
+            )
+
+        if source_datasets:
+            return concatenate_datasets(source_datasets)
+
+        parquet_files = sorted(str(parquet_path) for parquet_path in base_path.rglob("*.parquet"))
+        if not parquet_files:
+            raise RuntimeError(
+                f"Failed to load as Dataset/DatasetDict and found no parquet files under: {path}"
+            ) from load_from_disk_error
+
+        print(f"load_from_disk failed; falling back to parquet load ({len(parquet_files)} files)")
+        dataset = load_dataset("parquet", data_files=parquet_files, split="train")
+        return normalize_to_text_column(dataset)
+
+
 if __name__ == "__main__":
     TRAIN_DATASET_PATH = os.environ.get(
         "TRAIN_DATASET_PATH",
@@ -100,23 +176,7 @@ if __name__ == "__main__":
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
     print(f"Loading training dataset from {TRAIN_DATASET_PATH}")
 
-    dataset_obj = load_from_disk(TRAIN_DATASET_PATH)
-    if hasattr(dataset_obj, "keys"):
-        if "train" in dataset_obj:
-            dataset = dataset_obj["train"]
-        else:
-            raise ValueError(
-                f"DatasetDict at {TRAIN_DATASET_PATH} does not contain a 'train' split. "
-                f"Available splits: {list(dataset_obj.keys())}"
-            )
-    else:
-        dataset = dataset_obj
-
-    if "text" not in dataset.column_names:
-        raise ValueError(
-            f"Dataset at {TRAIN_DATASET_PATH} must include a 'text' column. "
-            f"Columns are: {dataset.column_names}"
-        )
+    dataset = load_training_dataset(TRAIN_DATASET_PATH)
     print(f"Loaded {len(dataset)} rows")
 
     char_chunks = dataset.map(
