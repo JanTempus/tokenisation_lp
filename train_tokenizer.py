@@ -6,6 +6,7 @@ from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 import pickle
 import os
 from pathlib import Path
+import traceback
 
 
 num_proc = int(os.environ.get("NUM_PROC", "16"))
@@ -132,6 +133,11 @@ def load_training_dataset(path):
         print("Loaded dataset using load_from_disk")
         return normalize_to_text_column(dataset)
     except Exception as load_from_disk_error:
+        print(
+            "[INFO] load_from_disk failed "
+            f"({type(load_from_disk_error).__name__}: {load_from_disk_error}). "
+            "Trying parquet-based loading."
+        )
         base_path = Path(path)
         if not base_path.exists():
             raise FileNotFoundError(f"Dataset path does not exist: {path}") from load_from_disk_error
@@ -144,13 +150,27 @@ def load_training_dataset(path):
             if not parquet_files:
                 continue
 
-            source_dataset = load_dataset("parquet", data_files=parquet_files, split="train")
-            source_dataset = normalize_to_text_column(source_dataset)
-            source_datasets.append(source_dataset)
-            print(
-                f"Loaded source '{source_dir.name}' via parquet "
-                f"({len(parquet_files)} files, {len(source_dataset)} rows)"
-            )
+            try:
+                source_dataset = load_dataset("parquet", data_files=parquet_files, split="train")
+                source_dataset = normalize_to_text_column(source_dataset)
+                source_datasets.append(source_dataset)
+                print(
+                    f"Loaded source '{source_dir.name}' via parquet "
+                    f"({len(parquet_files)} files, {len(source_dataset)} rows)"
+                )
+            except Exception as source_error:
+                print(
+                    f"[ERROR] Failed loading source '{source_dir.name}' "
+                    f"with {len(parquet_files)} parquet files."
+                )
+                print(f"[ERROR] Exception type: {type(source_error).__name__}")
+                print(f"[ERROR] Exception message: {source_error}")
+                print("[ERROR] Traceback:")
+                print(traceback.format_exc())
+                raise RuntimeError(
+                    f"Parquet source load failed for '{source_dir.name}'. "
+                    f"First file: {parquet_files[0]}"
+                ) from source_error
 
         if source_datasets:
             return concatenate_datasets(source_datasets)
@@ -161,9 +181,17 @@ def load_training_dataset(path):
                 f"Failed to load as Dataset/DatasetDict and found no parquet files under: {path}"
             ) from load_from_disk_error
 
-        print(f"load_from_disk failed; falling back to parquet load ({len(parquet_files)} files)")
-        dataset = load_dataset("parquet", data_files=parquet_files, split="train")
-        return normalize_to_text_column(dataset)
+        print(f"Falling back to recursive parquet load ({len(parquet_files)} files)")
+        try:
+            dataset = load_dataset("parquet", data_files=parquet_files, split="train")
+            return normalize_to_text_column(dataset)
+        except Exception as parquet_error:
+            print("[ERROR] Recursive parquet fallback load failed.")
+            print(f"[ERROR] Exception type: {type(parquet_error).__name__}")
+            print(f"[ERROR] Exception message: {parquet_error}")
+            print("[ERROR] Traceback:")
+            print(traceback.format_exc())
+            raise
 
 
 if __name__ == "__main__":
