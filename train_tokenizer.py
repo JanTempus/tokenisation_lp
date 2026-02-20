@@ -1,6 +1,6 @@
 from lp_tokenizer.lp_tokenizer import Tokenizer
 from transformers import AutoTokenizer
-from datasets import concatenate_datasets, load_dataset, load_from_disk
+from datasets import Value, concatenate_datasets, load_dataset, load_from_disk
 from tokenizers import Regex
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 import pickle
@@ -21,6 +21,14 @@ _CUSTOM_SPLIT_PATTERN = (
     r"|\s+(?!\S)"
     r"|\s+"
 )
+SOURCE_TEXT_COLUMN = {
+    "finemath": "text",
+    "fineweb": "text",
+    "fineweb2": "text",
+    "infimath": "text",
+    "megamath": "text",
+    "starcoder": "content",
+}
 
 
 def build_pretokenizer(mode):
@@ -106,13 +114,26 @@ def infer_text_column(dataset):
     raise ValueError(f"Could not infer text column from columns: {dataset.column_names}")
 
 
-def normalize_to_text_column(dataset):
-    text_column = infer_text_column(dataset)
+def normalize_to_text_column(dataset, source_name=None):
+    preferred_text_column = SOURCE_TEXT_COLUMN.get(source_name) if source_name else None
+    if preferred_text_column in dataset.column_names:
+        text_column = preferred_text_column
+    else:
+        text_column = infer_text_column(dataset)
+        if preferred_text_column is not None and preferred_text_column != text_column:
+            print(
+                f"[WARN] Source '{source_name}' expected text column '{preferred_text_column}' "
+                f"but using inferred column '{text_column}'."
+            )
+
     if text_column != "text":
         dataset = dataset.rename_column(text_column, "text")
     columns_to_remove = [column for column in dataset.column_names if column != "text"]
     if columns_to_remove:
         dataset = dataset.remove_columns(columns_to_remove)
+    text_dtype = getattr(dataset.features.get("text"), "dtype", None)
+    if text_dtype != "string":
+        dataset = dataset.cast_column("text", Value("string"))
     return dataset
 
 
@@ -151,12 +172,26 @@ def load_training_dataset(path):
                 continue
 
             try:
-                source_dataset = load_dataset("parquet", data_files=parquet_files, split="train")
-                source_dataset = normalize_to_text_column(source_dataset)
+                source_chunks = []
+                total_rows = 0
+                for index, parquet_file in enumerate(parquet_files, start=1):
+                    source_chunk = load_dataset("parquet", data_files=parquet_file, split="train")
+                    source_chunk = normalize_to_text_column(source_chunk, source_name=source_dir.name)
+                    source_chunks.append(source_chunk)
+                    total_rows += len(source_chunk)
+                    if index % 200 == 0 or index == len(parquet_files):
+                        print(
+                            f"Source '{source_dir.name}': loaded {index}/{len(parquet_files)} parquet files"
+                        )
+
+                if len(source_chunks) == 1:
+                    source_dataset = source_chunks[0]
+                else:
+                    source_dataset = concatenate_datasets(source_chunks)
                 source_datasets.append(source_dataset)
                 print(
                     f"Loaded source '{source_dir.name}' via parquet "
-                    f"({len(parquet_files)} files, {len(source_dataset)} rows)"
+                    f"({len(parquet_files)} files, {total_rows} rows)"
                 )
             except Exception as source_error:
                 print(
