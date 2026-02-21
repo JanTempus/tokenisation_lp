@@ -3,7 +3,6 @@ import numpy as np
 import scipy.sparse as sp
 import pickle
 from collections import defaultdict
-from tqdm import tqdm
 import time
 from numpy.typing import NDArray
 import random
@@ -50,7 +49,7 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
     B_col_offset = 0
 
     
-    for i in tqdm(range(numStrings), desc="Preparing matrices"):
+    for i in range(numStrings):
         edges = edgesList[i]
         freeEdges = freeEdgesList[i]
         numEdges = len(edges)
@@ -130,6 +129,7 @@ def setup_LP_tokenization(edgesList: list[list[tokenInstance]] ,
     objective=cp.Minimize(BigNonFreewVector.T@f +BigFreewVector.T@g)
 
     problem = cp.Problem(objective, constraints)
+    print("setup_LP_tokenization finished")
 
     return problem
 
@@ -149,7 +149,6 @@ def tokenize(edgesList: list[list[tokenInstance]] ,
     A_row_offset = 0
     A_col_offset = 0
 
-    #for i in tqdm(range(numStrings), desc="Preparing matrices"):
     for i in range(numStrings):
         edges = edgesList[i]
         numEdges = len(edges)
@@ -237,14 +236,14 @@ def create_vocab(inputStringList: list[str],
     numVertices = []
 
     if all_tokens:  
-        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+        for i in range(numStrings):
             stringLen = len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]))
             tokensList.append(hf.get_tokens(inputStringList[i]))
             freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen + 1)
     else:
-        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+        for i in range(numStrings):
             stringLen = len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings_upto_len_t(inputStringList[i], maxTokenLength))
             tokensList.append(hf.get_tokens_upto_len_t(inputStringList[i], maxTokenLength))
@@ -337,6 +336,7 @@ def create_vocab(inputStringList: list[str],
                 tokens_to_keep[i].get_index()
             )
             possibleTokens.append(nonZeroToken)
+    print("create_vocab finished")
 
     return possibleTokens
 
@@ -357,7 +357,7 @@ def create_vocab_old(inputStringList: list[str],
 
 
     if all_tokens:  
-        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+        for i in range(numStrings):
             stringLen=len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]) )
             tokensList.append(hf.get_tokens(inputStringList[i]))
@@ -368,7 +368,7 @@ def create_vocab_old(inputStringList: list[str],
         tokens=list(set([item for sublist in tokensList for item in sublist] ))
 
     else:
-        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+        for i in range(numStrings):
             stringLen=len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings_upto_len_t(inputStringList[i],maxTokenLength) )
             tokensList.append(hf.get_tokens_upto_len_t(inputStringList[i],maxTokenLength))
@@ -431,6 +431,7 @@ def create_vocab_old(inputStringList: list[str],
 
             
             possibleTokens.append(nonZeroToken)
+    print("create_vocab_old finished")
     
     return possibleTokens
 

@@ -9,7 +9,6 @@ import json
 import lp_tokenizer.helper_functions as hf
 import matplotlib.pyplot as plt
 import pickle
-from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import csv
 
@@ -166,7 +165,7 @@ class Tokenizer:
     
         word_freqs = defaultdict(int)
         
-        for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+        for i, text in enumerate(corpus):
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             new_words = [word for word, offset in words_with_offsets]
             for word in new_words:
@@ -174,6 +173,7 @@ class Tokenizer:
 
         input_strings=list(word_freqs.keys())
         input_strings_frequencies=list(word_freqs.values())
+        print("pretokenize_and_prepare_corpus finished")
 
         return input_strings, input_strings_frequencies
 
@@ -190,12 +190,12 @@ class Tokenizer:
         else:
             corpus=[]
 
-            for i in tqdm(range(dataset_size),desc="Appending text to the corpus"):
+            for i in range(dataset_size):
                 corpus.append(dataset['train'][i]['text'])
 
             word_freqs = defaultdict(int)
             
-            for i, text in tqdm(enumerate(corpus), total=len(corpus), desc="Pretokenizing"):
+            for i, text in enumerate(corpus):
                 words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
                 new_words = [word for word, offset in words_with_offsets]
                 for word in new_words:
@@ -208,6 +208,7 @@ class Tokenizer:
             # Save as .npy for faster reloads
                 np.save(strings_file, np.array(input_strings, dtype=object),allow_pickle=True)
                 np.save(freqs_file, np.array(input_strings_frequencies, dtype=np.int64))
+        print("pretokenize_and_prepare_dataset finished")
 
         return input_strings, input_strings_frequencies
 
@@ -226,7 +227,6 @@ class Tokenizer:
         num_vertices=[]
 
 
-        # for i in tqdm(range(num_strings), desc="Processing strings"):
         for i in range(num_strings):
             string_len=len(input_strings[i])
             edges=hf.get_strings_from_vocab(input_strings[i],vocab)
@@ -246,11 +246,12 @@ class Tokenizer:
 
         unique_chars = set()
 
-        for text in tqdm(corpus, desc="Getting Unique Characters"):
+        for text in corpus:
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
             tokens = [word for word, _ in words_with_offsets]
             for token in tokens:
                 unique_chars.update(token)
+        print("get_unique_chars_corpus finished")
 
         return sorted(unique_chars)
 
@@ -269,7 +270,7 @@ class Tokenizer:
         else:
             unique_chars = set()
 
-            for i in tqdm(range(dataset_size), desc="Getting Unique characters"):
+            for i in range(dataset_size):
                 text = dataset['train'][i]['text']
                 words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
                 tokens = [word for word, _ in words_with_offsets]
@@ -278,6 +279,7 @@ class Tokenizer:
 
             unique_chars = sorted(unique_chars)
             np.save(file_name, np.array(unique_chars, dtype=object))
+        print("get_unique_chars finished")
 
         return unique_chars
 
@@ -308,7 +310,7 @@ class Tokenizer:
         freeEdgesList = []
         numVertices = []
 
-        for i in tqdm(range(numStrings), desc="Converting data to graph format"):
+        for i in range(numStrings):
             stringLen = len(inputStringList[i])
             edgesList.append(hf.get_all_nonFree_substrings(inputStringList[i]))
             tokensList.append(hf.get_tokens(inputStringList[i]))
@@ -336,3 +338,4 @@ class Tokenizer:
         total_tokens = len(tokens_to_keep)
 
         print(f"Total edges {total_edges}, total tokens {total_tokens}" )
+        print("check_number_edges finished")
