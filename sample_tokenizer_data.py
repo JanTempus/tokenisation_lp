@@ -148,23 +148,23 @@ def save_sampling_outputs(output_dir, dataset, source_counts, sampling_manifest,
 if __name__ == "__main__":
     DATASET_BASE_DIR = os.environ.get(
         "TOKENIZER_DATASET_BASE",
-        "/capstor/store/cscs/swissai/a139/datasets/tokenizer_training",
+        "/capstor/store/cscs/swissai/a139/datasets/tokenizer_training/tokenizer_training_dataset",
     )
     SOURCE_DIRS = [
-        "fineweb2_sample",
-        "fineweb_sample",
-        "megamath_sample",
-        "infimath_sample",
-        "finemath_sample",
-        "starcoder_sample",
+        "fineweb2",
+        "fineweb",
+        "megamath",
+        "infimath",
+        "finemath",
+        "starcoder",
     ]
     SOURCE_TEXT_COLUMNS = {
-        "fineweb2_sample": "text",
-        "fineweb_sample": "text",
-        "megamath_sample": "text",
-        "infimath_sample": "text",
-        "finemath_sample": "text",
-        "starcoder_sample": "content",
+        "fineweb2": "text",
+        "fineweb": "text",
+        "megamath": "text",
+        "infimath": "text",
+        "finemath": "text",
+        "starcoder": "content",
     }
     TARGET_ROWS = int(os.environ.get("TARGET_ROWS", "120000"))
     SEED = int(os.environ.get("SEED", "42"))
