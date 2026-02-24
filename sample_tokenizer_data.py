@@ -4,7 +4,7 @@ import os
 import random
 from pathlib import Path
 
-from datasets import concatenate_datasets, load_dataset
+from datasets import Value, concatenate_datasets, load_dataset
 
 
 def discover_parquet_files(base_dir, source_dirs):
@@ -61,6 +61,9 @@ def normalize_to_text_column(dataset, source_name=None, source_text_columns=None
     columns_to_remove = [column for column in dataset.column_names if column != "text"]
     if columns_to_remove:
         dataset = dataset.remove_columns(columns_to_remove)
+    text_dtype = getattr(dataset.features.get("text"), "dtype", None)
+    if text_dtype != "string":
+        dataset = dataset.cast_column("text", Value("string"))
     return dataset
 
 
