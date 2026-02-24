@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from lp_tokenizer.lp_functions import create_vocab,tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk
+from lp_tokenizer.lp_functions import create_vocab, create_vocab_cuopt, tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk
 from lp_tokenizer.datastructures import tokenInstance
 import numpy as np
 import os
@@ -131,6 +131,56 @@ class Tokenizer:
         # vocab = OrderedDict((token, idx) for idx, token in enumerate(all_tokens))
    
         # self.vocab=vocab
+
+
+    def make_vocab_cuopt(self, solver_parameters=None, verbose: bool = True):
+
+        if self.corpus is None:
+            raise ValueError("Must include a corpus")
+
+        input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
+
+        if self.unique_chars is None:
+            print("Finding unique chars")
+            self.unique_chars = self.get_unique_chars_corpus(self.corpus)
+
+        special_char_count = 0
+        special_tokens = []
+
+        if self.unk_token is not None:
+            special_tokens.append(self.unk_token)
+            special_char_count += 1
+
+        if self.eos_token is not None:
+            special_tokens.append(self.eos_token)
+            special_char_count += 1
+
+        if self.pad_token is not None:
+            special_tokens.append(self.pad_token)
+            special_char_count += 1
+
+        if self.cls_token is not None:
+            special_tokens.append(self.cls_token)
+            special_char_count += 1
+
+        if self.mask_token is not None:
+            special_tokens.append(self.mask_token)
+            special_char_count += 1
+
+        lp_budget = self.vocab_size - len(self.unique_chars) - special_char_count
+        if lp_budget <= 0:
+            raise ValueError("Vocab size is too small, entire vocab already unique characters")
+
+        possible_tokens = create_vocab_cuopt(
+            inputStringList=input_strings,
+            inputStringFreq=input_strings_frequencies,
+            numAllowedTokens=lp_budget,
+            vocab_size=self.vocab_size,
+            solver_parameters=solver_parameters,
+            verbose=verbose,
+        )
+
+        return {"possible_tokens": possible_tokens, "unique_chars": self.unique_chars, "special_tokens": special_tokens}
 
 
     def generate_vocab_nonzero(self,input_strings,input_strings_frequencies,unique_chars):

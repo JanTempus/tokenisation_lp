@@ -93,7 +93,7 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
         mask_token="[MASK]",
         pretokenizer=pretokenizer_obj,
     )
-    tokens = tokenizer.make_vocab()
+    tokens = tokenizer.make_vocab_cuopt()
     file_name = os.path.join(save_dir, f"lp_tokens_{vocab_size}.pkl")
     os.makedirs(save_dir, exist_ok=True)
     with open(file_name, "wb") as f:
