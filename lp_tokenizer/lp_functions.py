@@ -222,7 +222,7 @@ def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int):
 
     c = np.hstack([BigNonFreewVector, BigFreewVector, np.zeros(num_t, dtype=float)])
     lower_bounds = np.zeros(num_x, dtype=float)
-    upper_bounds = np.full(num_x, 1.0e30, dtype=float)
+    upper_bounds = np.full(num_x, 1.0, dtype=float)
     upper_bounds[num_f + num_g:] = 1.0
 
     return {

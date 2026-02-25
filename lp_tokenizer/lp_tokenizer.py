@@ -214,15 +214,39 @@ class Tokenizer:
     def pretokenize_and_prepare_corpus(self, corpus):
     
         word_freqs = defaultdict(int)
+        empty_token_count = 0
+        empty_token_text_count = 0
+        empty_token_examples = []
         
         for i, text in enumerate(corpus):
             words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-            new_words = [word for word, offset in words_with_offsets]
-            for word in new_words:
+            saw_empty_token = False
+            for word, _ in words_with_offsets:
+                if word == "":
+                    empty_token_count += 1
+                    saw_empty_token = True
+                    continue
                 word_freqs[word] += 1
+            if saw_empty_token:
+                empty_token_text_count += 1
+                if len(empty_token_examples) < 5:
+                    text_preview = text[:80].replace("\n", "\\n")
+                    empty_token_examples.append((i, text_preview))
 
         input_strings=list(word_freqs.keys())
         input_strings_frequencies=list(word_freqs.values())
+        if empty_token_count > 0:
+            print(
+                f"[WARN] Found {empty_token_count} empty pretokenized strings "
+                f"across {empty_token_text_count} corpus entries."
+            )
+            for text_idx, preview in empty_token_examples:
+                print(f"[WARN] Empty-token example at corpus index {text_idx}: '{preview}'")
+            if os.environ.get("FAIL_ON_EMPTY_PRETOKENIZED_STRINGS", "0") == "1":
+                raise ValueError(
+                    "Empty pretokenized strings detected. "
+                    "Set FAIL_ON_EMPTY_PRETOKENIZED_STRINGS=0 to continue."
+                )
         print("pretokenize_and_prepare_corpus finished")
 
         return input_strings, input_strings_frequencies
@@ -244,15 +268,40 @@ class Tokenizer:
                 corpus.append(dataset['train'][i]['text'])
 
             word_freqs = defaultdict(int)
+            empty_token_count = 0
+            empty_token_text_count = 0
+            empty_token_examples = []
             
             for i, text in enumerate(corpus):
                 words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-                new_words = [word for word, offset in words_with_offsets]
-                for word in new_words:
+                saw_empty_token = False
+                for word, _ in words_with_offsets:
+                    if word == "":
+                        empty_token_count += 1
+                        saw_empty_token = True
+                        continue
                     word_freqs[word] += 1
+                if saw_empty_token:
+                    empty_token_text_count += 1
+                    if len(empty_token_examples) < 5:
+                        text_preview = text[:80].replace("\n", "\\n")
+                        empty_token_examples.append((i, text_preview))
 
             input_strings=list(word_freqs.keys())
             input_strings_frequencies=list(word_freqs.values())
+
+            if empty_token_count > 0:
+                print(
+                    f"[WARN] Found {empty_token_count} empty pretokenized strings "
+                    f"across {empty_token_text_count} dataset entries."
+                )
+                for text_idx, preview in empty_token_examples:
+                    print(f"[WARN] Empty-token example at dataset index {text_idx}: '{preview}'")
+                if os.environ.get("FAIL_ON_EMPTY_PRETOKENIZED_STRINGS", "0") == "1":
+                    raise ValueError(
+                        "Empty pretokenized strings detected. "
+                        "Set FAIL_ON_EMPTY_PRETOKENIZED_STRINGS=0 to continue."
+                    )
            
             if save:
             # Save as .npy for faster reloads
