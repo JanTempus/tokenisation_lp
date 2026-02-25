@@ -220,6 +220,8 @@ def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int):
     A_ub = sp.vstack([A_ub_flow, A_ub_budget], format="csr")
     b_ub = np.hstack([b_ub_flow, b_ub_budget])
 
+    # Weighted objective: minimize sum_i w_i * f_i + sum_j w_j * g_j
+    # where weights come from pretokenized-string frequencies.
     c = np.hstack([BigNonFreewVector, BigFreewVector, np.zeros(num_t, dtype=float)])
     lower_bounds = np.zeros(num_x, dtype=float)
     upper_bounds = np.full(num_x, 1.0, dtype=float)
@@ -264,10 +266,11 @@ def _get_var_value(variable_obj):
 
 def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool = True):
     try:
-        from cuopt.linear_programming.problem import MINIMIZE, Problem
+        from cuopt.linear_programming.problem import MINIMIZE, Problem, LinearExpression
     except ImportError:
         from cuopt.linear_programming.problem import Problem, sense
         MINIMIZE = sense.MINIMIZE
+        LinearExpression = None
     from cuopt.linear_programming.solver_settings import SolverSettings
 
     A_eq = cuopt_lp_data["A_eq"]
@@ -317,9 +320,12 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
         expr = _build_linear_expression(variables, cols, vals)
         problem.addConstraint(expr <= rhs, f"ub_{row_idx}")
 
-    # Objective coefficients are attached to variables via addVariable(obj=...).
-    objective_expr = 0.0 * variables[0] if variables else 0.0
-    problem.setObjective(objective_expr, MINIMIZE)
+    if LinearExpression is not None:
+        problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
+    elif variables:
+        # Fallback for older APIs: preserve variable objective coefficients,
+        # only force minimization sense via a neutral objective expression.
+        problem.setObjective(0.0 * variables[0], MINIMIZE)
     settings = SolverSettings()
     settings.set_parameter(CUOPT_METHOD, SolverMethod.PDLP)
     settings.set_parameter(CUOPT_PDLP_SOLVER_MODE, PDLPSolverMode.Stable2)
