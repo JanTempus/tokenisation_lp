@@ -9,7 +9,7 @@ set -euo pipefail
 # User-tunable settings
 REPO_DIR="/iopsstor/scratch/cscs/jtempus/tokenisation_lp"
 TOKENIZER_DATASET_BASE="${TOKENIZER_DATASET_BASE:-/capstor/store/cscs/swissai/a139/datasets/tokenizer_training/tokenizer_training_dataset}"
-TARGET_ROWS="${TARGET_ROWS:-120000}"
+TARGET_ROWS="${TARGET_ROWS:-60000}"
 SEED="${SEED:-42}"
 OUTPUT_DATASET_DIR="${OUTPUT_DATASET_DIR:-sampled_tokenizer_data}"
 TRAIN_DATASET_PATH="${TRAIN_DATASET_PATH:-${OUTPUT_DATASET_DIR}}"
