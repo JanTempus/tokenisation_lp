@@ -271,7 +271,7 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
         from cuopt.linear_programming.problem import Problem, sense
         MINIMIZE = sense.MINIMIZE
         LinearExpression = None
-    from cuopt.linear_programming.solver_settings import SolverSettings
+    
 
     A_eq = cuopt_lp_data["A_eq"]
     b_eq = cuopt_lp_data["b_eq"]
@@ -320,34 +320,32 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
         expr = _build_linear_expression(variables, cols, vals)
         problem.addConstraint(expr <= rhs, f"ub_{row_idx}")
 
-    if LinearExpression is not None:
-        problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
-    elif variables:
-        # Fallback for older APIs: preserve variable objective coefficients,
-        # only force minimization sense via a neutral objective expression.
-        problem.setObjective(0.0 * variables[0], MINIMIZE)
+ 
+    problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
+   
     settings = SolverSettings()
     settings.set_parameter(CUOPT_METHOD, SolverMethod.PDLP)
+    
     if solver_parameters:
         for param_name, param_value in solver_parameters.items():
             settings.set_parameter(param_name, param_value)
 
-    start = time.time()
+ 
     problem.solve(settings)
-    end = time.time()
 
+
+    print(f"problem status name: {problem.Status.name}")
     status_obj = getattr(problem, "Status", getattr(problem, "status", None))
     status_name = getattr(status_obj, "name", str(status_obj))
-    solve_time = getattr(problem, "SolveTime", getattr(problem, "solve_time", end - start))
+    
 
     t_offset = num_f + num_g
     t_values = np.array([float(_get_var_value(variables[t_offset + i])) for i in range(num_t)], dtype=float)
+    print(f"t_values: {t_values}")
 
     return {
         "status_name": status_name,
-        "solve_time": solve_time,
-        "wall_time": end - start,
-        "t_values": t_values,
+        "t_values": t_values
     }
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
@@ -710,7 +708,20 @@ def create_vocab_cuopt(inputStringList: list[str],
             "Direct cuOpt LP solve requested, but cuOpt Python modules are not available in this environment."
         ) from import_error
 
+    
     status_name = solve_output["status_name"]
+    if status_name is not None:
+        normalized_status = str(status_name).lower()
+        if "optimal" not in normalized_status and "feasible" not in normalized_status:
+            raise RuntimeError(f"cuOpt solve did not return an optimal/feasible status. Status={status_name}")
+
+    internal_time = solve_output["solve_time"]
+    wall_time = solve_output["wall_time"]
+    output_file = "computation_time.csv"
+    with open(output_file, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([f"Interal Time {internal_time}"])
+        writer.writerow([f"My Time {wall_time}"])
 
     tVar = solve_output["t_values"]
 
