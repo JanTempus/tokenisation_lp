@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from cuopt.linear_programming.solver.solver_parameters import (
     CUOPT_METHOD,
     CUOPT_PDLP_SOLVER_MODE,
+    CUOPT_PDLP_MAX_NUM_ITERATIONS,
 )
 
 from cuopt.linear_programming.solver_settings import (
@@ -329,6 +330,7 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
     settings = SolverSettings()
     settings.set_parameter(CUOPT_METHOD, SolverMethod.PDLP)
     settings.set_parameter(CUOPT_PDLP_SOLVER_MODE, PDLPSolverMode.Stable2)
+    settings.set_parameter(CUOPT_PDLP_MAX_NUM_ITERATIONS, 200000)
     if solver_parameters:
         for param_name, param_value in solver_parameters.items():
             settings.set_parameter(param_name, param_value)
