@@ -711,18 +711,6 @@ def create_vocab_cuopt(inputStringList: list[str],
         ) from import_error
 
     status_name = solve_output["status_name"]
-    if status_name is not None:
-        normalized_status = str(status_name).lower()
-        if "optimal" not in normalized_status and "feasible" not in normalized_status:
-            raise RuntimeError(f"cuOpt solve did not return an optimal/feasible status. Status={status_name}")
-
-    internal_time = solve_output["solve_time"]
-    wall_time = solve_output["wall_time"]
-    output_file = "computation_time.csv"
-    with open(output_file, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([f"Interal Time {internal_time}"])
-        writer.writerow([f"My Time {wall_time}"])
 
     tVar = solve_output["t_values"]
 
