@@ -176,7 +176,6 @@ class Tokenizer:
             inputStringFreq=input_strings_frequencies,
             numAllowedTokens=lp_budget,
             vocab_size=self.vocab_size,
-            solver_parameters=solver_parameters,
             verbose=verbose,
         )
 
