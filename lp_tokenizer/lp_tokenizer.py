@@ -176,7 +176,6 @@ class Tokenizer:
             inputStringFreq=input_strings_frequencies,
             numAllowedTokens=lp_budget,
             vocab_size=self.vocab_size,
-            verbose=verbose,
         )
 
         return {"possible_tokens": possible_tokens, "unique_chars": self.unique_chars, "special_tokens": special_tokens}
