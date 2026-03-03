@@ -171,7 +171,7 @@ class Tokenizer:
         if lp_budget <= 0:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
 
-        possible_tokens = create_vocab_cuopt(
+        possible_tokens = create_vocab(
             inputStringList=input_strings,
             inputStringFreq=input_strings_frequencies,
             numAllowedTokens=lp_budget,
