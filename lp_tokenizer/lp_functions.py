@@ -325,19 +325,20 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
    
     settings = SolverSettings()
     settings.set_parameter(CUOPT_METHOD, SolverMethod.PDLP)
-    
+    settings.set_parameter(CUOPT_PDLP_SOLVER_MODE, PDLPSolverMode.Stable2)
+
     if solver_parameters:
         for param_name, param_value in solver_parameters.items():
             settings.set_parameter(param_name, param_value)
 
- 
+    start = time.time()
     problem.solve(settings)
-
+    end = time.time()
 
     print(f"problem status name: {problem.Status.name}")
     status_obj = getattr(problem, "Status", getattr(problem, "status", None))
     status_name = getattr(status_obj, "name", str(status_obj))
-    
+    solve_time = getattr(problem, "SolveTime", getattr(problem, "solve_time", end - start))
 
     t_offset = num_f + num_g
     t_values = np.array([float(_get_var_value(variables[t_offset + i])) for i in range(num_t)], dtype=float)
@@ -345,7 +346,9 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
 
     return {
         "status_name": status_name,
-        "t_values": t_values
+        "solve_time": solve_time,
+        "wall_time": end - start,
+        "t_values": t_values,
     }
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
