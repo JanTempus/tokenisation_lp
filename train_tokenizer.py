@@ -11,7 +11,7 @@ import traceback
 
 num_proc = int(os.environ.get("NUM_PROC", "16"))
 batch_size = int(os.environ.get("BATCH_SIZE", "10000"))
-PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "pythia").strip().lower()
+PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "custom").strip().lower()
 _CUSTOM_SPLIT_PATTERN = (
     r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
     r"|[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*"
