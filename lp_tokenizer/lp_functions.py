@@ -323,10 +323,6 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
  
     problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
    
-    settings = SolverSettings()
-    settings.set_parameter(CUOPT_METHOD, SolverMethod.PDLP)
-    settings.set_parameter(CUOPT_PDLP_SOLVER_MODE, PDLPSolverMode.Stable2)
-
     if solver_parameters:
         for param_name, param_value in solver_parameters.items():
             settings.set_parameter(param_name, param_value)
