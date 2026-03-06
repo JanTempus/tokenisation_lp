@@ -323,12 +323,8 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
  
     problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
    
-    if solver_parameters:
-        for param_name, param_value in solver_parameters.items():
-            settings.set_parameter(param_name, param_value)
-
     start = time.time()
-    problem.solve(settings)
+    problem.solve()
     end = time.time()
 
     print(f"problem status name: {problem.Status.name}")
