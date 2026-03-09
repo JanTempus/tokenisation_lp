@@ -1,3 +1,4 @@
+import argparse
 from collections import Counter
 import json
 import os
@@ -148,43 +149,85 @@ def save_sampling_outputs(output_dir, dataset, source_counts, sampling_manifest,
     print(f"Wrote sampling manifest to {manifest_path}")
 
 
-if __name__ == "__main__":
-    DATASET_BASE_DIR = os.environ.get(
-        "TOKENIZER_DATASET_BASE",
-        "/capstor/store/cscs/swissai/a139/datasets/tokenizer_training/tokenizer_training_dataset",
-    )
-    SOURCE_DIRS = [
-        "fineweb2",
-        "fineweb",
-        "megamath",
-        "infimath",
-        "finemath",
-        "starcoder",
-    ]
-    SOURCE_TEXT_COLUMNS = {
-        "fineweb2": "text",
-        "fineweb": "text",
-        "megamath": "text",
-        "infimath": "text",
-        "finemath": "text",
-        "starcoder": "content",
-    }
-    TARGET_ROWS = int(os.environ.get("TARGET_ROWS", "120000"))
-    SEED = int(os.environ.get("SEED", "42"))
-    OUTPUT_DATASET_DIR = os.environ.get("OUTPUT_DATASET_DIR", "sampled_tokenizer_data")
+def sample_finewebedu(target_rows, seed):
+    print(f"Loading pietrolesci/finewebedu-20B (split=train)")
+    dataset = load_dataset("pietrolesci/finewebedu-20B", split="train")
+    print(f"Loaded {len(dataset)} rows, shuffling and selecting {target_rows}")
+    dataset = dataset.shuffle(seed=seed).select(range(target_rows))
+    dataset = dataset.select_columns(["text"])
+    return dataset
 
-    source_to_files = discover_parquet_files(DATASET_BASE_DIR, SOURCE_DIRS)
-    dataset, source_counts, sampling_manifest = sample_dataset(
-        source_to_files,
-        TARGET_ROWS,
-        SEED,
-        SOURCE_TEXT_COLUMNS,
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", default=os.environ.get("NAME"))
+    parser.add_argument("--source", default=os.environ.get("SOURCE", "parquet"))
+    parser.add_argument(
+        "--target-rows",
+        type=int,
+        default=int(os.environ.get("TARGET_ROWS", "120000")),
     )
-    save_sampling_outputs(
-        OUTPUT_DATASET_DIR,
-        dataset,
-        source_counts,
-        sampling_manifest,
-        TARGET_ROWS,
-        SEED,
+    parser.add_argument("--seed", type=int, default=int(os.environ.get("SEED", "42")))
+    parser.add_argument(
+        "--output-dataset-dir",
+        default=os.environ.get("OUTPUT_DATASET_DIR"),
     )
+    args = parser.parse_args()
+
+    source = args.source.strip().lower()
+
+    if source == "finewebedu":
+        if args.name is None:
+            parser.error("--name is required when --source finewebedu")
+        output_dir = args.output_dataset_dir or (
+            f"{args.name}_finewebedu20B_n{args.target_rows}_seed{args.seed}"
+        )
+        dataset = sample_finewebedu(args.target_rows, args.seed)
+        save_sampling_outputs(
+            output_dir,
+            dataset,
+            source_counts={"finewebedu20B": args.target_rows},
+            sampling_manifest=[{"source": "finewebedu20B", "rows": args.target_rows}],
+            target_rows=args.target_rows,
+            seed=args.seed,
+        )
+    elif source == "parquet":
+        DATASET_BASE_DIR = os.environ.get(
+            "TOKENIZER_DATASET_BASE",
+            "/capstor/store/cscs/swissai/a139/datasets/tokenizer_training/tokenizer_training_dataset",
+        )
+        SOURCE_DIRS = [
+            "fineweb2",
+            "fineweb",
+            "megamath",
+            "infimath",
+            "finemath",
+            "starcoder",
+        ]
+        SOURCE_TEXT_COLUMNS = {
+            "fineweb2": "text",
+            "fineweb": "text",
+            "megamath": "text",
+            "infimath": "text",
+            "finemath": "text",
+            "starcoder": "content",
+        }
+        output_dir = args.output_dataset_dir or "sampled_tokenizer_data"
+
+        source_to_files = discover_parquet_files(DATASET_BASE_DIR, SOURCE_DIRS)
+        dataset, source_counts, sampling_manifest = sample_dataset(
+            source_to_files,
+            args.target_rows,
+            args.seed,
+            SOURCE_TEXT_COLUMNS,
+        )
+        save_sampling_outputs(
+            output_dir,
+            dataset,
+            source_counts,
+            sampling_manifest,
+            args.target_rows,
+            args.seed,
+        )
+    else:
+        parser.error(f"Unknown --source '{source}'. Expected: parquet, finewebedu")
