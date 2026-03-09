@@ -292,17 +292,41 @@ def test_single_byte_strings(tokenizer, behavior="not_all_unk"):
     }
 
 
+OOV_SAMPLES = [
+    "😀🚀🌍",       # emoji (multi-byte UTF-8, very unlikely in training corpus)
+    "中文日本語한국어",  # CJK characters
+    "\x00\x01\x02",  # control characters
+]
+
+
+def test_oov_produces_unk(tokenizer):
+    """Verify that OOV strings encode without errors and produce at least one UNK token."""
+    unk_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKEN_MAP["unk_token"])
+    success = 0
+    for sample in OOV_SAMPLES:
+        try:
+            ids = tokenizer(sample, add_special_tokens=False)["input_ids"]
+            if len(ids) > 0 and any(token_id == unk_id for token_id in ids):
+                success += 1
+        except Exception:
+            pass
+    return success, len(OOV_SAMPLES)
+
+
 def run_tokenizer_tests(tokenizer_name, tokenizer, byte_behavior):
     special_ok = test_special_tokens(tokenizer)
     text_ok = test_text_samples(tokenizer)
-    roundtrip_ok, roundtrip_success, roundtrip_total = test_round_trip_samples(tokenizer)
+    _, roundtrip_success, roundtrip_total = test_round_trip_samples(tokenizer)
     bytes_ok, byte_stats = test_single_byte_strings(tokenizer, behavior=byte_behavior)
+    oov_success, oov_total = test_oov_produces_unk(tokenizer)
+    oov_ok = oov_success == oov_total
 
-    overall_ok = special_ok and text_ok and roundtrip_ok and bytes_ok
+    overall_ok = special_ok and text_ok and bytes_ok and oov_ok
     status = "PASS" if overall_ok else "FAIL"
     print(
         f"[TEST] {tokenizer_name}: {status} | "
         f"special={special_ok} text={text_ok} roundtrip={roundtrip_success}/{roundtrip_total} "
+        f"oov_unk={oov_success}/{oov_total} "
         f"bytes_mode={byte_stats['behavior']} bytes_enc={byte_stats['encodable']}/{byte_stats['total']} "
         f"bytes_exact={byte_stats['exact_roundtrip']}/{byte_stats['total']} "
         f"bytes_identity_frac={byte_stats['identity_fraction']:.4f} "
