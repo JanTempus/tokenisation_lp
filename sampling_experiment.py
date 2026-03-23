@@ -45,10 +45,35 @@ from train_tokenizer import (  # noqa: E402
     train_lp_tokenizer,
 )
 from bpe_tokenizer.bpe_tokenizer import train_bpe_tokenizer  # noqa: E402
-from jaccard_distances_sampling import (  # noqa: E402
-    jaccard_distance,
-    jaccard_distance_different_rounding,
+import pickle
+
+from lp_tokenizer.lp_functions import (  # noqa: E402
+    biased_rounding,
+    deterministic_rounding,
+    probabilistic_rounding,
 )
+
+
+def jaccard_distance(a, b):
+    inter = len(set(a) & set(b))
+    union = len(set(a) | set(b))
+    return inter / union if union > 0 else 0.0
+
+
+def jaccard_distance_different_rounding(vocab_size, raw_tokens_path):
+    with open(raw_tokens_path, "rb") as f:
+        tokens = pickle.load(f)
+    n_special = len(tokens["special_tokens"])
+    target = vocab_size - n_special
+    det_tokens  = deterministic_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
+    bias_tokens = biased_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
+    prob_tokens = probabilistic_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
+    ones_tokens = [t.token for t in tokens["possible_tokens"] if t.lp_value >= 0.99]
+    det_tokens  = list(set(det_tokens  + tokens["special_tokens"]))
+    bias_tokens = list(set(bias_tokens + tokens["special_tokens"]))
+    prob_tokens = list(set(prob_tokens + tokens["special_tokens"]))
+    ones_tokens = list(set(ones_tokens + tokens["unique_chars"] + tokens["special_tokens"]))
+    return {"all_ones": ones_tokens, "det": det_tokens, "bias": bias_tokens, "prob": prob_tokens}
 
 
 # ---------------------------------------------------------------------------
