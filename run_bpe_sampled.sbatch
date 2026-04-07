@@ -1,9 +1,8 @@
 #!/bin/bash
 #SBATCH -A a139
 #SBATCH -p normal
-#SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
-#SBATCH -t 08:00:00
+#SBATCH -t 00:45:00
 
 set -euo pipefail
 
@@ -11,9 +10,10 @@ set -euo pipefail
 # Experiment parameters — fill in before submitting
 # ---------------------------------------------------------------------------
 REPO_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp
-TRAIN_DATASET_PATH=   # path to dataset saved by sample_tokenizer_data.py
-VOCAB_SIZES=          # comma-separated, e.g. "4096,16384,32768"
-SAVE_DIR=             # where to save the trained tokenizers
+TRAIN_DATASET_PATH=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/basic_finewebedu20B_n180000_seed42  # path to dataset saved by sample_tokenizer_data.py
+VOCAB_SIZES= "8196,16384,32768,65536,131072,262144"           # comma-separated, e.g. "4096,16384,32768"
+SAVE_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/bpe_tokenizer
+             # where to save the trained tokenizers
 
 # ---------------------------------------------------------------------------
 # Environment setup
