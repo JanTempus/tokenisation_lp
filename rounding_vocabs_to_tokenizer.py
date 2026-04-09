@@ -378,8 +378,11 @@ def smoke_test():
         pieces = pretok.pre_tokenize_str(sample)
         print(f"  {sample!r:60s} -> {len(pieces)} pieces")
 
-    print("[SMOKE] Building tiny Unigram tokenizer (special tokens + ascii chars)...")
-    tiny_chars = [chr(c) for c in range(32, 127)]
+    print("[SMOKE] Building tiny Unigram tokenizer (special tokens + byte-level alphabet)...")
+    # The pretokenizer applies ByteLevel after Split, so every input character is
+    # remapped to its byte-level encoded form (e.g. space -> 'Ġ'). The tiny vocab
+    # must contain those 256 byte-level chars for round-tripping to work.
+    tiny_chars = list(ByteLevel.alphabet())
     tiny_tokenizer = build_tokenizer(tiny_chars)
 
     print("[SMOKE] Verifying special tokens...")
@@ -390,7 +393,13 @@ def smoke_test():
     for sample in samples:
         ids = tiny_tokenizer(sample, add_special_tokens=False)["input_ids"]
         decoded = tiny_tokenizer.decode(ids, skip_special_tokens=False)
-        print(f"  {sample!r:60s} -> {len(ids)} ids, decoded matches={decoded == sample}")
+        ok = decoded == sample
+        print(f"  {sample!r:60s} -> {len(ids)} ids, round-trip={ok}")
+        if not ok:
+            raise RuntimeError(
+                f"smoke test: round-trip failed for sample {sample!r}\n"
+                f"  decoded: {decoded!r}"
+            )
 
     print("[SMOKE] Verifying every special token round-trips as a single id...")
     for token in SPECIAL_TOKENS:
