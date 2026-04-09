@@ -10,27 +10,29 @@ from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 
-SPECIAL_TOKEN_MAP = {
-    "unk_token": "[UNK]",
-    "eos_token": "[EOS]",
-    "pad_token": "[PAD]",
-    "cls_token": "[CLS]",
-    "sep_token": "[SEP]",
-    "mask_token": "[MASK]",
-}
+SPECIAL_TOKENS = [
+    # every document begins with the Beginning of Sequence (BOS) token that delimits documents
+    "<|bos|>",
+    # tokens below are only used during finetuning to render Conversations into token ids
+    "<|user_start|>",       # user messages
+    "<|user_end|>",
+    "<|assistant_start|>",  # assistant messages
+    "<|assistant_end|>",
+    "<|python_start|>",     # assistant invokes python REPL tool
+    "<|python_end|>",
+    "<|output_start|>",     # python REPL outputs back to assistant
+    "<|output_end|>",
+    # unk fallback (required by Unigram model)
+    "<|unk|>",
+]
+
+BOS_TOKEN = "<|bos|>"
+UNK_TOKEN = "<|unk|>"
 
 ROUNDING_SCHEMES = ("all_ones", "all_nonzero", "det", "bias", "prob")
 
 PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "custom").strip().lower()
-_CUSTOM_SPLIT_PATTERN = (
-    r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
-    r"|[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*"
-    r"|\p{N}"
-    r"| ?[^\s\p{L}\p{N}]+[\r\n/]*"
-    r"|\s*[\r\n]+"
-    r"|\s+(?!\S)"
-    r"|\s+"
-)
+SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,2}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
 
 
 def build_pretokenizer(mode):
@@ -47,7 +49,7 @@ def build_pretokenizer(mode):
         tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
             [
                 Split(
-                    pattern=Regex(_CUSTOM_SPLIT_PATTERN),
+                    pattern=Regex(SPLIT_PATTERN),
                     behavior="isolated",
                     invert=False,
                 ),
@@ -124,14 +126,12 @@ def list_raw_vocab_files(raw_vocab_dir):
 
 
 def include_special_tokens(vocab_tokens):
-    special_tokens = list(SPECIAL_TOKEN_MAP.values())
-    return dedupe_tokens(special_tokens + vocab_tokens)
+    return dedupe_tokens(SPECIAL_TOKENS + vocab_tokens)
 
 
 def build_tokenizer(vocab_tokens):
     all_tokens = include_special_tokens(vocab_tokens)
-    unk_token = SPECIAL_TOKEN_MAP["unk_token"]
-    unk_id = all_tokens.index(unk_token)
+    unk_id = all_tokens.index(UNK_TOKEN)
 
     unigram_vocab = [(token, -1.0) for token in all_tokens]
     tokenizer = Tokenizer(Unigram(unigram_vocab, unk_id=unk_id))
@@ -142,7 +142,9 @@ def build_tokenizer(vocab_tokens):
 
     fast_tokenizer = PreTrainedTokenizerFast(
         tokenizer_object=tokenizer,
-        **SPECIAL_TOKEN_MAP,
+        bos_token=BOS_TOKEN,
+        unk_token=UNK_TOKEN,
+        additional_special_tokens=[t for t in SPECIAL_TOKENS if t not in (BOS_TOKEN, UNK_TOKEN)],
     )
     return fast_tokenizer
 
@@ -167,7 +169,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
         raise KeyError(f"'unique_chars' missing in {raw_tokens_path}")
 
     unique_chars = dedupe_tokens(tokens["unique_chars"])
-    num_special_tokens = len(SPECIAL_TOKEN_MAP)
+    num_special_tokens = len(SPECIAL_TOKENS)
     core_vocab_size = vocab_size - num_special_tokens
     if core_vocab_size <= 0:
         raise ValueError(
@@ -193,11 +195,12 @@ def round_vocabs(raw_tokens_path, vocab_size):
 
 
 def test_special_tokens(tokenizer):
-    for field, token in SPECIAL_TOKEN_MAP.items():
-        configured = getattr(tokenizer, field, None)
-        if configured != token:
-            return False
+    if tokenizer.bos_token != BOS_TOKEN:
+        return False
+    if tokenizer.unk_token != UNK_TOKEN:
+        return False
 
+    for token in SPECIAL_TOKENS:
         token_id = tokenizer.convert_tokens_to_ids(token)
         if token_id is None or token_id < 0:
             return False
@@ -244,7 +247,7 @@ def test_single_byte_strings(tokenizer, behavior="not_all_unk"):
     all_unk_count = 0
     exceptions = 0
     total = 256
-    unk_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKEN_MAP["unk_token"])
+    unk_id = tokenizer.convert_tokens_to_ids(UNK_TOKEN)
 
     for byte_value in range(total):
         char_as_string = bytes([byte_value]).decode("latin-1")
@@ -299,7 +302,7 @@ def test_oov_produces_unk(tokenizer):
     relying on fixed string literals whose bytes may land in the vocabulary or be
     silently dropped by the pretokenizer.
     """
-    unk_id = tokenizer.convert_tokens_to_ids(SPECIAL_TOKEN_MAP["unk_token"])
+    unk_id = tokenizer.convert_tokens_to_ids(UNK_TOKEN)
 
     oov_chars = []
     for byte_value in range(256):
@@ -357,11 +360,56 @@ def assert_expected_tokenizer_len(tokenizer, tokenizer_name, target_vocab_size, 
         )
 
 
+def smoke_test():
+    """Quick sanity check: verify the SPLIT_PATTERN compiles and a tiny tokenizer
+    built from SPECIAL_TOKENS plus a handful of single-char tokens can encode and
+    decode some sample text. Fails fast before touching any raw vocab files."""
+    print("[SMOKE] Compiling SPLIT_PATTERN and building pretokenizer...")
+    pretok = PRETOKENIZER.backend_tokenizer.pre_tokenizer
+
+    samples = [
+        "Hello world!",
+        "I'll bet you've never seen 42 cats in a row.\n",
+        "def f(x):\n    return x**2  # square",
+        "naive cafe 中文 Ελληνικα",
+    ]
+    print("[SMOKE] Pretokenizing samples:")
+    for sample in samples:
+        pieces = pretok.pre_tokenize_str(sample)
+        print(f"  {sample!r:60s} -> {len(pieces)} pieces")
+
+    print("[SMOKE] Building tiny Unigram tokenizer (special tokens + ascii chars)...")
+    tiny_chars = [chr(c) for c in range(32, 127)]
+    tiny_tokenizer = build_tokenizer(tiny_chars)
+
+    print("[SMOKE] Verifying special tokens...")
+    if not test_special_tokens(tiny_tokenizer):
+        raise RuntimeError("smoke test: special-token check failed")
+
+    print("[SMOKE] Encoding/decoding samples through tiny tokenizer...")
+    for sample in samples:
+        ids = tiny_tokenizer(sample, add_special_tokens=False)["input_ids"]
+        decoded = tiny_tokenizer.decode(ids, skip_special_tokens=False)
+        print(f"  {sample!r:60s} -> {len(ids)} ids, decoded matches={decoded == sample}")
+
+    print("[SMOKE] Verifying every special token round-trips as a single id...")
+    for token in SPECIAL_TOKENS:
+        ids = tiny_tokenizer(token, add_special_tokens=False)["input_ids"]
+        if len(ids) != 1:
+            raise RuntimeError(
+                f"smoke test: special token {token!r} did not encode to a single id "
+                f"(got {ids})"
+            )
+    print("[SMOKE] OK\n")
+
+
 if __name__ == "__main__":
     raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
     save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_apertus_2")
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
     byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "not_all_unk")
+
+    smoke_test()
 
     raw_files = list_raw_vocab_files(raw_vocab_path)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
