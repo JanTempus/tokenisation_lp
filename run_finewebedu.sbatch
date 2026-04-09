@@ -6,16 +6,12 @@
 
 set -euo pipefail
 
-if [[ -z "${NAME:-}" ]]; then
-    echo "ERROR: NAME env var is required. Submit with: NAME=myexp sbatch run_finewebedu.sbatch"
-    exit 1
-fi
-
 # User-tunable settings
+NAME=                                    # experiment tag (required)
 REPO_DIR="/iopsstor/scratch/cscs/jtempus/tokenisation_lp"
 TARGET_ROWS="${TARGET_ROWS:-60000}"
 SEED="${SEED:-42}"
-PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-custom}"
+PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
 VOCAB_SIZES="${VOCAB_SIZES:-131072}"
 NUM_PROC="${NUM_PROC:-16}"
 BATCH_SIZE="${BATCH_SIZE:-10000}"

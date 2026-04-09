@@ -12,7 +12,7 @@ import traceback
 num_proc = int(os.environ.get("NUM_PROC", "16"))
 batch_size = int(os.environ.get("BATCH_SIZE", "10000"))
 PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "custom").strip().lower()
-_CUSTOM_SPLIT_PATTERN = (
+_APERTUS_SPLIT_PATTERN = (
     r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
     r"|[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*"
     r"|\p{N}"
@@ -21,6 +21,7 @@ _CUSTOM_SPLIT_PATTERN = (
     r"|\s+(?!\S)"
     r"|\s+"
 )
+_NANOCHAT_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,2}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
 SOURCE_TEXT_COLUMN = {
     "finemath": "text",
     "fineweb": "text",
@@ -40,11 +41,22 @@ def build_pretokenizer(mode):
     if mode == "pythia":
         return tokenizer
 
-    if mode in {"split_bytelevel", "custom"}:
+    if mode == "split_bytelevel":
+        tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
+            [ByteLevel(add_prefix_space=False, trim_offsets=True, use_regex=True)]
+        )
+        return tokenizer
+
+    patterns = {
+        "apertus": _APERTUS_SPLIT_PATTERN,
+        "nanochat": _NANOCHAT_SPLIT_PATTERN,
+    }
+
+    if mode in patterns:
         tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
             [
                 Split(
-                    pattern=Regex(_CUSTOM_SPLIT_PATTERN),
+                    pattern=Regex(patterns[mode]),
                     behavior="isolated",
                     invert=False,
                 ),
@@ -58,7 +70,8 @@ def build_pretokenizer(mode):
         return tokenizer
 
     raise ValueError(
-        f"Unsupported PRETOKENIZER_MODE='{mode}'. Expected one of: pythia, split_bytelevel, custom"
+        f"Unsupported PRETOKENIZER_MODE='{mode}'. "
+        f"Expected one of: pythia, split_bytelevel, apertus, nanochat"
     )
 
 
@@ -78,19 +91,14 @@ def get_unique_chars_batch(batch):
     return {"unique_chars": [sorted(unique_chars)]}
 
 
-def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj):
+def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj, special_tokens):
     corpus_all = [text for text in dataset["text"] if isinstance(text, str) and text]
 
     tokenizer = Tokenizer(
         corpus=corpus_all,
         vocab_size=vocab_size,
+        special_tokens=special_tokens,
         unique_chars=unique_chars,
-        unk_token="[UNK]",
-        eos_token="[EOS]",
-        pad_token="[PAD]",
-        cls_token="[CLS]",
-        sep_token="[SEP]",
-        mask_token="[MASK]",
         pretokenizer=pretokenizer_obj,
     )
     tokens = tokenizer.make_vocab_cuopt()
@@ -229,6 +237,37 @@ def load_training_dataset(path):
             raise
 
 
+APERTUS_SPECIAL_TOKENS = ["[UNK]", "[EOS]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
+NANOCHAT_SPECIAL_TOKENS = [
+    "<|bos|>",
+    "<|user_start|>",
+    "<|user_end|>",
+    "<|assistant_start|>",
+    "<|assistant_end|>",
+    "<|python_start|>",
+    "<|python_end|>",
+    "<|output_start|>",
+    "<|output_end|>",
+    "<|unk|>",
+]
+
+_SPECIAL_TOKENS_BY_MODE = {
+    "pythia": APERTUS_SPECIAL_TOKENS,
+    "split_bytelevel": APERTUS_SPECIAL_TOKENS,
+    "apertus": APERTUS_SPECIAL_TOKENS,
+    "nanochat": NANOCHAT_SPECIAL_TOKENS,
+}
+
+
+def get_special_tokens(mode):
+    if mode not in _SPECIAL_TOKENS_BY_MODE:
+        raise ValueError(
+            f"No special tokens defined for PRETOKENIZER_MODE='{mode}'. "
+            f"Expected one of: {list(_SPECIAL_TOKENS_BY_MODE.keys())}"
+        )
+    return _SPECIAL_TOKENS_BY_MODE[mode]
+
+
 if __name__ == "__main__":
     TRAIN_DATASET_PATH = os.environ.get(
         "TRAIN_DATASET_PATH",
@@ -236,7 +275,9 @@ if __name__ == "__main__":
     )
     vocab_size = [int(size) for size in os.environ.get("VOCAB_SIZES", "131072").split(",") if size.strip()]
     save_dir = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2/")
+    special_tokens = get_special_tokens(PRETOKENIZER_MODE)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
+    print(f"Special tokens ({len(special_tokens)}): {special_tokens}")
     print(f"Loading training dataset from {TRAIN_DATASET_PATH}")
 
     dataset = load_training_dataset(TRAIN_DATASET_PATH)
@@ -254,4 +295,4 @@ if __name__ == "__main__":
     unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
 
     for vs in vocab_size:
-        train_lp_tokenizer(dataset, unique_chars, vs, save_dir, pretokenizer)
+        train_lp_tokenizer(dataset, unique_chars, vs, save_dir, pretokenizer, special_tokens)

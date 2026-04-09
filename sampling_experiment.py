@@ -48,6 +48,8 @@ EXP_DIR = f"experiment_{NAME}"
 # ---------------------------------------------------------------------------
 # train_tokenizer reads PRETOKENIZER_MODE when the module is first imported.
 from train_tokenizer import (  # noqa: E402
+    PRETOKENIZER_MODE,
+    get_special_tokens,
     get_unique_chars_batch,
     pretokenizer as lp_pretokenizer,
     train_lp_tokenizer,
@@ -154,7 +156,7 @@ def step2_train_lp(samples, ss_dir):
 
         for vs in VOCAB_SIZES:
             print(f"[LP Sample {i} vocab={vs}] Training")
-            train_lp_tokenizer(dataset, unique_chars, vs, lp_dir, lp_pretokenizer)
+            train_lp_tokenizer(dataset, unique_chars, vs, lp_dir, lp_pretokenizer, get_special_tokens(PRETOKENIZER_MODE))
             print(f"[LP Sample {i} vocab={vs}] Saved to {lp_dir}/lp_tokens_{vs}.pkl")
 
 

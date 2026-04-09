@@ -28,45 +28,25 @@ class Tokenizer:
 
     def __init__(self,
                  corpus,
-                 dataset_size=0,
-                 max_dataset_size=0,
-                 vocab_size=0,
-                 vocab=None,
+                 vocab_size,
+                 special_tokens,
                  unique_chars=None,
-                 unk_token=None,
-                 eos_token=None,
-                 cls_token=None,
-                 pad_token=None,
-                 sep_token=None,
-                 mask_token=None,
                  pretokenizer=None):
-        
-        if pretokenizer is None:    
+
+        if pretokenizer is None:
             self.pretokenizer=AutoTokenizer.from_pretrained(
                                                             "EleutherAI/pythia-70m-deduped",
                                                             revision="step3000",
                                                             cache_dir="./pythia-70m-deduped/step3000",
                                             )
         else:
-            self.pretokenizer=pretokenizer  
+            self.pretokenizer=pretokenizer
 
-     
         self.unique_chars=unique_chars
-
         self.corpus=corpus
-        self.vocab=vocab
         self.vocab_size=vocab_size
-        self.dataset_size = dataset_size
-        self.max_dataset_size=max_dataset_size
-    
+        self.special_tokens_list=special_tokens
         self.debug=False
-        
-        self.unk_token=unk_token
-        self.eos_token=eos_token     
-        self.pad_token=pad_token
-        self.cls_token=cls_token
-        self.sep_token=sep_token
-        self.mask_token=mask_token
       
        
     def make_vocab(self):
@@ -80,36 +60,13 @@ class Tokenizer:
             print("Finding unique chars")
             self.unique_chars = self.get_unique_chars_corpus(self.corpus)
       
-        special_char_count=0
-        special_tokens=[]
+        special_tokens = list(self.special_tokens_list)
+        lp_budget = self.vocab_size - len(self.unique_chars) - len(special_tokens)
 
-        if self.unk_token is not None:
-            special_tokens.append(self.unk_token)
-            special_char_count+=1
-
-        if self.eos_token is not None:
-            special_tokens.append(self.eos_token)
-            special_char_count+=1
-
-        if self.pad_token is not None:
-            special_tokens.append(self.pad_token)
-            special_char_count+=1
-
-        if self.cls_token is not None:
-            special_tokens.append(self.cls_token)
-            special_char_count+=1
-        
-        if self.mask_token is not None:
-            special_tokens.append(self.mask_token)
-            special_char_count+=1
-        
-        lp_budget=self.vocab_size-len(self.unique_chars)-special_char_count
-        
         if lp_budget <= 0:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
 
-
-        possible_tokens=create_vocab(input_strings,input_strings_frequencies,lp_budget,self.vocab_size)
+        possible_tokens = create_vocab(input_strings, input_strings_frequencies, lp_budget, self.vocab_size)
         
        
 
@@ -144,30 +101,8 @@ class Tokenizer:
             print("Finding unique chars")
             self.unique_chars = self.get_unique_chars_corpus(self.corpus)
 
-        special_char_count = 0
-        special_tokens = []
-
-        if self.unk_token is not None:
-            special_tokens.append(self.unk_token)
-            special_char_count += 1
-
-        if self.eos_token is not None:
-            special_tokens.append(self.eos_token)
-            special_char_count += 1
-
-        if self.pad_token is not None:
-            special_tokens.append(self.pad_token)
-            special_char_count += 1
-
-        if self.cls_token is not None:
-            special_tokens.append(self.cls_token)
-            special_char_count += 1
-
-        if self.mask_token is not None:
-            special_tokens.append(self.mask_token)
-            special_char_count += 1
-
-        lp_budget = self.vocab_size - len(self.unique_chars) - special_char_count
+        special_tokens = list(self.special_tokens_list)
+        lp_budget = self.vocab_size - len(self.unique_chars) - len(special_tokens)
         if lp_budget <= 0:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
 

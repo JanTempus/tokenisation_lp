@@ -31,8 +31,22 @@ UNK_TOKEN = "<|unk|>"
 
 ROUNDING_SCHEMES = ("all_ones", "all_nonzero", "det", "bias", "prob")
 
-PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "custom").strip().lower()
-SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,2}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
+PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "nanochat").strip().lower()
+_APERTUS_SPLIT_PATTERN = (
+    r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
+    r"|[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*"
+    r"|\p{N}"
+    r"| ?[^\s\p{L}\p{N}]+[\r\n/]*"
+    r"|\s*[\r\n]+"
+    r"|\s+(?!\S)"
+    r"|\s+"
+)
+_NANOCHAT_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,2}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
+
+_SPLIT_PATTERNS = {
+    "apertus": _APERTUS_SPLIT_PATTERN,
+    "nanochat": _NANOCHAT_SPLIT_PATTERN,
+}
 
 
 def build_pretokenizer(mode):
@@ -45,11 +59,17 @@ def build_pretokenizer(mode):
     if mode == "pythia":
         return tokenizer
 
-    if mode in {"split_bytelevel", "custom"}:
+    if mode == "split_bytelevel":
+        tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
+            [ByteLevel(add_prefix_space=False, trim_offsets=True, use_regex=True)]
+        )
+        return tokenizer
+
+    if mode in _SPLIT_PATTERNS:
         tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
             [
                 Split(
-                    pattern=Regex(SPLIT_PATTERN),
+                    pattern=Regex(_SPLIT_PATTERNS[mode]),
                     behavior="isolated",
                     invert=False,
                 ),
@@ -64,7 +84,7 @@ def build_pretokenizer(mode):
 
     raise ValueError(
         f"Unsupported PRETOKENIZER_MODE='{mode}'. "
-        "Expected one of: pythia, split_bytelevel, custom"
+        f"Expected one of: pythia, split_bytelevel, apertus, nanochat"
     )
 
 
