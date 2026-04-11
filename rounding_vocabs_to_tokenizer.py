@@ -31,6 +31,11 @@ UNK_TOKEN = "<|unk|>"
 
 ROUNDING_SCHEMES = ("all_ones", "all_nonzero", "det", "bias", "prob")
 
+# Full ByteLevel alphabet: 256 byte-level chars. Mirrors initial_alphabet
+# in standard BPE trainers — guarantees every byte is encodable regardless
+# of what the LP training corpus happened to contain.
+BYTE_LEVEL_ALPHABET = list(ByteLevel.alphabet())
+
 PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "nanochat").strip().lower()
 _APERTUS_SPLIT_PATTERN = (
     r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
@@ -188,12 +193,19 @@ def round_vocabs(raw_tokens_path, vocab_size):
     if "unique_chars" not in tokens:
         raise KeyError(f"'unique_chars' missing in {raw_tokens_path}")
 
-    unique_chars = dedupe_tokens(tokens["unique_chars"])
+    # Replace the corpus-derived unique_chars with the full ByteLevel alphabet.
+    # The rounding helpers account for len(unique_chars) internally, so this
+    # shrinks the LP multi-char budget by (256 - |old unique_chars|) tokens
+    # without changing the final vocab size. Any bytes that were in the old
+    # unique_chars are subsumed by BYTE_LEVEL_ALPHABET (which has all 256).
+    unique_chars = dedupe_tokens(BYTE_LEVEL_ALPHABET)
     num_special_tokens = len(SPECIAL_TOKENS)
     core_vocab_size = vocab_size - num_special_tokens
-    if core_vocab_size <= 0:
+    if core_vocab_size <= len(unique_chars):
         raise ValueError(
-            f"Vocab size {vocab_size} too small for special tokens ({num_special_tokens})"
+            f"Vocab size {vocab_size} too small: after {num_special_tokens} "
+            f"specials + {len(unique_chars)} byte-level chars there is no "
+            f"room for LP multi-char tokens"
         )
 
     possible_tokens = tokens["possible_tokens"]
@@ -436,7 +448,7 @@ if __name__ == "__main__":
     raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
     save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_apertus_2")
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
-    byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "not_all_unk")
+    byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "strict_roundtrip")
 
     smoke_test()
 
