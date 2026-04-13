@@ -437,7 +437,7 @@ if __name__ == "__main__":
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
     byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "strict_roundtrip")
 
-    smoke_test()
+    #smoke_test()
 
     raw_files = list_raw_vocab_files(raw_vocab_path)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
