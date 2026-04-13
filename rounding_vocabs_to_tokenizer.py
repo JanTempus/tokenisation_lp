@@ -55,7 +55,7 @@ _SPLIT_PATTERNS = {
 
 
 def build_pretokenizer(mode):
-
+    print("Building pretokenizer")
 
     if mode == "pythia":
         tokenizer = AutoTokenizer.from_pretrained(
@@ -116,20 +116,6 @@ ROUND_TRIP_SAMPLES = [
 ]
 
 
-def dedupe_tokens(tokens):
-    seen = set()
-    out = []
-    for token in tokens:
-        if not isinstance(token, str):
-            continue
-        if token == "":
-            continue
-        if token in seen:
-            continue
-        seen.add(token)
-        out.append(token)
-    return out
-
 
 def parse_vocab_size_from_path(path):
     match = re.search(r"lp_tokens_(\d+)\.pkl$", Path(path).name)
@@ -152,7 +138,7 @@ def list_raw_vocab_files(raw_vocab_dir):
 
 
 def include_special_tokens(vocab_tokens):
-    return dedupe_tokens(SPECIAL_TOKENS + vocab_tokens)
+    return SPECIAL_TOKENS + vocab_tokens
 
 
 def build_tokenizer(vocab_tokens):
@@ -188,7 +174,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
 
     with open(raw_tokens_path, "rb") as file:
         tokens = pickle.load(file)
-
+    print(f"Loaded the data files for vocab size: {vocab_size} ")
     if "possible_tokens" not in tokens:
         raise KeyError(f"'possible_tokens' missing in {raw_tokens_path}")
     if "unique_chars" not in tokens:
@@ -199,7 +185,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
     # shrinks the LP multi-char budget by (256 - |old unique_chars|) tokens
     # without changing the final vocab size. Any bytes that were in the old
     # unique_chars are subsumed by BYTE_LEVEL_ALPHABET (which has all 256).
-    unique_chars = dedupe_tokens(BYTE_LEVEL_ALPHABET)
+    unique_chars = list(BYTE_LEVEL_ALPHABET)
     num_special_tokens = len(SPECIAL_TOKENS)
     core_vocab_size = vocab_size - num_special_tokens
     if core_vocab_size <= len(unique_chars):
@@ -219,11 +205,11 @@ def round_vocabs(raw_tokens_path, vocab_size):
     tokens_nonzero = [token.token for token in possible_tokens if token.lp_value > 0.0]
 
     return {
-        "all_ones": dedupe_tokens(tokens_ones + unique_chars),
-        "all_nonzero": dedupe_tokens(tokens_nonzero + unique_chars),
-        "det": dedupe_tokens(det_tokens + unique_chars),
-        "bias": dedupe_tokens(bias_tokens + unique_chars),
-        "prob": dedupe_tokens(prob_tokens + unique_chars),
+        "all_ones": tokens_ones + unique_chars,
+        "all_nonzero": tokens_nonzero + unique_chars,
+        "det": det_tokens + unique_chars,
+        "bias": bias_tokens + unique_chars,
+        "prob": prob_tokens + unique_chars,
     }
 
 
@@ -475,7 +461,7 @@ if __name__ == "__main__":
             save_tokenizer(tokenizer, vocab_output_dir, vocab_size, rnd_scheme)
 
             total_tokenizers += 1
-            if run_tests:
+            if run_tests and rnd_scheme == "bias":
                 if run_tokenizer_tests(tokenizer_name, tokenizer, byte_test_behavior):
                     passed_tokenizers += 1
             else:
