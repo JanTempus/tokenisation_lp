@@ -7,6 +7,7 @@ from tokenizers import Regex
 from tokenizers import Tokenizer
 from tokenizers.models import Unigram
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 
@@ -58,21 +59,21 @@ def build_pretokenizer(mode):
     print("Building pretokenizer")
 
     if mode == "pythia":
-        tokenizer = AutoTokenizer.from_pretrained(
-        "EleutherAI/pythia-70m-deduped",
-        revision="step3000",
-        cache_dir="./pythia-70m-deduped/step3000",
-    )
-        return tokenizer
+        tok = AutoTokenizer.from_pretrained(
+            "EleutherAI/pythia-70m-deduped",
+            revision="step3000",
+            cache_dir="./pythia-70m-deduped/step3000",
+        )
+        return tok.backend_tokenizer.pre_tokenizer, tok.backend_tokenizer.decoder
 
     if mode == "split_bytelevel":
-        tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
+        pre_tok = Sequence(
             [ByteLevel(add_prefix_space=False, trim_offsets=True, use_regex=True)]
         )
-        return tokenizer
+        return pre_tok, ByteLevelDecoder()
 
     if mode in _SPLIT_PATTERNS:
-        tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
+        pre_tok = Sequence(
             [
                 Split(
                     pattern=Regex(_SPLIT_PATTERNS[mode]),
@@ -86,7 +87,7 @@ def build_pretokenizer(mode):
                 ),
             ]
         )
-        return tokenizer
+        return pre_tok, ByteLevelDecoder()
 
     raise ValueError(
         f"Unsupported PRETOKENIZER_MODE='{mode}'. "
@@ -94,7 +95,7 @@ def build_pretokenizer(mode):
     )
 
 
-PRETOKENIZER = build_pretokenizer(PRETOKENIZER_MODE)
+PRETOKENIZER, DECODER = build_pretokenizer(PRETOKENIZER_MODE)
 
 ROUND_TRIP_SAMPLES = [
     (
@@ -149,8 +150,8 @@ def build_tokenizer(vocab_tokens):
     tokenizer = Tokenizer(Unigram(unigram_vocab, unk_id=unk_id))
 
     # Keep pretokenization consistent with training.
-    tokenizer.pre_tokenizer = PRETOKENIZER.backend_tokenizer.pre_tokenizer
-    tokenizer.decoder = PRETOKENIZER.backend_tokenizer.decoder
+    tokenizer.pre_tokenizer = PRETOKENIZER
+    tokenizer.decoder = DECODER
 
     fast_tokenizer = PreTrainedTokenizerFast(
         tokenizer_object=tokenizer,
@@ -384,7 +385,7 @@ def smoke_test():
     built from SPECIAL_TOKENS plus a handful of single-char tokens can encode and
     decode some sample text. Fails fast before touching any raw vocab files."""
     print("[SMOKE] Compiling SPLIT_PATTERN and building pretokenizer...")
-    pretok = PRETOKENIZER.backend_tokenizer.pre_tokenizer
+    pretok = PRETOKENIZER
 
     samples = [
         "Hello world!",
