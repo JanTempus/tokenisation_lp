@@ -1,10 +1,15 @@
 import os
 import sys
 
-from datasets import load_from_disk
+from datasets import load_dataset, Dataset
+from huggingface_hub import list_repo_files
 
 
-TRAIN_DATASET_PATH = os.environ["TRAIN_DATASET_PATH"]
+BASE_URL = "https://huggingface.co/datasets/karpathy/climbmix-400b-shuffle/resolve/main"
+DATASET_ID = "karpathy/climbmix-400b-shuffle"
+
+NUM_SHARDS = int(os.getenv("NUM_SHARDS", "8"))
+MAX_CHARS = int(os.getenv("MAX_CHARS", "2000000000"))
 VOCAB_SIZES = [int(v) for v in os.environ["VOCAB_SIZES"].split(",") if v.strip()]
 SAVE_DIR = os.environ["SAVE_DIR"]
 NANOCHAT_REPO = os.environ.get(
@@ -27,8 +32,32 @@ def text_iterator(dataset):
 
 
 def main():
-    dataset = load_from_disk(TRAIN_DATASET_PATH)
-    print(f"Loaded dataset from {TRAIN_DATASET_PATH} ({len(dataset)} rows)")
+    print(f"Listing parquet shards for {DATASET_ID}...")
+    all_shards = sorted(
+        f for f in list_repo_files(DATASET_ID, repo_type="dataset")
+        if f.endswith(".parquet")
+    )
+    selected = all_shards[:NUM_SHARDS]
+    print(f"Using {len(selected)} shards: {selected}")
+
+    shard_urls = [f"{BASE_URL}/{f}" for f in selected]
+
+    print("Loading shards...")
+    raw_dataset = load_dataset("parquet", data_files={"train": shard_urls}, split="train")
+    print(f"Loaded {len(raw_dataset):,} rows from {len(shard_urls)} shards")
+
+    print(f"Collecting up to {MAX_CHARS:,} characters...")
+    texts = []
+    total_chars = 0
+    for item in raw_dataset:
+        text = item["text"]
+        texts.append(text)
+        total_chars += len(text)
+        if total_chars >= MAX_CHARS:
+            break
+
+    print(f"Collected {len(texts):,} documents, {total_chars:,} characters")
+    dataset = Dataset.from_dict({"text": texts})
     print(f"Using nanochat repo at {NANOCHAT_REPO}")
 
     for vocab_size in VOCAB_SIZES:
@@ -37,7 +66,7 @@ def main():
             text_iterator(dataset), vocab_size
         )
 
-        save_path = os.path.join(SAVE_DIR, "nano_bpe", str(vocab_size))
+        save_path = os.path.join(SAVE_DIR, "nano_bpe_climb_mix", str(vocab_size))
         os.makedirs(save_path, exist_ok=True)
         tok.save(save_path)
 
