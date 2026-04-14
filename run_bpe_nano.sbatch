@@ -2,7 +2,7 @@
 #SBATCH -A a139
 #SBATCH -p normal
 #SBATCH --cpus-per-task=8
-#SBATCH -t 00:45:00
+#SBATCH -t 00:15:00
 
 set -euo pipefail
 
@@ -11,7 +11,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 REPO_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp
 TRAIN_DATASET_PATH=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/basic_finewebedu20B_n200000_seed42
-VOCAB_SIZES="8196,16384,32768,65536,131072,262144"
+VOCAB_SIZES="32768"
 SAVE_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/bpe_tokenizer
 # UPDATE this path to where the nanochat repo lives on the cluster
 NANOCHAT_REPO=/iopsstor/scratch/cscs/jtempus/nanochat
