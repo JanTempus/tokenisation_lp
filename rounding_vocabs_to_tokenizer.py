@@ -204,11 +204,26 @@ def round_vocabs(raw_tokens_path, vocab_size):
     prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
     tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
 
+    # deterministic_rounding / biased_rounding / probabilistic_rounding already
+    # merge unique_chars into their result. tokens_ones does not, so all_ones
+    # needs unique_chars appended. Appending unique_chars to the others would
+    # double every byte-level char, producing duplicate Unigram entries with
+    # fresh ids beyond get_vocab_size().
+    for scheme_name, scheme_tokens in (("det", det_tokens), ("bias", bias_tokens), ("prob", prob_tokens)):
+        final_size = num_special_tokens + len(set(scheme_tokens))
+        if final_size != vocab_size:
+            raise ValueError(
+                f"{scheme_name} rounding produced final vocab size {final_size} "
+                f"(= {num_special_tokens} specials + {len(set(scheme_tokens))} unique scheme tokens) "
+                f"!= target vocab_size {vocab_size}. "
+                f"Raw scheme token count was {len(scheme_tokens)}."
+            )
+
     return {
         "all_ones": tokens_ones + unique_chars,
-        "det": det_tokens + unique_chars,
-        "bias": bias_tokens + unique_chars,
-        "prob": prob_tokens + unique_chars,
+        "det": det_tokens,
+        "bias": bias_tokens,
+        "prob": prob_tokens,
     }
 
 
