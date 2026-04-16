@@ -30,7 +30,7 @@ SPECIAL_TOKENS = [
 BOS_TOKEN = "<|bos|>"
 UNK_TOKEN = "<|unk|>"
 
-ROUNDING_SCHEMES = ("all_ones", "all_nonzero", "det", "bias", "prob")
+ROUNDING_SCHEMES = ("all_ones", "det", "bias", "prob")
 
 # Full ByteLevel alphabet: 256 byte-level chars. Mirrors initial_alphabet
 # in standard BPE trainers — guarantees every byte is encodable regardless
@@ -203,11 +203,9 @@ def round_vocabs(raw_tokens_path, vocab_size):
     bias_tokens = biased_rounding(possible_tokens, unique_chars, core_vocab_size)
     prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
     tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
-    tokens_nonzero = [token.token for token in possible_tokens if token.lp_value > 0.0]
 
     return {
         "all_ones": tokens_ones + unique_chars,
-        "all_nonzero": tokens_nonzero + unique_chars,
         "det": det_tokens + unique_chars,
         "bias": bias_tokens + unique_chars,
         "prob": prob_tokens + unique_chars,
