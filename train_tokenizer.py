@@ -108,6 +108,37 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
         pickle.dump(tokens, f)
 
 
+def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
+                             pretokenizer_obj, special_tokens):
+    if not vocab_sizes:
+        return
+
+    corpus_all = [text for text in dataset["text"] if isinstance(text, str) and text]
+    # Build the LP once with the largest vocab size so the lp_budget > 0 check
+    # in the Tokenizer holds for every entry in the sweep.
+    sorted_sizes = sorted(set(int(vs) for vs in vocab_sizes))
+
+    tokenizer = Tokenizer(
+        corpus=corpus_all,
+        vocab_size=sorted_sizes[-1],
+        special_tokens=special_tokens,
+        unique_chars=unique_chars,
+        pretokenizer=pretokenizer_obj,
+    )
+    tokenizer.prepare_cuopt_model()
+
+    os.makedirs(save_dir, exist_ok=True)
+    for vs in sorted_sizes:
+        print(f"[sweep] Solving for vocab_size={vs}")
+        tokens = tokenizer.solve_for_vocab_size(vs)
+        # Drop x_values before pickling to keep output shape identical to the
+        # single-size path.
+        tokens.pop("x_values", None)
+        file_name = os.path.join(save_dir, f"lp_tokens_{vs}.pkl")
+        with open(file_name, "wb") as f:
+            pickle.dump(tokens, f)
+
+
 def infer_text_column(dataset):
     preferred_columns = ("text", "content", "code")
     for column in preferred_columns:
@@ -294,5 +325,4 @@ if __name__ == "__main__":
 
     unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
 
-    for vs in vocab_size:
-        train_lp_tokenizer(dataset, unique_chars, vs, save_dir, pretokenizer, special_tokens)
+    train_lp_tokenizer_sweep(dataset, unique_chars, vocab_size, save_dir, pretokenizer, special_tokens)

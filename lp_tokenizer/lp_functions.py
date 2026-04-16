@@ -264,14 +264,76 @@ def _get_var_value(variable_obj):
     return variable_obj.Value
 
 
-def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool = True):
+def _import_cuopt_problem():
     try:
         from cuopt.linear_programming.problem import MINIMIZE, Problem, LinearExpression
     except ImportError:
         from cuopt.linear_programming.problem import Problem, sense
         MINIMIZE = sense.MINIMIZE
         LinearExpression = None
-    
+    return Problem, MINIMIZE, LinearExpression
+
+
+def _set_constraint_rhs(constraint_obj, new_rhs: float) -> bool:
+    for attr in ("rhs", "Rhs", "RHS"):
+        if hasattr(constraint_obj, attr):
+            try:
+                setattr(constraint_obj, attr, float(new_rhs))
+                return True
+            except (AttributeError, TypeError):
+                continue
+    for method_name in ("set_rhs", "setRhs", "setRHS"):
+        method = getattr(constraint_obj, method_name, None)
+        if callable(method):
+            try:
+                method(float(new_rhs))
+                return True
+            except (AttributeError, TypeError):
+                continue
+    return False
+
+
+def _apply_warm_start(problem, warm_start_primal, num_vars: int, verbose: bool = True):
+    if warm_start_primal is None:
+        return None
+    if len(warm_start_primal) != num_vars:
+        if verbose:
+            print(
+                f"[WARN] Warm-start primal length {len(warm_start_primal)} != num_vars {num_vars}; skipping warm start."
+            )
+        return None
+    try:
+        settings = SolverSettings()
+    except Exception as exc:
+        if verbose:
+            print(f"[WARN] Could not instantiate SolverSettings for warm start ({exc}); solving cold.")
+        return None
+
+    primal_arr = np.asarray(warm_start_primal, dtype=float)
+    for method_name in (
+        "set_initial_primal_solution",
+        "set_pdlp_initial_primal_solution",
+        "setInitialPrimalSolution",
+    ):
+        method = getattr(settings, method_name, None)
+        if callable(method):
+            try:
+                method(primal_arr)
+                if verbose:
+                    print(f"[INFO] Warm start applied via SolverSettings.{method_name}()")
+                return settings
+            except Exception as exc:
+                if verbose:
+                    print(f"[WARN] SolverSettings.{method_name}() failed ({exc}); trying next.")
+                continue
+
+    if verbose:
+        print("[WARN] No supported warm-start entry point on SolverSettings; solving cold.")
+    return None
+
+
+def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = True):
+    Problem, MINIMIZE, LinearExpression = _import_cuopt_problem()
 
     A_eq = cuopt_lp_data["A_eq"]
     b_eq = cuopt_lp_data["b_eq"]
@@ -280,9 +342,9 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
     c = cuopt_lp_data["c"]
     lb = cuopt_lp_data["lb"]
     ub = cuopt_lp_data["ub"]
-    num_f = cuopt_lp_data["num_f"]
-    num_g = cuopt_lp_data["num_g"]
-    num_t = cuopt_lp_data["num_t"]
+
+    num_ub_rows = A_ub.shape[0]
+    budget_row_idx = num_ub_rows - 1
 
     problem = Problem("tokenizer_lp_cuopt")
     variables = []
@@ -310,30 +372,82 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
         problem.addConstraint(expr == rhs, f"eq_{row_idx}")
 
     if verbose:
-        print(f"Adding {A_ub.shape[0]} inequality constraints to cuOpt")
+        print(f"Adding {num_ub_rows} inequality constraints to cuOpt")
+    budget_constraint = None
     for row_idx, cols, vals in _iter_csr_rows(A_ub):
-        rhs = float(b_ub[row_idx])
+        is_budget = row_idx == budget_row_idx
+        rhs = float(numAllowedTokens) if is_budget else float(b_ub[row_idx])
         if len(cols) == 0:
             if rhs < -1e-12:
                 raise ValueError("Inconsistent empty inequality row encountered while building cuOpt model.")
             continue
         expr = _build_linear_expression(variables, cols, vals)
-        problem.addConstraint(expr <= rhs, f"ub_{row_idx}")
+        name = "budget" if is_budget else f"ub_{row_idx}"
+        handle = problem.addConstraint(expr <= rhs, name)
+        if is_budget:
+            budget_constraint = handle
 
- 
     problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
-   
+
+    return {
+        "problem": problem,
+        "variables": variables,
+        "budget_constraint": budget_constraint,
+        "cuopt_lp_data": cuopt_lp_data,
+        "num_f": cuopt_lp_data["num_f"],
+        "num_g": cuopt_lp_data["num_g"],
+        "num_t": cuopt_lp_data["num_t"],
+        "current_budget": int(numAllowedTokens),
+    }
+
+
+def solve_cuopt_problem(model, numAllowedTokens: int, warm_start=None,
+                        solver_parameters=None, verbose: bool = True):
+    num_f = model["num_f"]
+    num_g = model["num_g"]
+    num_t = model["num_t"]
+
+    if int(numAllowedTokens) != model["current_budget"]:
+        mutated = _set_constraint_rhs(model["budget_constraint"], float(numAllowedTokens))
+        if not mutated:
+            if verbose:
+                print("[INFO] cuOpt budget RHS mutation unavailable; rebuilding cuOpt Problem from cached matrices.")
+            rebuilt = build_cuopt_problem(
+                model["cuopt_lp_data"], numAllowedTokens, verbose=verbose
+            )
+            model["problem"] = rebuilt["problem"]
+            model["variables"] = rebuilt["variables"]
+            model["budget_constraint"] = rebuilt["budget_constraint"]
+        model["current_budget"] = int(numAllowedTokens)
+
+    problem = model["problem"]
+    variables = model["variables"]
+
+    settings = _apply_warm_start(problem, warm_start, num_vars=len(variables), verbose=verbose)
+
     start = time.time()
-    problem.solve()
+    if settings is not None:
+        try:
+            problem.solve(settings)
+        except TypeError:
+            try:
+                problem.solve(solver_settings=settings)
+            except TypeError:
+                if verbose:
+                    print("[WARN] problem.solve() did not accept SolverSettings; solving without warm start.")
+                problem.solve()
+    else:
+        problem.solve()
     end = time.time()
 
-    print(f"problem status name: {problem.Status.name}")
     status_obj = getattr(problem, "Status", getattr(problem, "status", None))
     status_name = getattr(status_obj, "name", str(status_obj))
+    print(f"problem status name: {status_name}")
     solve_time = getattr(problem, "SolveTime", getattr(problem, "solve_time", end - start))
 
+    x_values = np.array([float(_get_var_value(v)) for v in variables], dtype=float)
     t_offset = num_f + num_g
-    t_values = np.array([float(_get_var_value(variables[t_offset + i])) for i in range(num_t)], dtype=float)
+    t_values = x_values[t_offset:t_offset + num_t]
     print(f"t_values: {t_values}")
 
     return {
@@ -341,7 +455,17 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
         "solve_time": solve_time,
         "wall_time": end - start,
         "t_values": t_values,
+        "x_values": x_values,
     }
+
+
+def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool = True):
+    numAllowedTokens = int(cuopt_lp_data["b_ub"][-1])
+    model = build_cuopt_problem(cuopt_lp_data, numAllowedTokens, verbose=verbose)
+    return solve_cuopt_problem(
+        model, numAllowedTokens, warm_start=None,
+        solver_parameters=solver_parameters, verbose=verbose,
+    )
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
             edgeListWeight:list[int] , 
@@ -666,15 +790,12 @@ def create_vocab(inputStringList: list[str],
     return possibleTokens
 
 
-def create_vocab_cuopt(inputStringList: list[str],
-                       inputStringFreq: list[int],
-                       numAllowedTokens: int,
-                       vocab_size: int,
-                       minTokenCount: int = 1,
-                       maxTokenLength: int = 5,
-                       all_tokens: bool = True,
-                       solver_parameters=None,
-                       verbose: bool = True):
+def prepare_cuopt_model(inputStringList: list[str],
+                        inputStringFreq: list[int],
+                        minTokenCount: int = 1,
+                        maxTokenLength: int = 5,
+                        all_tokens: bool = True,
+                        verbose: bool = True):
     filtered_edgesList, freeEdgesList, numVertices, tokens_to_keep = prepare_vocab_lp_data(
         inputStringList=inputStringList,
         inputStringFreq=inputStringFreq,
@@ -690,20 +811,43 @@ def create_vocab_cuopt(inputStringList: list[str],
         freeEdgesList=freeEdgesList,
         numVerticesList=numVertices,
     )
-    cuopt_lp_data = build_cuopt_standard_form(lp_blocks, numAllowedTokens=numAllowedTokens)
+    cuopt_lp_data = build_cuopt_standard_form(lp_blocks, numAllowedTokens=0)
 
     try:
-        solve_output = solve_lp_direct_cuopt(
-            cuopt_lp_data=cuopt_lp_data,
-            solver_parameters=solver_parameters,
-            verbose=verbose,
-        )
+        model = build_cuopt_problem(cuopt_lp_data, numAllowedTokens=0, verbose=verbose)
     except ImportError as import_error:
         raise ImportError(
             "Direct cuOpt LP solve requested, but cuOpt Python modules are not available in this environment."
         ) from import_error
 
-    
+    model["tokens_to_keep"] = tokens_to_keep
+    return model
+
+
+def _possible_tokens_from_tvar(tokens_to_keep, tVar):
+    possibleTokens = []
+    for i in range(len(tokens_to_keep)):
+        if tVar[i] > 0.0:
+            nonZeroToken = possibleToken(
+                tokens_to_keep[i].get_token(),
+                tVar[i],
+                tokens_to_keep[i].get_count(),
+                tokens_to_keep[i].get_index(),
+            )
+            possibleTokens.append(nonZeroToken)
+    return possibleTokens
+
+
+def solve_vocab_on_model(model, numAllowedTokens: int, warm_start=None,
+                         solver_parameters=None, verbose: bool = True):
+    solve_output = solve_cuopt_problem(
+        model,
+        numAllowedTokens=numAllowedTokens,
+        warm_start=warm_start,
+        solver_parameters=solver_parameters,
+        verbose=verbose,
+    )
+
     status_name = solve_output["status_name"]
     if status_name is not None:
         normalized_status = str(status_name).lower()
@@ -718,21 +862,41 @@ def create_vocab_cuopt(inputStringList: list[str],
         writer.writerow([f"Interal Time {internal_time}"])
         writer.writerow([f"My Time {wall_time}"])
 
-    tVar = solve_output["t_values"]
+    possibleTokens = _possible_tokens_from_tvar(model["tokens_to_keep"], solve_output["t_values"])
+    return {
+        "possible_tokens": possibleTokens,
+        "x_values": solve_output["x_values"],
+        "t_values": solve_output["t_values"],
+        "status_name": status_name,
+    }
 
-    possibleTokens = []
-    for i in range(len(tokens_to_keep)):
-        if tVar[i] > 0.0:
-            nonZeroToken = possibleToken(
-                tokens_to_keep[i].get_token(),
-                tVar[i],
-                tokens_to_keep[i].get_count(),
-                tokens_to_keep[i].get_index(),
-            )
-            possibleTokens.append(nonZeroToken)
+
+def create_vocab_cuopt(inputStringList: list[str],
+                       inputStringFreq: list[int],
+                       numAllowedTokens: int,
+                       vocab_size: int,
+                       minTokenCount: int = 1,
+                       maxTokenLength: int = 5,
+                       all_tokens: bool = True,
+                       solver_parameters=None,
+                       verbose: bool = True):
+    model = prepare_cuopt_model(
+        inputStringList=inputStringList,
+        inputStringFreq=inputStringFreq,
+        minTokenCount=minTokenCount,
+        maxTokenLength=maxTokenLength,
+        all_tokens=all_tokens,
+        verbose=verbose,
+    )
+    result = solve_vocab_on_model(
+        model,
+        numAllowedTokens=numAllowedTokens,
+        warm_start=None,
+        solver_parameters=solver_parameters,
+        verbose=verbose,
+    )
     print("create_vocab_cuopt finished")
-
-    return possibleTokens
+    return result["possible_tokens"]
 
 
 def create_vocab_old(inputStringList: list[str],

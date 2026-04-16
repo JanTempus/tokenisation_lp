@@ -1,6 +1,15 @@
 from transformers import AutoTokenizer
 from collections import OrderedDict,defaultdict
-from lp_tokenizer.lp_functions import create_vocab, create_vocab_cuopt, tokenize, deterministic_rounding,probabilistic_rounding,fill_missing_edges_with_unk
+from lp_tokenizer.lp_functions import (
+    create_vocab,
+    create_vocab_cuopt,
+    prepare_cuopt_model,
+    solve_vocab_on_model,
+    tokenize,
+    deterministic_rounding,
+    probabilistic_rounding,
+    fill_missing_edges_with_unk,
+)
 from lp_tokenizer.datastructures import tokenInstance
 import numpy as np
 import os
@@ -114,6 +123,58 @@ class Tokenizer:
         )
 
         return {"possible_tokens": possible_tokens, "unique_chars": self.unique_chars, "special_tokens": special_tokens}
+
+
+    def prepare_cuopt_model(self, verbose: bool = True):
+        if self.corpus is None:
+            raise ValueError("Must include a corpus")
+
+        input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
+
+        if self.unique_chars is None:
+            print("Finding unique chars")
+            self.unique_chars = self.get_unique_chars_corpus(self.corpus)
+
+        self._cuopt_model = prepare_cuopt_model(
+            inputStringList=input_strings,
+            inputStringFreq=input_strings_frequencies,
+            verbose=verbose,
+        )
+        self._prev_x_values = None
+        return self._cuopt_model
+
+
+    def solve_for_vocab_size(self, vocab_size: int, warm_start=None,
+                             solver_parameters=None, verbose: bool = True):
+        if not hasattr(self, "_cuopt_model") or self._cuopt_model is None:
+            raise RuntimeError("Call prepare_cuopt_model() before solve_for_vocab_size().")
+
+        special_tokens = list(self.special_tokens_list)
+        lp_budget = vocab_size - len(self.unique_chars) - len(special_tokens)
+        if lp_budget <= 0:
+            raise ValueError(
+                f"Vocab size {vocab_size} too small: unique_chars={len(self.unique_chars)} "
+                f"+ special_tokens={len(special_tokens)} already exceeds budget."
+            )
+
+        if warm_start is None:
+            warm_start = getattr(self, "_prev_x_values", None)
+
+        result = solve_vocab_on_model(
+            self._cuopt_model,
+            numAllowedTokens=lp_budget,
+            warm_start=warm_start,
+            solver_parameters=solver_parameters,
+            verbose=verbose,
+        )
+        self._prev_x_values = result["x_values"]
+
+        return {
+            "possible_tokens": result["possible_tokens"],
+            "unique_chars": self.unique_chars,
+            "special_tokens": special_tokens,
+            "x_values": result["x_values"],
+        }
 
 
     def generate_vocab_nonzero(self,input_strings,input_strings_frequencies,unique_chars):
