@@ -446,8 +446,8 @@ def smoke_test():
 
 
 if __name__ == "__main__":
-    raw_vocab_path = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2")
-    save_dir = os.environ.get("SAVE_TOKENIZER_DIR", "rounded_tokenizers_apertus_2")
+    raw_vocab_path = os.environ.get("RAW_VOCAB_PATH")
+    save_dir = os.environ.get("SAVE_TOKENIZER_DIR")
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
     byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "strict_roundtrip")
 
@@ -471,6 +471,7 @@ if __name__ == "__main__":
         for rnd_scheme in ROUNDING_SCHEMES:
             tokenizer = build_tokenizer(vocabs[rnd_scheme])
             tokenizer_name = f"lp_{vocab_size}_{rnd_scheme}"
+            print(f"Working on {tokenizer_name}")
             assert_expected_tokenizer_len(tokenizer, tokenizer_name, vocab_size, rnd_scheme)
             save_tokenizer(tokenizer, vocab_output_dir, vocab_size, rnd_scheme)
 

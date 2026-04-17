@@ -140,11 +140,10 @@ class Tokenizer:
             inputStringFreq=input_strings_frequencies,
             verbose=verbose,
         )
-        self._prev_x_values = None
         return self._cuopt_model
 
 
-    def solve_for_vocab_size(self, vocab_size: int, warm_start=None,
+    def solve_for_vocab_size(self, vocab_size: int,
                              solver_parameters=None, verbose: bool = True):
         if not hasattr(self, "_cuopt_model") or self._cuopt_model is None:
             raise RuntimeError("Call prepare_cuopt_model() before solve_for_vocab_size().")
@@ -157,17 +156,14 @@ class Tokenizer:
                 f"+ special_tokens={len(special_tokens)} already exceeds budget."
             )
 
-        if warm_start is None:
-            warm_start = getattr(self, "_prev_x_values", None)
+        print(f"[solve_for_vocab_size] vocab_size={vocab_size} lp_budget={lp_budget}")
 
         result = solve_vocab_on_model(
             self._cuopt_model,
             numAllowedTokens=lp_budget,
-            warm_start=warm_start,
             solver_parameters=solver_parameters,
             verbose=verbose,
         )
-        self._prev_x_values = result["x_values"]
 
         return {
             "possible_tokens": result["possible_tokens"],

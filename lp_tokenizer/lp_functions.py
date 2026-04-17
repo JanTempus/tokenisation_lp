@@ -20,7 +20,6 @@ from cuopt.linear_programming.solver.solver_parameters import (
 )
 
 from cuopt.linear_programming.solver_settings import (
-    SolverSettings,
     SolverMethod,
     PDLPSolverMode,
 )
@@ -274,64 +273,6 @@ def _import_cuopt_problem():
     return Problem, MINIMIZE, LinearExpression
 
 
-def _set_constraint_rhs(constraint_obj, new_rhs: float) -> bool:
-    for attr in ("rhs", "Rhs", "RHS"):
-        if hasattr(constraint_obj, attr):
-            try:
-                setattr(constraint_obj, attr, float(new_rhs))
-                return True
-            except (AttributeError, TypeError):
-                continue
-    for method_name in ("set_rhs", "setRhs", "setRHS"):
-        method = getattr(constraint_obj, method_name, None)
-        if callable(method):
-            try:
-                method(float(new_rhs))
-                return True
-            except (AttributeError, TypeError):
-                continue
-    return False
-
-
-def _apply_warm_start(problem, warm_start_primal, num_vars: int, verbose: bool = True):
-    if warm_start_primal is None:
-        return None
-    if len(warm_start_primal) != num_vars:
-        if verbose:
-            print(
-                f"[WARN] Warm-start primal length {len(warm_start_primal)} != num_vars {num_vars}; skipping warm start."
-            )
-        return None
-    try:
-        settings = SolverSettings()
-    except Exception as exc:
-        if verbose:
-            print(f"[WARN] Could not instantiate SolverSettings for warm start ({exc}); solving cold.")
-        return None
-
-    primal_arr = np.asarray(warm_start_primal, dtype=float)
-    for method_name in (
-        "set_initial_primal_solution",
-        "set_pdlp_initial_primal_solution",
-        "setInitialPrimalSolution",
-    ):
-        method = getattr(settings, method_name, None)
-        if callable(method):
-            try:
-                method(primal_arr)
-                if verbose:
-                    print(f"[INFO] Warm start applied via SolverSettings.{method_name}()")
-                return settings
-            except Exception as exc:
-                if verbose:
-                    print(f"[WARN] SolverSettings.{method_name}() failed ({exc}); trying next.")
-                continue
-
-    if verbose:
-        print("[WARN] No supported warm-start entry point on SolverSettings; solving cold.")
-    return None
-
-
 def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = True):
     Problem, MINIMIZE, LinearExpression = _import_cuopt_problem()
 
@@ -401,43 +342,33 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
     }
 
 
-def solve_cuopt_problem(model, numAllowedTokens: int, warm_start=None,
+def solve_cuopt_problem(model, numAllowedTokens: int,
                         solver_parameters=None, verbose: bool = True):
+    # Always rebuild the cuOpt Problem from the cached cuopt_lp_data matrices
+    # with the requested budget. In-place mutation of the budget constraint
+    # RHS on an existing cuOpt Problem was observed to silently fail (the
+    # Python-side attribute changed but the solver kept using the original
+    # RHS), so every vocab size produced identical primal/dual objectives.
+    # The expensive matrices (A_eq, A_ub, ...) are built once in
+    # prepare_cuopt_model and reused here; only the Problem/variable wrappers
+    # are recreated.
+    print(f"[solve_cuopt_problem] Building cuOpt Problem with numAllowedTokens={numAllowedTokens}")
+    rebuilt = build_cuopt_problem(
+        model["cuopt_lp_data"], numAllowedTokens, verbose=verbose
+    )
+    model["problem"] = rebuilt["problem"]
+    model["variables"] = rebuilt["variables"]
+    model["budget_constraint"] = rebuilt["budget_constraint"]
+    model["current_budget"] = int(numAllowedTokens)
+
     num_f = model["num_f"]
     num_g = model["num_g"]
     num_t = model["num_t"]
-
-    if int(numAllowedTokens) != model["current_budget"]:
-        mutated = _set_constraint_rhs(model["budget_constraint"], float(numAllowedTokens))
-        if not mutated:
-            if verbose:
-                print("[INFO] cuOpt budget RHS mutation unavailable; rebuilding cuOpt Problem from cached matrices.")
-            rebuilt = build_cuopt_problem(
-                model["cuopt_lp_data"], numAllowedTokens, verbose=verbose
-            )
-            model["problem"] = rebuilt["problem"]
-            model["variables"] = rebuilt["variables"]
-            model["budget_constraint"] = rebuilt["budget_constraint"]
-        model["current_budget"] = int(numAllowedTokens)
-
     problem = model["problem"]
     variables = model["variables"]
 
-    settings = _apply_warm_start(problem, warm_start, num_vars=len(variables), verbose=verbose)
-
     start = time.time()
-    if settings is not None:
-        try:
-            problem.solve(settings)
-        except TypeError:
-            try:
-                problem.solve(solver_settings=settings)
-            except TypeError:
-                if verbose:
-                    print("[WARN] problem.solve() did not accept SolverSettings; solving without warm start.")
-                problem.solve()
-    else:
-        problem.solve()
+    problem.solve()
     end = time.time()
 
     status_obj = getattr(problem, "Status", getattr(problem, "status", None))
@@ -448,7 +379,13 @@ def solve_cuopt_problem(model, numAllowedTokens: int, warm_start=None,
     x_values = np.array([float(_get_var_value(v)) for v in variables], dtype=float)
     t_offset = num_f + num_g
     t_values = x_values[t_offset:t_offset + num_t]
-    print(f"t_values: {t_values}")
+
+    count_above_0999 = int((t_values > 0.999).sum())
+    count_positive = int((t_values > 0).sum())
+    total_t = len(t_values)
+    t_sum = float(t_values.sum())
+    print(f"[INFO] numAllowedTokens={numAllowedTokens}  sum(t_values)={t_sum:.3f}")
+    print(f"[INFO] t_values stats: {count_above_0999} above 0.999, {count_positive} strictly positive, out of {total_t} total")
 
     return {
         "status_name": status_name,
@@ -463,7 +400,7 @@ def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool =
     numAllowedTokens = int(cuopt_lp_data["b_ub"][-1])
     model = build_cuopt_problem(cuopt_lp_data, numAllowedTokens, verbose=verbose)
     return solve_cuopt_problem(
-        model, numAllowedTokens, warm_start=None,
+        model, numAllowedTokens,
         solver_parameters=solver_parameters, verbose=verbose,
     )
 
@@ -838,12 +775,11 @@ def _possible_tokens_from_tvar(tokens_to_keep, tVar):
     return possibleTokens
 
 
-def solve_vocab_on_model(model, numAllowedTokens: int, warm_start=None,
+def solve_vocab_on_model(model, numAllowedTokens: int,
                          solver_parameters=None, verbose: bool = True):
     solve_output = solve_cuopt_problem(
         model,
         numAllowedTokens=numAllowedTokens,
-        warm_start=warm_start,
         solver_parameters=solver_parameters,
         verbose=verbose,
     )
@@ -891,7 +827,6 @@ def create_vocab_cuopt(inputStringList: list[str],
     result = solve_vocab_on_model(
         model,
         numAllowedTokens=numAllowedTokens,
-        warm_start=None,
         solver_parameters=solver_parameters,
         verbose=verbose,
     )

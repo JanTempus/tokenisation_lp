@@ -129,7 +129,9 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
 
     os.makedirs(save_dir, exist_ok=True)
     for vs in sorted_sizes:
+        print("---------------------------------------")
         print(f"[sweep] Solving for vocab_size={vs}")
+        print("---------------------------------------")
         tokens = tokenizer.solve_for_vocab_size(vs)
         # Drop x_values before pickling to keep output shape identical to the
         # single-size path.
