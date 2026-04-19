@@ -16,12 +16,14 @@ import matplotlib.pyplot as plt
 
 from cuopt.linear_programming.solver.solver_parameters import (
     CUOPT_METHOD,
-    CUOPT_PDLP_SOLVER_MODE
+    CUOPT_PDLP_SOLVER_MODE,
+    CUOPT_CROSSOVER,
 )
 
 from cuopt.linear_programming.solver_settings import (
     SolverMethod,
     PDLPSolverMode,
+    SolverSettings,
 )
 
 
@@ -367,8 +369,11 @@ def solve_cuopt_problem(model, numAllowedTokens: int,
     problem = model["problem"]
     variables = model["variables"]
 
+    settings = SolverSettings()
+    settings.set_parameter(CUOPT_CROSSOVER, True)
+
     start = time.time()
-    problem.solve()
+    problem.solve(settings)
     end = time.time()
 
     status_obj = getattr(problem, "Status", getattr(problem, "status", None))
