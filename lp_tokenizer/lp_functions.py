@@ -370,7 +370,7 @@ def solve_cuopt_problem(model, numAllowedTokens: int,
     variables = model["variables"]
 
     settings = SolverSettings()
-    settings.set_parameter(CUOPT_CROSSOVER, True)
+    settings.set_parameter(CUOPT_CROSSOVER, False)
 
     start = time.time()
     problem.solve(settings)
