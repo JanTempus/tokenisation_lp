@@ -53,8 +53,8 @@ def main():
         text = item["text"]
         texts.append(text)
         total_chars += len(text)
-        if total_chars >= MAX_CHARS:
-            break
+        # if total_chars >= MAX_CHARS:
+        #     break
 
     print(f"Collected {len(texts):,} documents, {total_chars:,} characters")
     dataset = Dataset.from_dict({"text": texts})
