@@ -991,10 +991,17 @@ def probabilistic_rounding(possible_tokens: list, unique_chars: list[str], vocab
     if len(lp_values) == 0 and remaining_budget > 0:
         raise ValueError("No available tokens to sample from.")
         
-    probabilities = lp_values / lp_values.sum()
-
-    # Sample without replacement
-    sampled_tokens = list(np.random.choice(token_list, size=remaining_budget, replace=False, p=probabilities))
+    # Weighted sampling without replacement via the Gumbel-top-k trick
+    # (equivalent to Efraimidis-Spirakis). O(N) instead of O(N^2) that
+    # np.random.choice(replace=False, p=...) incurs for large N.
+    if remaining_budget > 0:
+        log_w = np.log(lp_values)
+        gumbel = -np.log(-np.log(np.random.random(len(lp_values))))
+        keys = log_w + gumbel
+        top_idx = np.argpartition(-keys, remaining_budget - 1)[:remaining_budget]
+        sampled_tokens = [token_list[i] for i in top_idx]
+    else:
+        sampled_tokens = []
 
     # Final vocabulary
     final_vocab = list(set(unique_chars) | set(always_taking) | set(sampled_tokens))
