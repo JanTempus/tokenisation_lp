@@ -4,7 +4,7 @@ set -euo pipefail
 # User-tunable settings
 NAME="${NAME:-please_work}"                         # experiment tag (required)
 REPO_DIR="${REPO_DIR:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
-NUM_SHARDS="${NUM_SHARDS:-8}"
+NUM_SHARDS="${NUM_SHARDS:-7}"
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
 VOCAB_SIZES="${VOCAB_SIZES:-32768}"
