@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # User-tunable settings
-NAME="${NAME:-please_work}"                         # experiment tag (required)
+NAME="${NAME:-please_work_climbmix400b}"             # experiment tag (required)
 REPO_DIR="${REPO_DIR:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
 NUM_SHARDS="${NUM_SHARDS:-7}"
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
@@ -19,7 +19,7 @@ if [[ -z "${NAME}" ]]; then
 fi
 
 # Property-based paths
-DATASET_TAG="${NAME}_${NUM_SHARDS}"
+DATASET_TAG="${NAME}_s${NUM_SHARDS}"
 OUTPUT_DIR="${DATASET_TAG}"
 TRAIN_DATASET_PATH="${DATASET_TAG}"
 RAW_VOCAB_PATH="rounding_vocabs/${DATASET_TAG}"
