@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # User-tunable settings
-NAME="${NAME:-climb_mix}"                         # experiment tag (required)
+NAME="${NAME:-please_work}"                         # experiment tag (required)
 REPO_DIR="${REPO_DIR:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
 NUM_SHARDS="${NUM_SHARDS:-8}"
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
