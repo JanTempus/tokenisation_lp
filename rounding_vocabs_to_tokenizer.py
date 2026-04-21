@@ -30,7 +30,7 @@ SPECIAL_TOKENS = [
 BOS_TOKEN = "<|bos|>"
 UNK_TOKEN = "<|unk|>"
 
-ROUNDING_SCHEMES = ("all_ones", "det", "bias", "prob")
+ROUNDING_SCHEMES = ("all_ones", "det", "bias")
 
 # Full ByteLevel alphabet: 256 byte-level chars. Mirrors initial_alphabet
 # in standard BPE trainers — guarantees every byte is encodable regardless
@@ -205,8 +205,8 @@ def round_vocabs(raw_tokens_path, vocab_size):
     print(" created the deterministic vocab")
     bias_tokens = biased_rounding(possible_tokens, unique_chars, core_vocab_size)
     print("created the bias tokens")
-    prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
-    print("created the randomized rounding")
+    #prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
+    #print("created the randomized rounding")
     tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
     print(" created all ones vocab")
     # deterministic_rounding / biased_rounding / probabilistic_rounding already
@@ -214,7 +214,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
     # needs unique_chars appended. Appending unique_chars to the others would
     # double every byte-level char, producing duplicate Unigram entries with
     # fresh ids beyond get_vocab_size().
-    for scheme_name, scheme_tokens in (("det", det_tokens), ("bias", bias_tokens), ("prob", prob_tokens)):
+    for scheme_name, scheme_tokens in (("det", det_tokens), ("bias", bias_tokens)):
         final_size = num_special_tokens + len(set(scheme_tokens))
         if final_size != vocab_size:
             raise ValueError(
@@ -229,7 +229,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
         "all_ones": tokens_ones + unique_chars,
         "det": det_tokens,
         "bias": bias_tokens,
-        "prob": prob_tokens,
+        #"prob": prob_tokens,
     }
 
 
