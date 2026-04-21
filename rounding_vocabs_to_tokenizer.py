@@ -197,14 +197,18 @@ def round_vocabs(raw_tokens_path, vocab_size):
             f"room for LP multi-char tokens"
         )
 
+    print(" created the core vocab")
     possible_tokens = tokens["possible_tokens"]
 
     # Rounding helpers already account for unique_chars internally.
     det_tokens = deterministic_rounding(possible_tokens, unique_chars, core_vocab_size)
+    print(" created the deterministic vocab")
     bias_tokens = biased_rounding(possible_tokens, unique_chars, core_vocab_size)
+    print("created the bias tokens")
     prob_tokens = probabilistic_rounding(possible_tokens, unique_chars, core_vocab_size)
+    print("created the randomized rounding")
     tokens_ones = [token.token for token in possible_tokens if token.lp_value >= 0.99]
-
+    print(" created all ones vocab")
     # deterministic_rounding / biased_rounding / probabilistic_rounding already
     # merge unique_chars into their result. tokens_ones does not, so all_ones
     # needs unique_chars appended. Appending unique_chars to the others would
