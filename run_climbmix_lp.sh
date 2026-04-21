@@ -51,10 +51,10 @@ export BYTE_TEST_BEHAVIOR
 echo "Run tag: ${DATASET_TAG}"
 
 echo "Step 1/3: materializing first ${NUM_SHARDS} shards of ${DATASET_ID} -> ${OUTPUT_DIR}"
-python3 -u prepare_climbmix_shards.py
+#python3 -u prepare_climbmix_shards.py
 
 echo "Step 2/3: training LP vocab(s) from ${TRAIN_DATASET_PATH} -> ${RAW_VOCAB_PATH}"
-python3 -u train_tokenizer.py
+#python3 -u train_tokenizer.py
 
 echo "Step 3/3: rounding/exporting tokenizers -> ${SAVE_TOKENIZER_DIR}"
 python3 -u rounding_vocabs_to_tokenizer.py
