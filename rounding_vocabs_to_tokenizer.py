@@ -173,6 +173,7 @@ def save_tokenizer(tokenizer, save_dir, target_vocab_size, rnd_scheme):
 def round_vocabs(raw_tokens_path, vocab_size):
     from lp_tokenizer.lp_functions import biased_rounding, deterministic_rounding, probabilistic_rounding
 
+    print("Working on rounding vocabs")
     with open(raw_tokens_path, "rb") as file:
         tokens = pickle.load(file)
     print(f"Loaded the data files for vocab size: {vocab_size} ")
@@ -219,6 +220,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
                 f"Raw scheme token count was {len(scheme_tokens)}."
             )
 
+    print("Finished creating the vocabs") 
     return {
         "all_ones": tokens_ones + unique_chars,
         "det": det_tokens,
@@ -228,6 +230,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
 
 
 def test_special_tokens(tokenizer):
+    print(" Testing special tokens") 
     if tokenizer.bos_token != BOS_TOKEN:
         return False
     if tokenizer.unk_token != UNK_TOKEN:
@@ -262,6 +265,7 @@ def test_text_samples(tokenizer):
 
 
 def test_round_trip_samples(tokenizer):
+    print("doing a round trip with samples" )
     success = 0
     total = len(ROUND_TRIP_SAMPLES)
 
@@ -275,6 +279,7 @@ def test_round_trip_samples(tokenizer):
 
 
 def test_single_byte_strings(tokenizer, behavior="not_all_unk"):
+    print("testing single byte strings")
     encodable = 0
     exact_roundtrip = 0
     all_unk_count = 0
@@ -336,7 +341,7 @@ def test_oov_produces_unk(tokenizer):
     silently dropped by the pretokenizer.
     """
     unk_id = tokenizer.convert_tokens_to_ids(UNK_TOKEN)
-
+    print("checking oov characters")
     oov_chars = []
     for byte_value in range(256):
         char = bytes([byte_value]).decode("latin-1")
@@ -361,6 +366,7 @@ def test_oov_produces_unk(tokenizer):
 
 
 def run_tokenizer_tests(tokenizer_name, tokenizer, byte_behavior):
+    print("running tokenizer tests") 
     special_ok = test_special_tokens(tokenizer)
     text_ok = test_text_samples(tokenizer)
     _, roundtrip_success, roundtrip_total = test_round_trip_samples(tokenizer)
@@ -383,7 +389,7 @@ def run_tokenizer_tests(tokenizer_name, tokenizer, byte_behavior):
 
 
 def assert_expected_tokenizer_len(tokenizer, tokenizer_name, target_vocab_size, rounding_scheme):
-    if rounding_scheme in {"all_ones", "all_nonzero"}:
+    if rounding_scheme in {"all_ones"}:
         return
     actual = len(tokenizer)
     if actual != target_vocab_size:
