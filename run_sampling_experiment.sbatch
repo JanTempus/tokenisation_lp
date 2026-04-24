@@ -18,7 +18,12 @@ T="${T:-5}"                          # number of independent samples
 SAMPLE_SIZES="${SAMPLE_SIZES:-60000}"  # comma-separated rows per sample, e.g. "8192,60000"
 VOCAB_SIZES="${VOCAB_SIZES:-32768}"  # comma-separated, e.g. "4096,16384,32768"
 SEED_BASE="${SEED_BASE:-42}"         # sample i uses seed SEED_BASE+i
-SOURCE="${SOURCE:-finewebedu}"       # finewebedu | parquet
+SOURCE="${SOURCE:-finewebedu}"       # finewebedu | parquet | climbmix
+
+# climbmix-only settings (two-tier sampling from HF parquet shards)
+DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
+NUM_SHARDS="${NUM_SHARDS:-2}"        # shards to download per independent sample
+CLIMBMIX_SHARD_TMP="${CLIMBMIX_SHARD_TMP:-}"   # optional override for tmp shard dir
 
 # ---------------------------------------------------------------------------
 # Infrastructure settings — usually no need to change
@@ -41,6 +46,9 @@ export SAMPLE_SIZES
 export VOCAB_SIZES
 export SEED_BASE
 export SOURCE
+export DATASET_ID
+export NUM_SHARDS
+export CLIMBMIX_SHARD_TMP
 export PRETOKENIZER_MODE
 export NUM_PROC
 export BATCH_SIZE

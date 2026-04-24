@@ -8,6 +8,81 @@ from pathlib import Path
 from datasets import Value, concatenate_datasets, load_dataset
 
 
+_CLIMBMIX_SHARD_LIST_CACHE = {}
+
+
+def _list_climbmix_shards(dataset_id):
+    if dataset_id not in _CLIMBMIX_SHARD_LIST_CACHE:
+        from huggingface_hub import list_repo_files
+        shards = sorted(
+            f for f in list_repo_files(dataset_id, repo_type="dataset")
+            if f.endswith(".parquet")
+        )
+        if not shards:
+            raise ValueError(f"No parquet shards found in {dataset_id}")
+        _CLIMBMIX_SHARD_LIST_CACHE[dataset_id] = shards
+    return _CLIMBMIX_SHARD_LIST_CACHE[dataset_id]
+
+
+def sample_climbmix(dataset_id, num_shards, target_rows, seed, shard_tmp_dir):
+    """Two-tier sampling against a HF parquet dataset (e.g. climbmix).
+
+    Tier 1: randomly pick `num_shards` parquet shards from `dataset_id` using
+            `seed`, and download only those shards into `shard_tmp_dir`.
+    Tier 2: shuffle the concatenated shard rows with `seed` and select
+            `target_rows`.
+
+    Returns (dataset, source_counts, manifest, shard_tmp_dir). The caller is
+    responsible for deleting `shard_tmp_dir` after saving the dataset.
+    """
+    from huggingface_hub import hf_hub_download
+
+    all_shards = _list_climbmix_shards(dataset_id)
+    if num_shards > len(all_shards):
+        raise ValueError(
+            f"Requested num_shards={num_shards} > available shards={len(all_shards)} "
+            f"for {dataset_id}"
+        )
+
+    rng = random.Random(seed)
+    selected = rng.sample(all_shards, num_shards)
+    print(f"climbmix tier-1: seed={seed} picked shards: {selected}")
+
+    os.makedirs(shard_tmp_dir, exist_ok=True)
+    local_paths = []
+    for shard in selected:
+        print(f"  downloading {shard} -> {shard_tmp_dir}")
+        local_path = hf_hub_download(
+            repo_id=dataset_id,
+            filename=shard,
+            repo_type="dataset",
+            local_dir=shard_tmp_dir,
+        )
+        local_paths.append(local_path)
+
+    dataset = load_dataset("parquet", data_files=local_paths, split="train")
+    if "text" not in dataset.column_names:
+        raise ValueError(
+            f"Expected a 'text' column in {dataset_id} shards, got {dataset.column_names}"
+        )
+    dataset = dataset.select_columns(["text"])
+
+    if target_rows > len(dataset):
+        raise ValueError(
+            f"target_rows={target_rows} exceeds rows available in "
+            f"{num_shards} shards ({len(dataset)}). Increase NUM_SHARDS."
+        )
+
+    dataset = dataset.shuffle(seed=seed).select(range(target_rows))
+
+    source_counts = {"climbmix": target_rows}
+    manifest = [
+        {"source": "climbmix", "dataset_id": dataset_id, "shard": shard, "local_path": local_path}
+        for shard, local_path in zip(selected, local_paths)
+    ]
+    return dataset, source_counts, manifest, shard_tmp_dir
+
+
 def discover_parquet_files(base_dir, source_dirs):
     source_to_files = {}
     base_path = Path(base_dir)

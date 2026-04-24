@@ -13,6 +13,7 @@ All settings are read from environment variables (see run_sampling_experiment.sb
 
 import json
 import os
+import shutil
 import time
 
 import numpy as np
@@ -92,6 +93,7 @@ def jaccard_distance_different_rounding(vocab_size, raw_tokens_path):
 def step1_sample_datasets(sample_size, ss_dir, full_ds=None):
     from sample_tokenizer_data import (
         discover_parquet_files,
+        sample_climbmix,
         sample_dataset,
         save_sampling_outputs,
     )
@@ -125,8 +127,29 @@ def step1_sample_datasets(sample_size, ss_dir, full_ds=None):
                 source_to_files, sample_size, seed, SOURCE_TEXT_COLUMNS
             )
             save_sampling_outputs(all_dirs[i], dataset, source_counts, manifest, sample_size, seed)
+    elif SOURCE == "climbmix":
+        DATASET_ID = os.environ.get("DATASET_ID", "karpathy/climbmix-400b-shuffle")
+        NUM_SHARDS = int(_require_env("NUM_SHARDS"))
+        SHARD_TMP_BASE = os.environ.get(
+            "CLIMBMIX_SHARD_TMP", os.path.join(ss_dir, "_shard_tmp")
+        )
+        for i in range(T):
+            seed = SEED_BASE + i
+            per_sample_tmp = os.path.join(SHARD_TMP_BASE, f"sample_{i}")
+            print(
+                f"[Sample {i}] climbmix: sampling {NUM_SHARDS} shards + "
+                f"{sample_size} rows (seed={seed})"
+            )
+            dataset, source_counts, manifest, shard_dir = sample_climbmix(
+                DATASET_ID, NUM_SHARDS, sample_size, seed, per_sample_tmp
+            )
+            save_sampling_outputs(
+                all_dirs[i], dataset, source_counts, manifest, sample_size, seed
+            )
+            shutil.rmtree(shard_dir, ignore_errors=True)
+            print(f"[Sample {i}] deleted downloaded shards at {shard_dir}")
     else:
-        raise ValueError(f"Unknown SOURCE='{SOURCE}'. Expected: finewebedu, parquet")
+        raise ValueError(f"Unknown SOURCE='{SOURCE}'. Expected: finewebedu, parquet, climbmix")
 
     samples = []
     for i in range(T):
