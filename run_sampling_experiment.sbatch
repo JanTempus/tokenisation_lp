@@ -2,7 +2,7 @@
 #SBATCH -A a139
 #SBATCH -p normal
 #SBATCH --gres=gpu:1
-#SBATCH -t 12:00:00
+#SBATCH -t 2:00:00
 
 set -euo pipefail
 
@@ -15,8 +15,8 @@ fi
 # Experiment parameters — edit these before submitting
 # ---------------------------------------------------------------------------
 T="${T:-5}"                          # number of independent samples
-SAMPLE_SIZES="${SAMPLE_SIZES:-60000}"  # comma-separated rows per sample, e.g. "8192,60000"
-VOCAB_SIZES="${VOCAB_SIZES:-32768}"  # comma-separated, e.g. "4096,16384,32768"
+SAMPLE_SIZES="${SAMPLE_SIZES:-8192,16384,32768,65536,131072}"  # comma-separated rows per sample, e.g. "8192,60000"
+VOCAB_SIZES="${VOCAB_SIZES:-8192,16384,32768,65536,131072,262144}"  # comma-separated, e.g. "4096,16384,32768"
 SEED_BASE="${SEED_BASE:-42}"         # sample i uses seed SEED_BASE+i
 SOURCE="${SOURCE:-finewebedu}"       # finewebedu | parquet | climbmix
 
