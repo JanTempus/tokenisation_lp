@@ -14,6 +14,7 @@ fi
 # ---------------------------------------------------------------------------
 # Experiment parameters — edit these before submitting
 # ---------------------------------------------------------------------------
+NAME="${NAME:-climbmix_sampling}"  
 T="${T:-5}"                          # number of independent samples
 SAMPLE_SIZES="${SAMPLE_SIZES:-8192,16384,32768,65536,131072}"  # comma-separated rows per sample, e.g. "8192,60000"
 VOCAB_SIZES="${VOCAB_SIZES:-8192,16384,32768,65536,131072,262144}"  # comma-separated, e.g. "4096,16384,32768"
