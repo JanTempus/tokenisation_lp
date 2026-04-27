@@ -6,10 +6,6 @@
 
 set -euo pipefail
 
-if [[ -z "${NAME:-}" ]]; then
-    echo "ERROR: NAME env var is required. Submit with: NAME=myexp sbatch run_sampling_experiment.sbatch"
-    exit 1
-fi
 
 # ---------------------------------------------------------------------------
 # Experiment parameters — edit these before submitting
