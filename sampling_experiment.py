@@ -100,8 +100,14 @@ def step1_sample_datasets(sample_size, ss_dir, full_ds=None):
 
     all_dirs = [os.path.join(ss_dir, "samples", f"sample_{i}") for i in range(T)]
 
+    def _already_sampled(d):
+        return os.path.exists(os.path.join(d, "dataset_info.json"))
+
     if SOURCE == "finewebedu":
         for i in range(T):
+            if _already_sampled(all_dirs[i]):
+                print(f"[Sample {i}] already sampled at {all_dirs[i]}, skipping")
+                continue
             seed = SEED_BASE + i
             print(f"[Sample {i}] shuffle(seed={seed}).select({sample_size})")
             sample = full_ds.shuffle(seed=seed).select(range(sample_size))
@@ -119,8 +125,13 @@ def step1_sample_datasets(sample_size, ss_dir, full_ds=None):
             "fineweb2": "text", "fineweb": "text", "megamath": "text",
             "infimath": "text", "finemath": "text", "starcoder": "content",
         }
-        source_to_files = discover_parquet_files(DATASET_BASE_DIR, SOURCE_DIRS)
+        source_to_files = None
         for i in range(T):
+            if _already_sampled(all_dirs[i]):
+                print(f"[Sample {i}] already sampled at {all_dirs[i]}, skipping")
+                continue
+            if source_to_files is None:
+                source_to_files = discover_parquet_files(DATASET_BASE_DIR, SOURCE_DIRS)
             seed = SEED_BASE + i
             print(f"[Sample {i}] Sampling {sample_size} parquet rows with seed={seed}")
             dataset, source_counts, manifest = sample_dataset(
@@ -134,6 +145,9 @@ def step1_sample_datasets(sample_size, ss_dir, full_ds=None):
             "CLIMBMIX_SHARD_TMP", os.path.join(ss_dir, "_shard_tmp")
         )
         for i in range(T):
+            if _already_sampled(all_dirs[i]):
+                print(f"[Sample {i}] already sampled at {all_dirs[i]}, skipping")
+                continue
             seed = SEED_BASE + i
             per_sample_tmp = os.path.join(SHARD_TMP_BASE, f"sample_{i}")
             print(
@@ -166,7 +180,15 @@ def step2_train_lp(samples, ss_dir):
     for i, dataset in enumerate(samples):
         lp_dir = os.path.join(ss_dir, "lp_raw", f"sample_{i}")
 
-        print(f"\n[LP Sample {i}] Computing unique chars")
+        missing = [
+            vs for vs in VOCAB_SIZES
+            if not os.path.exists(os.path.join(lp_dir, f"lp_tokens_{vs}.pkl"))
+        ]
+        if not missing:
+            print(f"\n[LP Sample {i}] all {len(VOCAB_SIZES)} vocab sizes already trained, skipping")
+            continue
+
+        print(f"\n[LP Sample {i}] Computing unique chars (training {len(missing)}/{len(VOCAB_SIZES)} vocab sizes: {missing})")
         char_chunks = dataset.map(
             get_unique_chars_batch,
             batched=True,
@@ -177,7 +199,7 @@ def step2_train_lp(samples, ss_dir):
         )
         unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
 
-        for vs in VOCAB_SIZES:
+        for vs in missing:
             print(f"[LP Sample {i} vocab={vs}] Training")
             train_lp_tokenizer(dataset, unique_chars, vs, lp_dir, lp_pretokenizer, get_special_tokens(PRETOKENIZER_MODE))
             print(f"[LP Sample {i} vocab={vs}] Saved to {lp_dir}/lp_tokens_{vs}.pkl")
@@ -191,6 +213,9 @@ def step3_train_bpe(samples, ss_dir):
         bpe_dir = os.path.join(ss_dir, "bpe", f"sample_{i}")
         for vs in VOCAB_SIZES:
             out_path = os.path.join(bpe_dir, f"bpe_{vs}")
+            if os.path.exists(os.path.join(out_path, "tokenizer.json")):
+                print(f"[BPE Sample {i} vocab={vs}] already trained at {out_path}, skipping")
+                continue
             print(f"[BPE Sample {i} vocab={vs}] Training")
             train_bpe_tokenizer(vs, dataset, bpe_dir)
             print(f"[BPE Sample {i} vocab={vs}] Saved to {out_path}")
