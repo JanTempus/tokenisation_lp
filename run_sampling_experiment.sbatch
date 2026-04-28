@@ -15,7 +15,7 @@ T="${T:-5}"                          # number of independent samples
 SAMPLE_SIZES="${SAMPLE_SIZES:-8192,16384,32768,65536,131072}"  # comma-separated rows per sample, e.g. "8192,60000"
 VOCAB_SIZES="${VOCAB_SIZES:-8192,16384,32768,65536,131072,262144}"  # comma-separated, e.g. "4096,16384,32768"
 SEED_BASE="${SEED_BASE:-42}"         # sample i uses seed SEED_BASE+i
-SOURCE="${SOURCE:-finewebedu}"       # finewebedu | parquet | climbmix
+SOURCE="${SOURCE:-climbmix}"       # finewebedu | parquet | climbmix
 
 # climbmix-only settings (two-tier sampling from HF parquet shards)
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
@@ -26,7 +26,7 @@ CLIMBMIX_SHARD_TMP="${CLIMBMIX_SHARD_TMP:-}"   # optional override for tmp shard
 # Infrastructure settings — usually no need to change
 # ---------------------------------------------------------------------------
 REPO_DIR="/iopsstor/scratch/cscs/jtempus/tokenisation_lp"
-PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-custom}"
+PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
 NUM_PROC="${NUM_PROC:-16}"
 BATCH_SIZE="${BATCH_SIZE:-10000}"
 
