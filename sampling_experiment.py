@@ -225,7 +225,7 @@ def step3_train_bpe(samples, ss_dir):
 # Step 4 – Compute pairwise inter-sample Jaccard distances
 # ---------------------------------------------------------------------------
 def step4_jaccard(sample_size, ss_dir):
-    lp_keys = ["all_ones", "det", "bias", "prob"]
+    lp_keys = ["all_ones", "det", "bias"]
     results = {}
 
     for vs in VOCAB_SIZES:
