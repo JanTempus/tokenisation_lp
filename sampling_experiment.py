@@ -61,7 +61,6 @@ import pickle
 from lp_tokenizer.lp_functions import (  # noqa: E402
     biased_rounding,
     deterministic_rounding,
-    probabilistic_rounding,
 )
 
 
@@ -78,13 +77,11 @@ def jaccard_distance_different_rounding(vocab_size, raw_tokens_path):
     target = vocab_size - n_special
     det_tokens  = deterministic_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
     bias_tokens = biased_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
-    prob_tokens = probabilistic_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
-    ones_tokens = [t.token for t in tokens["possible_tokens"] if t.lp_value >= 0.99]
+    ones_tokens = [t.token for t in tokens["possible_tokens"] if t.lp_value >= 0.999]
     det_tokens  = list(set(det_tokens  + tokens["special_tokens"]))
     bias_tokens = list(set(bias_tokens + tokens["special_tokens"]))
-    prob_tokens = list(set(prob_tokens + tokens["special_tokens"]))
     ones_tokens = list(set(ones_tokens + tokens["unique_chars"] + tokens["special_tokens"]))
-    return {"all_ones": ones_tokens, "det": det_tokens, "bias": bias_tokens, "prob": prob_tokens}
+    return {"all_ones": ones_tokens, "det": det_tokens, "bias": bias_tokens}
 
 
 # ---------------------------------------------------------------------------
