@@ -108,6 +108,37 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
         pickle.dump(tokens, f)
 
 
+def print_lp_variable_counts(vocab_size, x_values, cuopt_model):
+    num_f = int(cuopt_model["num_f"])
+    num_g = int(cuopt_model["num_g"])
+    num_t = int(cuopt_model["num_t"])
+    expected_total = num_f + num_g + num_t
+
+    if len(x_values) != expected_total:
+        print(
+            f"[lp-variable-counts] WARNING: vocab_size={vocab_size} "
+            f"has {len(x_values)} x_values but expected {expected_total} "
+            f"(num_f={num_f}, num_g={num_g}, num_t={num_t})"
+        )
+
+    f_values = x_values[:num_f]
+    g_values = x_values[num_f:num_f + num_g]
+    t_values = x_values[num_f + num_g:num_f + num_g + num_t]
+
+    print(f"[lp-variable-counts] vocab_size={vocab_size}")
+    for name, values in (
+        ("f", f_values),
+        ("g", g_values),
+        ("t", t_values),
+        ("all", x_values),
+    ):
+        print(
+            f"[lp-variable-counts] {name}: total={len(values)} "
+            f">0.999={int((values > 0.999).sum())} "
+            f">0.001={int((values > 0.001).sum())}"
+        )
+
+
 def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
                              pretokenizer_obj, special_tokens):
     if not vocab_sizes:
@@ -133,6 +164,7 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
         print(f"[sweep] Solving for vocab_size={vs}")
         print("---------------------------------------")
         tokens = tokenizer.solve_for_vocab_size(vs)
+        print_lp_variable_counts(vs, tokens["x_values"], tokenizer._cuopt_model)
         # Drop x_values before pickling to keep output shape identical to the
         # single-size path.
         tokens.pop("x_values", None)
