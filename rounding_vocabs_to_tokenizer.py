@@ -11,7 +11,7 @@ from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 
-SPECIAL_TOKENS = [
+NANOCHAT_SPECIAL_TOKENS = [
     # every document begins with the Beginning of Sequence (BOS) token that delimits documents
     "<|bos|>",
     # tokens below are only used during finetuning to render Conversations into token ids
@@ -27,8 +27,42 @@ SPECIAL_TOKENS = [
     "<|unk|>",
 ]
 
-BOS_TOKEN = "<|bos|>"
-UNK_TOKEN = "<|unk|>"
+APERTUS_SPECIAL_TOKENS = ["[UNK]", "[EOS]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
+APERTUS_TOKEN_KWARGS = {
+    "unk_token": "[UNK]",
+    "eos_token": "[EOS]",
+    "pad_token": "[PAD]",
+    "cls_token": "[CLS]",
+    "sep_token": "[SEP]",
+    "mask_token": "[MASK]",
+}
+
+SPECIAL_TOKEN_CONFIGS = {
+    "pythia": {
+        "special_tokens": APERTUS_SPECIAL_TOKENS,
+        "token_kwargs": APERTUS_TOKEN_KWARGS,
+    },
+    "split_bytelevel": {
+        "special_tokens": APERTUS_SPECIAL_TOKENS,
+        "token_kwargs": APERTUS_TOKEN_KWARGS,
+    },
+    "apertus": {
+        "special_tokens": APERTUS_SPECIAL_TOKENS,
+        "token_kwargs": APERTUS_TOKEN_KWARGS,
+    },
+    "nanochat": {
+        "special_tokens": NANOCHAT_SPECIAL_TOKENS,
+        "token_kwargs": {
+            "bos_token": "<|bos|>",
+            "unk_token": "<|unk|>",
+            "additional_special_tokens": [
+                token
+                for token in NANOCHAT_SPECIAL_TOKENS
+                if token not in ("<|bos|>", "<|unk|>")
+            ],
+        },
+    },
+}
 
 ROUNDING_SCHEMES = ("all_ones", "det", "bias")
 
@@ -97,6 +131,16 @@ def build_pretokenizer(mode):
 
 PRETOKENIZER, DECODER = build_pretokenizer(PRETOKENIZER_MODE)
 
+if PRETOKENIZER_MODE not in SPECIAL_TOKEN_CONFIGS:
+    raise ValueError(
+        f"No special tokens defined for PRETOKENIZER_MODE='{PRETOKENIZER_MODE}'. "
+        f"Expected one of: {list(SPECIAL_TOKEN_CONFIGS.keys())}"
+    )
+
+SPECIAL_TOKENS = SPECIAL_TOKEN_CONFIGS[PRETOKENIZER_MODE]["special_tokens"]
+TOKEN_KWARGS = SPECIAL_TOKEN_CONFIGS[PRETOKENIZER_MODE]["token_kwargs"]
+UNK_TOKEN = TOKEN_KWARGS["unk_token"]
+
 ROUND_TRIP_SAMPLES = [
     (
         "whitespace",
@@ -138,6 +182,23 @@ def list_raw_vocab_files(raw_vocab_dir):
     return [str(path) for path in files]
 
 
+def validate_raw_special_tokens(tokens, raw_tokens_path):
+    if "special_tokens" not in tokens:
+        raise KeyError(
+            f"'special_tokens' missing in {raw_tokens_path}; cannot verify "
+            f"compatibility with PRETOKENIZER_MODE='{PRETOKENIZER_MODE}'"
+        )
+
+    raw_special_tokens = list(tokens["special_tokens"])
+    if raw_special_tokens != SPECIAL_TOKENS:
+        raise ValueError(
+            f"Raw vocab {raw_tokens_path} was trained with special_tokens="
+            f"{raw_special_tokens}, but PRETOKENIZER_MODE='{PRETOKENIZER_MODE}' "
+            f"expects special_tokens={SPECIAL_TOKENS}. Set PRETOKENIZER_MODE to "
+            "the training mode before rounding/exporting."
+        )
+
+
 def include_special_tokens(vocab_tokens):
     return SPECIAL_TOKENS + vocab_tokens
 
@@ -155,9 +216,7 @@ def build_tokenizer(vocab_tokens):
 
     fast_tokenizer = PreTrainedTokenizerFast(
         tokenizer_object=tokenizer,
-        bos_token=BOS_TOKEN,
-        unk_token=UNK_TOKEN,
-        additional_special_tokens=[t for t in SPECIAL_TOKENS if t not in (BOS_TOKEN, UNK_TOKEN)],
+        **TOKEN_KWARGS,
     )
     return fast_tokenizer
 
@@ -181,6 +240,7 @@ def round_vocabs(raw_tokens_path, vocab_size):
         raise KeyError(f"'possible_tokens' missing in {raw_tokens_path}")
     if "unique_chars" not in tokens:
         raise KeyError(f"'unique_chars' missing in {raw_tokens_path}")
+    validate_raw_special_tokens(tokens, raw_tokens_path)
 
     # Replace the corpus-derived unique_chars with the full ByteLevel alphabet.
     # The rounding helpers account for len(unique_chars) internally, so this
@@ -235,9 +295,14 @@ def round_vocabs(raw_tokens_path, vocab_size):
 
 def test_special_tokens(tokenizer):
     print(" Testing special tokens") 
-    if tokenizer.bos_token != BOS_TOKEN:
-        return False
-    if tokenizer.unk_token != UNK_TOKEN:
+    for attribute_name, expected_token in TOKEN_KWARGS.items():
+        if attribute_name == "additional_special_tokens":
+            continue
+        if getattr(tokenizer, attribute_name) != expected_token:
+            return False
+
+    additional_special_tokens = TOKEN_KWARGS.get("additional_special_tokens", [])
+    if list(tokenizer.additional_special_tokens) != additional_special_tokens:
         return False
 
     for token in SPECIAL_TOKENS:
