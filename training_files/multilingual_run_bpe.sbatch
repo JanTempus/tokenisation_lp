@@ -7,7 +7,7 @@ set -euo pipefail
 
 # User-tunable settings
 NAME="${NAME:-Multilingual}"
-REPO_DIR="${REPO_DIR:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
+REPO_DIR="${REPO_DIR:-/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp}"
 TARGET_ROWS="${TARGET_ROWS:-60000}"
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
 VOCAB_SIZES="${VOCAB_SIZES:-131072}"
