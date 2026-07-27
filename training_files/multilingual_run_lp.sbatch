@@ -2,6 +2,8 @@
 #SBATCH -A a0229
 #SBATCH -p debug
 #SBATCH -t 01:30:00
+#SBATCH --output=logs/slurm-%j.out
+#SBATCH --error=logs/slurm-%j.err
 
 
 set -euo pipefail
