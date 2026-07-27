@@ -17,12 +17,6 @@ BATCH_SIZE="${BATCH_SIZE:-10000}"
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 BYTE_TEST_BEHAVIOR="${BYTE_TEST_BEHAVIOR:-not_all_unk}"
 
-# Pinned upstream datasets
-FINEWEB2_DATASET_ID="${FINEWEB2_DATASET_ID:-HuggingFaceFW/fineweb-2}"
-FINEWEB2_REVISION="${FINEWEB2_REVISION:-v2.1.1}"
-FINEWEB_DATASET_ID="${FINEWEB_DATASET_ID:-HuggingFaceFW/fineweb}"
-FINEWEB_REVISION="${FINEWEB_REVISION:-v1.4.0}"
-
 if [[ -z "${NAME}" ]]; then
     echo "ERROR: NAME is required. Submit with --export=NAME=<experiment>" >&2
     exit 1
@@ -50,15 +44,9 @@ export RAW_VOCAB_PATH
 export SAVE_TOKENIZER_DIR
 export RUN_TOKENIZER_TESTS
 export BYTE_TEST_BEHAVIOR
-export FINEWEB2_DATASET_ID
-export FINEWEB2_REVISION
-export FINEWEB_DATASET_ID
-export FINEWEB_REVISION
 
 echo "Run tag:              ${DATASET_TAG}"
 echo "Training dataset:     ${TRAIN_DATASET_PATH}"
-echo "FineWeb2 revision:    ${FINEWEB2_REVISION}"
-echo "FineWeb revision:     ${FINEWEB_REVISION}"
 
 if [[ -f "${TRAIN_DATASET_PATH}/sampling_manifest.json" ]]; then
     echo "Step 1/3: reusing existing dataset at ${TRAIN_DATASET_PATH}"

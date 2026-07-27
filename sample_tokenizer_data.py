@@ -10,11 +10,8 @@ from datasets import Value, concatenate_datasets, load_dataset
 
 
 _CLIMBMIX_SHARD_LIST_CACHE = {}
-_HF_REPO_FILE_LIST_CACHE = {}
 FINEWEB2_DATASET_ID = "HuggingFaceFW/fineweb-2"
-FINEWEB2_REVISION = "v2.1.1"
 FINEWEB_DATASET_ID = "HuggingFaceFW/fineweb"
-FINEWEB_REVISION = "v1.4.0"
 FINEWEB2_LANGUAGE_CONFIGS = (
     "cmn_Hani",
     "fra_Latn",
@@ -181,15 +178,12 @@ def allocate_equal_quotas(source_names, target_rows):
 
 def build_fineweb_prefix_sources(
     fineweb2_dataset_id=FINEWEB2_DATASET_ID,
-    fineweb2_revision=FINEWEB2_REVISION,
     fineweb_dataset_id=FINEWEB_DATASET_ID,
-    fineweb_revision=FINEWEB_REVISION,
 ):
     sources = [
         {
             "source": config,
             "dataset_id": fineweb2_dataset_id,
-            "revision": fineweb2_revision,
             "parquet_prefix": f"data/{config}/train/",
         }
         for config in FINEWEB2_LANGUAGE_CONFIGS
@@ -198,41 +192,34 @@ def build_fineweb_prefix_sources(
         {
             "source": FINEWEB_ENGLISH_SOURCE,
             "dataset_id": fineweb_dataset_id,
-            "revision": fineweb_revision,
             "parquet_prefix": FINEWEB_ENGLISH_PREFIX,
         }
     )
     return sources
 
 
-def list_ordered_parquet_shards(source, list_repo_files_fn=None):
-    use_cache = list_repo_files_fn is None
-    if list_repo_files_fn is None:
-        from huggingface_hub import list_repo_files
+def list_ordered_parquet_shards(source, list_repo_tree_fn=None):
+    if list_repo_tree_fn is None:
+        from huggingface_hub import list_repo_tree
 
-        list_repo_files_fn = list_repo_files
+        list_repo_tree_fn = list_repo_tree
 
-    cache_key = (source["dataset_id"], source["revision"])
-    if use_cache and cache_key in _HF_REPO_FILE_LIST_CACHE:
-        repo_files = _HF_REPO_FILE_LIST_CACHE[cache_key]
-    else:
-        repo_files = list_repo_files_fn(
-            source["dataset_id"],
-            repo_type="dataset",
-            revision=source["revision"],
-        )
-        if use_cache:
-            _HF_REPO_FILE_LIST_CACHE[cache_key] = repo_files
+    repo_entries = list_repo_tree_fn(
+        source["dataset_id"],
+        path_in_repo=source["parquet_prefix"].rstrip("/"),
+        recursive=False,
+        repo_type="dataset",
+    )
     shards = sorted(
-        path
-        for path in repo_files
-        if path.startswith(source["parquet_prefix"]) and path.endswith(".parquet")
+        entry.path
+        for entry in repo_entries
+        if getattr(entry, "path", "").endswith(".parquet")
     )
     if not shards:
         raise FileNotFoundError(
             "No parquet shards found for "
             f"source={source['source']} dataset={source['dataset_id']} "
-            f"revision={source['revision']} prefix={source['parquet_prefix']}"
+            f"prefix={source['parquet_prefix']}"
         )
     return shards
 
@@ -251,7 +238,7 @@ def _first_valid_text_indices(dataset, limit):
 def materialize_fineweb_prefix_dataset(
     target_rows,
     sources=None,
-    list_repo_files_fn=None,
+    list_repo_tree_fn=None,
     hf_hub_download_fn=None,
     load_dataset_fn=None,
     concatenate_datasets_fn=None,
@@ -280,10 +267,10 @@ def materialize_fineweb_prefix_dataset(
         source_name = source["source"]
         quota = source_quotas[source_name]
         retained = 0
-        shards = list_ordered_parquet_shards(source, list_repo_files_fn)
+        shards = list_ordered_parquet_shards(source, list_repo_tree_fn)
         print(
             f"[{source_name}] selecting first {quota} valid documents from "
-            f"{source['dataset_id']}@{source['revision']}"
+            f"{source['dataset_id']}"
         )
 
         for shard in shards:
@@ -295,7 +282,6 @@ def materialize_fineweb_prefix_dataset(
                 repo_id=source["dataset_id"],
                 filename=shard,
                 repo_type="dataset",
-                revision=source["revision"],
             )
             shard_dataset = load_dataset_fn(
                 "parquet",
@@ -318,7 +304,6 @@ def materialize_fineweb_prefix_dataset(
                 {
                     "source": source_name,
                     "dataset_id": source["dataset_id"],
-                    "revision": source["revision"],
                     "repository_path": shard,
                     "cache_path": str(local_path),
                     "downloaded_rows": len(shard_dataset),
@@ -510,20 +495,12 @@ if __name__ == "__main__":
         fineweb2_dataset_id = os.environ.get(
             "FINEWEB2_DATASET_ID", FINEWEB2_DATASET_ID
         )
-        fineweb2_revision = os.environ.get(
-            "FINEWEB2_REVISION", FINEWEB2_REVISION
-        )
         fineweb_dataset_id = os.environ.get(
             "FINEWEB_DATASET_ID", FINEWEB_DATASET_ID
         )
-        fineweb_revision = os.environ.get(
-            "FINEWEB_REVISION", FINEWEB_REVISION
-        )
         sources = build_fineweb_prefix_sources(
             fineweb2_dataset_id=fineweb2_dataset_id,
-            fineweb2_revision=fineweb2_revision,
             fineweb_dataset_id=fineweb_dataset_id,
-            fineweb_revision=fineweb_revision,
         )
         output_dir = args.output_dataset_dir or (
             f"{args.name}_fineweb2_10lang_n{args.target_rows}"
