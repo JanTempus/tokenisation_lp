@@ -1,5 +1,6 @@
 import argparse
 from collections import Counter
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
 import random
@@ -9,6 +10,24 @@ from datasets import Value, concatenate_datasets, load_dataset
 
 
 _CLIMBMIX_SHARD_LIST_CACHE = {}
+_HF_REPO_FILE_LIST_CACHE = {}
+FINEWEB2_DATASET_ID = "HuggingFaceFW/fineweb-2"
+FINEWEB2_REVISION = "v2.1.1"
+FINEWEB_DATASET_ID = "HuggingFaceFW/fineweb"
+FINEWEB_REVISION = "v1.4.0"
+FINEWEB2_LANGUAGE_CONFIGS = (
+    "cmn_Hani",
+    "fra_Latn",
+    "arb_Arab",
+    "rus_Cyrl",
+    "tha_Thai",
+    "hin_Deva",
+    "tur_Latn",
+    "swh_Latn",
+    "tel_Telu",
+)
+FINEWEB_ENGLISH_SOURCE = "eng_Latn"
+FINEWEB_ENGLISH_PREFIX = "sample/10BT/"
 
 
 def _list_climbmix_shards(dataset_id):
@@ -143,6 +162,207 @@ def normalize_to_text_column(dataset, source_name=None, source_text_columns=None
     return dataset
 
 
+def allocate_equal_quotas(source_names, target_rows):
+    """Divide target_rows as evenly as possible in declared source order."""
+    source_names = list(source_names)
+    if not source_names:
+        raise ValueError("At least one source is required")
+    if len(source_names) != len(set(source_names)):
+        raise ValueError(f"Source names must be unique: {source_names}")
+    if target_rows <= 0:
+        raise ValueError(f"target_rows must be positive, got {target_rows}")
+
+    rows_per_source, remainder = divmod(target_rows, len(source_names))
+    return {
+        source: rows_per_source + (1 if index < remainder else 0)
+        for index, source in enumerate(source_names)
+    }
+
+
+def build_fineweb_prefix_sources(
+    fineweb2_dataset_id=FINEWEB2_DATASET_ID,
+    fineweb2_revision=FINEWEB2_REVISION,
+    fineweb_dataset_id=FINEWEB_DATASET_ID,
+    fineweb_revision=FINEWEB_REVISION,
+):
+    sources = [
+        {
+            "source": config,
+            "dataset_id": fineweb2_dataset_id,
+            "revision": fineweb2_revision,
+            "parquet_prefix": f"data/{config}/train/",
+        }
+        for config in FINEWEB2_LANGUAGE_CONFIGS
+    ]
+    sources.append(
+        {
+            "source": FINEWEB_ENGLISH_SOURCE,
+            "dataset_id": fineweb_dataset_id,
+            "revision": fineweb_revision,
+            "parquet_prefix": FINEWEB_ENGLISH_PREFIX,
+        }
+    )
+    return sources
+
+
+def list_ordered_parquet_shards(source, list_repo_files_fn=None):
+    use_cache = list_repo_files_fn is None
+    if list_repo_files_fn is None:
+        from huggingface_hub import list_repo_files
+
+        list_repo_files_fn = list_repo_files
+
+    cache_key = (source["dataset_id"], source["revision"])
+    if use_cache and cache_key in _HF_REPO_FILE_LIST_CACHE:
+        repo_files = _HF_REPO_FILE_LIST_CACHE[cache_key]
+    else:
+        repo_files = list_repo_files_fn(
+            source["dataset_id"],
+            repo_type="dataset",
+            revision=source["revision"],
+        )
+        if use_cache:
+            _HF_REPO_FILE_LIST_CACHE[cache_key] = repo_files
+    shards = sorted(
+        path
+        for path in repo_files
+        if path.startswith(source["parquet_prefix"]) and path.endswith(".parquet")
+    )
+    if not shards:
+        raise FileNotFoundError(
+            "No parquet shards found for "
+            f"source={source['source']} dataset={source['dataset_id']} "
+            f"revision={source['revision']} prefix={source['parquet_prefix']}"
+        )
+    return shards
+
+
+def _first_valid_text_indices(dataset, limit):
+    indices = []
+    for index in range(len(dataset)):
+        text = dataset[index]["text"]
+        if isinstance(text, str) and text.strip():
+            indices.append(index)
+            if len(indices) == limit:
+                break
+    return indices
+
+
+def materialize_fineweb_prefix_dataset(
+    target_rows,
+    sources=None,
+    list_repo_files_fn=None,
+    hf_hub_download_fn=None,
+    load_dataset_fn=None,
+    concatenate_datasets_fn=None,
+):
+    """Download ordered parquet shards and retain a balanced prefix of valid texts."""
+    if sources is None:
+        sources = build_fineweb_prefix_sources()
+    sources = list(sources)
+    source_names = [source["source"] for source in sources]
+    source_quotas = allocate_equal_quotas(source_names, target_rows)
+
+    if hf_hub_download_fn is None:
+        from huggingface_hub import hf_hub_download
+
+        hf_hub_download_fn = hf_hub_download
+    if load_dataset_fn is None:
+        load_dataset_fn = load_dataset
+    if concatenate_datasets_fn is None:
+        concatenate_datasets_fn = concatenate_datasets
+
+    selected_chunks = []
+    shard_manifest = []
+    source_counts = {}
+
+    for source in sources:
+        source_name = source["source"]
+        quota = source_quotas[source_name]
+        retained = 0
+        shards = list_ordered_parquet_shards(source, list_repo_files_fn)
+        print(
+            f"[{source_name}] selecting first {quota} valid documents from "
+            f"{source['dataset_id']}@{source['revision']}"
+        )
+
+        for shard in shards:
+            if retained >= quota:
+                break
+
+            print(f"[{source_name}] downloading {shard}")
+            local_path = hf_hub_download_fn(
+                repo_id=source["dataset_id"],
+                filename=shard,
+                repo_type="dataset",
+                revision=source["revision"],
+            )
+            shard_dataset = load_dataset_fn(
+                "parquet",
+                data_files=local_path,
+                split="train",
+            )
+            shard_dataset = normalize_to_text_column(
+                shard_dataset,
+                source_name=source_name,
+                source_text_columns={source_name: "text"},
+            )
+
+            rows_needed = quota - retained
+            valid_indices = _first_valid_text_indices(shard_dataset, rows_needed)
+            if valid_indices:
+                selected_chunks.append(shard_dataset.select(valid_indices))
+                retained += len(valid_indices)
+
+            shard_manifest.append(
+                {
+                    "source": source_name,
+                    "dataset_id": source["dataset_id"],
+                    "revision": source["revision"],
+                    "repository_path": shard,
+                    "cache_path": str(local_path),
+                    "downloaded_rows": len(shard_dataset),
+                    "retained_rows": len(valid_indices),
+                }
+            )
+            print(
+                f"[{source_name}] retained {retained}/{quota} documents "
+                f"after {shard}"
+            )
+
+        if retained != quota:
+            raise RuntimeError(
+                f"Could not fill quota for {source_name}: retained {retained}/{quota} "
+                f"after examining {len(shards)} parquet shards"
+            )
+        source_counts[source_name] = retained
+
+    if not selected_chunks:
+        raise RuntimeError("FineWeb/FineWeb2 prefix selection produced no data")
+
+    dataset = concatenate_datasets_fn(selected_chunks)
+    dataset = normalize_to_text_column(dataset)
+    if dataset.column_names != ["text"]:
+        raise RuntimeError(
+            f"Expected a text-only dataset, got columns={dataset.column_names}"
+        )
+    if len(dataset) != target_rows:
+        raise RuntimeError(
+            f"Expected {target_rows} rows after concatenation, got {len(dataset)}"
+        )
+    return dataset, source_counts, shard_manifest
+
+
+def get_library_versions():
+    versions = {}
+    for package_name in ("datasets", "huggingface_hub", "tokenizers"):
+        try:
+            versions[package_name] = version(package_name)
+        except PackageNotFoundError:
+            versions[package_name] = None
+    return versions
+
+
 def draw_source_counts(source_names, total_rows, seed):
     rng = random.Random(seed)
     source_counts = Counter({source: 0 for source in source_names})
@@ -207,7 +427,16 @@ def sample_dataset(source_to_files, target_rows, seed, source_text_columns):
     return sampled_dataset, source_counts, sampling_manifest
 
 
-def save_sampling_outputs(output_dir, dataset, source_counts, sampling_manifest, target_rows, seed):
+def save_sampling_outputs(
+    output_dir,
+    dataset,
+    source_counts,
+    sampling_manifest,
+    target_rows,
+    seed=None,
+    selection_strategy=None,
+    manifest_metadata=None,
+):
     os.makedirs(output_dir, exist_ok=True)
     dataset.save_to_disk(output_dir)
     print(f"Saved sampled dataset to {output_dir} with {len(dataset)} rows")
@@ -215,10 +444,15 @@ def save_sampling_outputs(output_dir, dataset, source_counts, sampling_manifest,
     manifest_path = os.path.join(output_dir, "sampling_manifest.json")
     payload = {
         "target_rows": target_rows,
-        "seed": seed,
         "source_counts": source_counts,
         "draws": sampling_manifest,
     }
+    if seed is not None:
+        payload["seed"] = seed
+    if selection_strategy is not None:
+        payload["selection_strategy"] = selection_strategy
+    if manifest_metadata:
+        payload.update(manifest_metadata)
     with open(manifest_path, "w", encoding="utf-8") as file:
         json.dump(payload, file, indent=2)
     print(f"Wrote sampling manifest to {manifest_path}")
@@ -240,7 +474,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target-rows",
         type=int,
-        default=int(os.environ.get("TARGET_ROWS", "120000")),
+        default=None,
     )
     parser.add_argument("--seed", type=int, default=int(os.environ.get("SEED", "42")))
     parser.add_argument(
@@ -250,6 +484,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     source = args.source.strip().lower()
+    if args.target_rows is None:
+        default_target_rows = "60000" if source == "fineweb2" else "120000"
+        args.target_rows = int(os.environ.get("TARGET_ROWS", default_target_rows))
 
     if source == "finewebedu":
         if args.name is None:
@@ -265,6 +502,47 @@ if __name__ == "__main__":
             sampling_manifest=[{"source": "finewebedu20B", "rows": args.target_rows}],
             target_rows=args.target_rows,
             seed=args.seed,
+        )
+    elif source == "fineweb2":
+        if args.name is None:
+            parser.error("--name is required when --source fineweb2")
+
+        fineweb2_dataset_id = os.environ.get(
+            "FINEWEB2_DATASET_ID", FINEWEB2_DATASET_ID
+        )
+        fineweb2_revision = os.environ.get(
+            "FINEWEB2_REVISION", FINEWEB2_REVISION
+        )
+        fineweb_dataset_id = os.environ.get(
+            "FINEWEB_DATASET_ID", FINEWEB_DATASET_ID
+        )
+        fineweb_revision = os.environ.get(
+            "FINEWEB_REVISION", FINEWEB_REVISION
+        )
+        sources = build_fineweb_prefix_sources(
+            fineweb2_dataset_id=fineweb2_dataset_id,
+            fineweb2_revision=fineweb2_revision,
+            fineweb_dataset_id=fineweb_dataset_id,
+            fineweb_revision=fineweb_revision,
+        )
+        output_dir = args.output_dataset_dir or (
+            f"{args.name}_fineweb2_10lang_n{args.target_rows}"
+        )
+        dataset, source_counts, shard_manifest = materialize_fineweb_prefix_dataset(
+            args.target_rows,
+            sources=sources,
+        )
+        save_sampling_outputs(
+            output_dir,
+            dataset,
+            source_counts,
+            shard_manifest,
+            args.target_rows,
+            selection_strategy="ordered_parquet_prefix",
+            manifest_metadata={
+                "sources": sources,
+                "library_versions": get_library_versions(),
+            },
         )
     elif source == "parquet":
         DATASET_BASE_DIR = os.environ.get(
@@ -305,4 +583,6 @@ if __name__ == "__main__":
             args.seed,
         )
     else:
-        parser.error(f"Unknown --source '{source}'. Expected: parquet, finewebedu")
+        parser.error(
+            f"Unknown --source '{source}'. Expected: parquet, finewebedu, fineweb2"
+        )

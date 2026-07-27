@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import sys
 
 from datasets import load_from_disk
@@ -6,14 +7,46 @@ from datasets import load_from_disk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bpe_tokenizer import train_bpe_tokenizer
 
-TRAIN_DATASET_PATH = os.environ["TRAIN_DATASET_PATH"]
-VOCAB_SIZES        = [int(v) for v in os.environ["VOCAB_SIZES"].split(",") if v.strip()]
-SAVE_DIR           = os.environ["SAVE_DIR"]
 
-dataset = load_from_disk(TRAIN_DATASET_PATH)
-print(f"Loaded {len(dataset):,} rows from {TRAIN_DATASET_PATH}")
+def train_requested_tokenizers(dataset, vocab_sizes, save_dir):
+    if "text" not in dataset.column_names:
+        raise ValueError(
+            f"Training dataset must contain a 'text' column, got {dataset.column_names}"
+        )
+    if not vocab_sizes:
+        raise ValueError("At least one vocabulary size is required")
 
-for vs in VOCAB_SIZES:
-    print(f"Training BPE vocab_size={vs}...")
-    train_bpe_tokenizer(vs, dataset, SAVE_DIR)
-    print(f"Done vocab_size={vs}")
+    for vocab_size in vocab_sizes:
+        tokenizer_json = Path(save_dir) / f"bpe_{vocab_size}" / "tokenizer.json"
+        if tokenizer_json.is_file():
+            print(
+                f"Skipping BPE vocab_size={vocab_size}; "
+                f"completed tokenizer exists at {tokenizer_json}"
+            )
+            continue
+
+        print(f"Training BPE vocab_size={vocab_size}...")
+        train_bpe_tokenizer(vocab_size, dataset, save_dir)
+        if not tokenizer_json.is_file():
+            raise RuntimeError(
+                f"BPE training did not create expected output: {tokenizer_json}"
+            )
+        print(f"Done vocab_size={vocab_size}")
+
+
+def main():
+    train_dataset_path = os.environ["TRAIN_DATASET_PATH"]
+    vocab_sizes = [
+        int(value)
+        for value in os.environ["VOCAB_SIZES"].split(",")
+        if value.strip()
+    ]
+    save_dir = os.environ["SAVE_DIR"]
+
+    dataset = load_from_disk(train_dataset_path)
+    print(f"Loaded {len(dataset):,} rows from {train_dataset_path}")
+    train_requested_tokenizers(dataset, vocab_sizes, save_dir)
+
+
+if __name__ == "__main__":
+    main()

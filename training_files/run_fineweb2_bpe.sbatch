@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH -A a139
+#SBATCH -p normal
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+#SBATCH -t 08:00:00
+
+set -euo pipefail
+
+# User-tunable settings
+NAME="${NAME:-Multilingual}"
+REPO_DIR="${REPO_DIR:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
+TARGET_ROWS="${TARGET_ROWS:-60000}"
+PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
+VOCAB_SIZES="${VOCAB_SIZES:-131072}"
+
+if [[ -z "${NAME}" ]]; then
+    echo "ERROR: NAME is required. Submit with --export=NAME=<experiment>" >&2
+    exit 1
+fi
+
+DATASET_TAG="${NAME}_n${TARGET_ROWS}"
+TRAIN_DATASET_PATH="${TRAIN_DATASET_PATH:-${DATASET_TAG}}"
+SAVE_DIR="${SAVE_DIR:-bpe_tokenizers/${DATASET_TAG}}"
+
+source /users/jtempus/miniconda3/etc/profile.d/conda.sh
+conda activate primer-py311
+cd "${REPO_DIR}"
+
+export TARGET_ROWS
+export TRAIN_DATASET_PATH
+export PRETOKENIZER_MODE
+export VOCAB_SIZES
+export SAVE_DIR
+
+echo "Run tag:          ${DATASET_TAG}"
+echo "Training dataset: ${TRAIN_DATASET_PATH}"
+echo "BPE output:       ${SAVE_DIR}"
+echo "Vocabulary sizes: ${VOCAB_SIZES}"
+
+python3 -u bpe_tokenizer/train_sampled.py
