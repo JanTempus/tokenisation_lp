@@ -1,9 +1,7 @@
 #!/bin/bash
-#SBATCH -A a139
-#SBATCH -p normal
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=128G
-#SBATCH -t 08:00:00
+#SBATCH -A a0229
+#SBATCH -p debug
+#SBATCH -t 01:30:00
 
 set -euo pipefail
 
