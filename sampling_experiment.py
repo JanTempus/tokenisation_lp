@@ -39,8 +39,6 @@ SAMPLE_SIZES = [int(v) for v in _require_env("SAMPLE_SIZES").split(",") if v.str
 VOCAB_SIZES  = [int(v) for v in _require_env("VOCAB_SIZES").split(",") if v.strip()]
 SEED_BASE    = int(_require_env("SEED_BASE"))
 SOURCE       = _require_env("SOURCE").strip().lower()
-NUM_PROC     = int(_require_env("NUM_PROC"))
-BATCH_SIZE   = int(_require_env("BATCH_SIZE"))
 
 EXP_DIR = f"experiment_{NAME}"
 
@@ -49,9 +47,9 @@ EXP_DIR = f"experiment_{NAME}"
 # ---------------------------------------------------------------------------
 # train_tokenizer reads PRETOKENIZER_MODE when the module is first imported.
 from train_tokenizer import (  # noqa: E402
+    BYTE_LEVEL_ALPHABET,
     PRETOKENIZER_MODE,
     get_special_tokens,
-    get_unique_chars_batch,
     pretokenizer as lp_pretokenizer,
     train_lp_tokenizer,
 )
@@ -185,16 +183,11 @@ def step2_train_lp(samples, ss_dir):
             print(f"\n[LP Sample {i}] all {len(VOCAB_SIZES)} vocab sizes already trained, skipping")
             continue
 
-        print(f"\n[LP Sample {i}] Computing unique chars (training {len(missing)}/{len(VOCAB_SIZES)} vocab sizes: {missing})")
-        char_chunks = dataset.map(
-            get_unique_chars_batch,
-            batched=True,
-            batch_size=BATCH_SIZE,
-            num_proc=NUM_PROC,
-            remove_columns=dataset.column_names,
-            desc=f"Unique chars sample {i}",
+        print(
+            f"\n[LP Sample {i}] Using fixed ByteLevel alphabet "
+            f"(training {len(missing)}/{len(VOCAB_SIZES)} vocab sizes: {missing})"
         )
-        unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
+        unique_chars = list(BYTE_LEVEL_ALPHABET)
 
         for vs in missing:
             print(f"[LP Sample {i} vocab={vs}] Training")

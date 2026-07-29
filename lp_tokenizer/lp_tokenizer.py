@@ -1,4 +1,6 @@
 from transformers import AutoTokenizer
+from datasets import Dataset, Features, Sequence, Value
+from tokenizers.pre_tokenizers import ByteLevel
 from collections import OrderedDict,defaultdict
 from lp_tokenizer.lp_functions import (
     create_vocab,
@@ -20,6 +22,47 @@ import matplotlib.pyplot as plt
 import pickle
 from concurrent.futures import ProcessPoolExecutor
 import csv
+
+
+BYTE_LEVEL_ALPHABET = sorted(ByteLevel.alphabet())
+
+
+def _pretokenize_batch(batch, indices, pretokenizer):
+    word_freqs = defaultdict(int)
+    empty_token_count = 0
+    empty_token_text_count = 0
+    empty_token_indices = []
+    empty_token_previews = []
+
+    for text_idx, text in zip(indices, batch["text"]):
+        if not isinstance(text, str) or not text:
+            continue
+
+        words_with_offsets = (
+            pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
+        )
+        saw_empty_token = False
+        for word, _ in words_with_offsets:
+            if word == "":
+                empty_token_count += 1
+                saw_empty_token = True
+                continue
+            word_freqs[word] += 1
+
+        if saw_empty_token:
+            empty_token_text_count += 1
+            if len(empty_token_indices) < 5:
+                empty_token_indices.append(text_idx)
+                empty_token_previews.append(text[:80].replace("\n", "\\n"))
+
+    return {
+        "tokens": [list(word_freqs.keys())],
+        "frequencies": [list(word_freqs.values())],
+        "empty_token_count": [empty_token_count],
+        "empty_token_text_count": [empty_token_text_count],
+        "empty_token_indices": [empty_token_indices],
+        "empty_token_previews": [empty_token_previews],
+    }
 
 
 class Tokenizer:
@@ -51,7 +94,11 @@ class Tokenizer:
         else:
             self.pretokenizer=pretokenizer
 
-        self.unique_chars=unique_chars
+        self.unique_chars = (
+            list(BYTE_LEVEL_ALPHABET)
+            if unique_chars is None
+            else list(unique_chars)
+        )
         self.corpus=corpus
         self.vocab_size=vocab_size
         self.special_tokens_list=special_tokens
@@ -65,10 +112,6 @@ class Tokenizer:
 
         input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
 
-        if self.unique_chars is None:
-            print("Finding unique chars")
-            self.unique_chars = self.get_unique_chars_corpus(self.corpus)
-      
         special_tokens = list(self.special_tokens_list)
         lp_budget = self.vocab_size - len(self.unique_chars) - len(special_tokens)
 
@@ -106,10 +149,6 @@ class Tokenizer:
 
         input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
 
-        if self.unique_chars is None:
-            print("Finding unique chars")
-            self.unique_chars = self.get_unique_chars_corpus(self.corpus)
-
         special_tokens = list(self.special_tokens_list)
         lp_budget = self.vocab_size - len(self.unique_chars) - len(special_tokens)
         if lp_budget <= 0:
@@ -131,9 +170,7 @@ class Tokenizer:
 
         input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
 
-        if self.unique_chars is None:
-            print("Finding unique chars")
-            self.unique_chars = self.get_unique_chars_corpus(self.corpus)
+      
 
         self._cuopt_model = prepare_cuopt_model(
             inputStringList=input_strings,
@@ -202,26 +239,61 @@ class Tokenizer:
 
 
     def pretokenize_and_prepare_corpus(self, corpus):
-    
+        if isinstance(corpus, Dataset):
+            corpus_dataset = corpus
+        else:
+            corpus_dataset = Dataset.from_dict({"text": list(corpus)})
+
+        if "text" not in corpus_dataset.column_names:
+            raise ValueError("Corpus dataset must contain a 'text' column")
+
         word_freqs = defaultdict(int)
         empty_token_count = 0
         empty_token_text_count = 0
         empty_token_examples = []
-        
-        for i, text in enumerate(corpus):
-            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-            saw_empty_token = False
-            for word, _ in words_with_offsets:
-                if word == "":
-                    empty_token_count += 1
-                    saw_empty_token = True
-                    continue
-                word_freqs[word] += 1
-            if saw_empty_token:
-                empty_token_text_count += 1
-                if len(empty_token_examples) < 5:
-                    text_preview = text[:80].replace("\n", "\\n")
-                    empty_token_examples.append((i, text_preview))
+
+        if len(corpus_dataset) > 0:
+            aggregate_features = Features(
+                {
+                    "tokens": Sequence(Value("string")),
+                    "frequencies": Sequence(Value("int64")),
+                    "empty_token_count": Value("int64"),
+                    "empty_token_text_count": Value("int64"),
+                    "empty_token_indices": Sequence(Value("int64")),
+                    "empty_token_previews": Sequence(Value("string")),
+                }
+            )
+            aggregates = corpus_dataset.map(
+                _pretokenize_batch,
+                batched=True,
+                batch_size=int(os.environ.get("BATCH_SIZE", "10000")),
+                num_proc=int(os.environ.get("NUM_PROC", "16")),
+                with_indices=True,
+                fn_kwargs={"pretokenizer": self.pretokenizer},
+                remove_columns=corpus_dataset.column_names,
+                features=aggregate_features,
+                desc="Pretokenizing corpus",
+            )
+
+            for tokens, frequencies in zip(
+                aggregates["tokens"], aggregates["frequencies"]
+            ):
+                for word, frequency in zip(tokens, frequencies):
+                    word_freqs[word] += frequency
+
+            empty_token_count = sum(aggregates["empty_token_count"])
+            empty_token_text_count = sum(aggregates["empty_token_text_count"])
+            empty_token_examples = sorted(
+                (
+                    (text_idx, preview)
+                    for indices, previews in zip(
+                        aggregates["empty_token_indices"],
+                        aggregates["empty_token_previews"],
+                    )
+                    for text_idx, preview in zip(indices, previews)
+                ),
+                key=lambda example: example[0],
+            )[:5]
 
         input_strings=list(word_freqs.keys())
         input_strings_frequencies=list(word_freqs.values())
@@ -330,61 +402,6 @@ class Tokenizer:
      
         return tokenized_data
       
-           
-    def get_unique_chars_corpus(self, corpus):
-
-        unique_chars = set()
-
-        for text in corpus:
-            words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-            tokens = [word for word, _ in words_with_offsets]
-            for token in tokens:
-                unique_chars.update(token)
-        print("get_unique_chars_corpus finished")
-
-        return sorted(unique_chars)
-
-            
-    def get_unique_chars(self, dataset,dataset_size):
-        """
-        Collect unique characters from the pretokenized dataset.
-        Uses pre_tokenize_str to get tokens, then collects all unique characters from those tokens.
-        """
-
-        file_name = f"unique_chars{self.saved_dataset_path}{dataset_size}.npy"
-
-        if os.path.exists(file_name):
-            # Load directly from .npy
-            unique_chars = np.load(file_name, allow_pickle=True).tolist()
-        else:
-            unique_chars = set()
-
-            for i in range(dataset_size):
-                text = dataset['train'][i]['text']
-                words_with_offsets = self.pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-                tokens = [word for word, _ in words_with_offsets]
-                for token in tokens:
-                    unique_chars.update(token)
-
-            unique_chars = sorted(unique_chars)
-            np.save(file_name, np.array(unique_chars, dtype=object))
-        print("get_unique_chars finished")
-
-        return unique_chars
-
-
-
-    def extract_unique_from_text(args):
-        text, pretokenizer = args
-        words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-        tokens = [word for word, _ in words_with_offsets]
-        chars = set()
-        for token in tokens:
-            chars.update(token)
-        return chars
-
-
-
     def get_vocab(self):
         return self.vocab
 

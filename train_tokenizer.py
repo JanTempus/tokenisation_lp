@@ -1,4 +1,4 @@
-from lp_tokenizer.lp_tokenizer import Tokenizer
+from lp_tokenizer.lp_tokenizer import BYTE_LEVEL_ALPHABET, Tokenizer
 from transformers import AutoTokenizer
 from datasets import Value, concatenate_datasets, load_dataset, load_from_disk
 from tokenizers import Regex
@@ -9,8 +9,6 @@ from pathlib import Path
 import traceback
 
 
-num_proc = int(os.environ.get("NUM_PROC", "16"))
-batch_size = int(os.environ.get("BATCH_SIZE", "10000"))
 PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "custom").strip().lower()
 _APERTUS_SPLIT_PATTERN = (
     r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
@@ -78,24 +76,9 @@ def build_pretokenizer(mode):
 pretokenizer = build_pretokenizer(PRETOKENIZER_MODE)
 
 
-def get_unique_chars_batch(batch):
-    unique_chars = set()
-
-    for text in batch["text"]:
-        if not isinstance(text, str) or not text:
-            continue
-        words_with_offsets = pretokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(text)
-        for token, _ in words_with_offsets:
-            unique_chars.update(token)
-
-    return {"unique_chars": [sorted(unique_chars)]}
-
-
 def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj, special_tokens):
-    corpus_all = [text for text in dataset["text"] if isinstance(text, str) and text]
-
     tokenizer = Tokenizer(
-        corpus=corpus_all,
+        corpus=dataset,
         vocab_size=vocab_size,
         special_tokens=special_tokens,
         unique_chars=unique_chars,
@@ -144,13 +127,12 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
     if not vocab_sizes:
         return
 
-    corpus_all = [text for text in dataset["text"] if isinstance(text, str) and text]
     # Build the LP once with the largest vocab size so the lp_budget > 0 check
     # in the Tokenizer holds for every entry in the sweep.
     sorted_sizes = sorted(set(int(vs) for vs in vocab_sizes))
 
     tokenizer = Tokenizer(
-        corpus=corpus_all,
+        corpus=dataset,
         vocab_size=sorted_sizes[-1],
         special_tokens=special_tokens,
         unique_chars=unique_chars,
@@ -348,15 +330,7 @@ if __name__ == "__main__":
     dataset = load_training_dataset(TRAIN_DATASET_PATH)
     print(f"Loaded {len(dataset)} rows")
 
-    char_chunks = dataset.map(
-        get_unique_chars_batch,
-        batched=True,
-        batch_size=batch_size,
-        num_proc=num_proc,
-        remove_columns=dataset.column_names,
-        desc="Finding unique characters",
-    )
-
-    unique_chars = sorted(set().union(*map(set, char_chunks["unique_chars"])))
+    unique_chars = list(BYTE_LEVEL_ALPHABET)
+    print(f"Using fixed ByteLevel alphabet ({len(unique_chars)} symbols)")
 
     train_lp_tokenizer_sweep(dataset, unique_chars, vocab_size, save_dir, pretokenizer, special_tokens)
