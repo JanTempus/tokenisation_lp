@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import pickle
 from concurrent.futures import ProcessPoolExecutor
 import csv
+import time
 
 
 BYTE_LEVEL_ALPHABET = sorted(ByteLevel.alphabet())
@@ -168,14 +169,26 @@ class Tokenizer:
         if self.corpus is None:
             raise ValueError("Must include a corpus")
 
+        total_start = time.perf_counter()
+        print("[pipeline] Starting corpus preparation and cuOpt model construction")
         input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
+        print(
+            f"[pipeline] Corpus preparation returned "
+            f"{len(input_strings):,} unique pre-tokens after "
+            f"{time.perf_counter() - total_start:.1f}s"
+        )
 
-      
-
+        model_start = time.perf_counter()
+        print("[pipeline] Starting LP data and cuOpt model construction")
         self._cuopt_model = prepare_cuopt_model(
             inputStringList=input_strings,
             inputStringFreq=input_strings_frequencies,
             verbose=verbose,
+        )
+        print(
+            f"[pipeline] cuOpt model construction finished in "
+            f"{time.perf_counter() - model_start:.1f}s "
+            f"({time.perf_counter() - total_start:.1f}s total)"
         )
         return self._cuopt_model
 
@@ -239,6 +252,7 @@ class Tokenizer:
 
 
     def pretokenize_and_prepare_corpus(self, corpus):
+        total_start = time.perf_counter()
         if isinstance(corpus, Dataset):
             corpus_dataset = corpus
         else:
@@ -253,6 +267,8 @@ class Tokenizer:
         empty_token_examples = []
 
         if len(corpus_dataset) > 0:
+            batch_size = int(os.environ.get("BATCH_SIZE", "10000"))
+            num_proc = int(os.environ.get("NUM_PROC", "16"))
             aggregate_features = Features(
                 {
                     "tokens": Sequence(Value("string")),
@@ -263,23 +279,41 @@ class Tokenizer:
                     "empty_token_previews": Sequence(Value("string")),
                 }
             )
+            print(
+                f"[pretokenize] Starting worker map: "
+                f"rows={len(corpus_dataset):,}, num_proc={num_proc}, "
+                f"batch_size={batch_size:,}"
+            )
+            map_start = time.perf_counter()
             aggregates = corpus_dataset.map(
                 _pretokenize_batch,
                 batched=True,
-                batch_size=int(os.environ.get("BATCH_SIZE", "10000")),
-                num_proc=int(os.environ.get("NUM_PROC", "16")),
+                batch_size=batch_size,
+                num_proc=num_proc,
                 with_indices=True,
                 fn_kwargs={"pretokenizer": self.pretokenizer},
                 remove_columns=corpus_dataset.column_names,
                 features=aggregate_features,
                 desc="Pretokenizing corpus",
             )
+            print(
+                f"[pretokenize] Worker map finished in "
+                f"{time.perf_counter() - map_start:.1f}s; "
+                f"partial frequency tables={len(aggregates):,}"
+            )
 
+            merge_start = time.perf_counter()
+            print("[pretokenize] Merging partial frequency tables")
             for tokens, frequencies in zip(
                 aggregates["tokens"], aggregates["frequencies"]
             ):
                 for word, frequency in zip(tokens, frequencies):
                     word_freqs[word] += frequency
+            print(
+                f"[pretokenize] Frequency merge finished in "
+                f"{time.perf_counter() - merge_start:.1f}s; "
+                f"unique pre-tokens={len(word_freqs):,}"
+            )
 
             empty_token_count = sum(aggregates["empty_token_count"])
             empty_token_text_count = sum(aggregates["empty_token_text_count"])
@@ -309,7 +343,12 @@ class Tokenizer:
                     "Empty pretokenized strings detected. "
                     "Set FAIL_ON_EMPTY_PRETOKENIZED_STRINGS=0 to continue."
                 )
-        print("pretokenize_and_prepare_corpus finished")
+        print(
+            f"[pretokenize] Corpus preparation finished in "
+            f"{time.perf_counter() - total_start:.1f}s; "
+            f"unique pre-tokens={len(input_strings):,}; "
+            f"total pre-token occurrences={sum(input_strings_frequencies):,}"
+        )
 
         return input_strings, input_strings_frequencies
 

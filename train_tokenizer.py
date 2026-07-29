@@ -138,6 +138,10 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
         unique_chars=unique_chars,
         pretokenizer=pretokenizer_obj,
     )
+    print(
+        f"[pipeline] Tokenizer initialized: rows={len(dataset):,}, "
+        f"vocab_sizes={sorted_sizes}"
+    )
     tokenizer.prepare_cuopt_model()
 
     os.makedirs(save_dir, exist_ok=True)
@@ -153,6 +157,7 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
         file_name = os.path.join(save_dir, f"lp_tokens_{vs}.pkl")
         with open(file_name, "wb") as f:
             pickle.dump(tokens, f)
+        print(f"[sweep] Saved vocabulary output to {file_name}")
 
 
 def infer_text_column(dataset):

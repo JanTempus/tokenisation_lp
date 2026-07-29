@@ -35,14 +35,24 @@ def prepare_vocab_lp_data(inputStringList: list[str],
                           inputStringFreq: list[int],
                           minTokenCount: int = 1,
                           maxTokenLength: int = 5,
-                          all_tokens: bool = True):
+                          all_tokens: bool = True,
+                          verbose: bool = True):
     numStrings = len(inputStringList)
+    total_start = time.perf_counter()
 
     edgesList = []
     tokensList = []
     freeEdgesList = []
     numVertices = []
 
+    if verbose:
+        mode = "all substrings" if all_tokens else f"substrings up to length {maxTokenLength}"
+        print(
+            f"[lp-data] Generating candidate edges for "
+            f"{numStrings:,} unique pre-tokens ({mode})"
+        )
+    edge_start = time.perf_counter()
+    progress_interval = max(1, numStrings // 10)
     if all_tokens:
         for i in range(numStrings):
             stringLen = len(inputStringList[i])
@@ -50,6 +60,14 @@ def prepare_vocab_lp_data(inputStringList: list[str],
             tokensList.append(hf.get_tokens(inputStringList[i]))
             freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen + 1)
+            completed = i + 1
+            if verbose and (completed % progress_interval == 0 or completed == numStrings):
+                print(
+                    f"[lp-data] Candidate-edge progress: "
+                    f"{completed:,}/{numStrings:,} "
+                    f"({100.0 * completed / numStrings:.0f}%) in "
+                    f"{time.perf_counter() - edge_start:.1f}s"
+                )
     else:
         for i in range(numStrings):
             stringLen = len(inputStringList[i])
@@ -57,9 +75,47 @@ def prepare_vocab_lp_data(inputStringList: list[str],
             tokensList.append(hf.get_tokens_upto_len_t(inputStringList[i], maxTokenLength))
             freeEdgesList.append(hf.get_all_free_substrings(inputStringList[i]))
             numVertices.append(stringLen + 1)
+            completed = i + 1
+            if verbose and (completed % progress_interval == 0 or completed == numStrings):
+                print(
+                    f"[lp-data] Candidate-edge progress: "
+                    f"{completed:,}/{numStrings:,} "
+                    f"({100.0 * completed / numStrings:.0f}%) in "
+                    f"{time.perf_counter() - edge_start:.1f}s"
+                )
 
+    if verbose:
+        print(
+            f"[lp-data] Candidate-edge generation finished in "
+            f"{time.perf_counter() - edge_start:.1f}s; "
+            f"non-free edges={sum(map(len, edgesList)):,}; "
+            f"free edges={sum(map(len, freeEdgesList)):,}"
+        )
+
+    token_start = time.perf_counter()
+    if verbose:
+        print("[lp-data] Deduplicating candidate tokens")
     tokens = list(set([item for sublist in tokensList for item in sublist]))
+    if verbose:
+        print(
+            f"[lp-data] Deduplication finished in "
+            f"{time.perf_counter() - token_start:.1f}s; "
+            f"candidate tokens={len(tokens):,}"
+        )
+
+    count_start = time.perf_counter()
+    if verbose:
+        print("[lp-data] Counting candidate-token instances")
     hf.update_token_instance_counts(tokens, inputStringFreq, edgesList)
+    if verbose:
+        print(
+            f"[lp-data] Token-instance counting finished in "
+            f"{time.perf_counter() - count_start:.1f}s"
+        )
+
+    filter_start = time.perf_counter()
+    if verbose:
+        print(f"[lp-data] Filtering tokens with count <= {minTokenCount:,}")
     tokens_to_keep = [token for token in tokens if token.token_instance_count > minTokenCount]
     keep_set = set(t.token for t in tokens_to_keep)
 
@@ -67,6 +123,14 @@ def prepare_vocab_lp_data(inputStringList: list[str],
         [token for token in sublist if token.token in keep_set]
         for sublist in edgesList
     ]
+    if verbose:
+        print(
+            f"[lp-data] Filtering finished in "
+            f"{time.perf_counter() - filter_start:.1f}s; "
+            f"tokens kept={len(tokens_to_keep):,}; "
+            f"non-free edges kept={sum(map(len, filtered_edgesList)):,}; "
+            f"LP-data total={time.perf_counter() - total_start:.1f}s"
+        )
 
     return filtered_edgesList, freeEdgesList, numVertices, tokens_to_keep
 
@@ -75,7 +139,8 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
                     edgeListWeight: list[int],
                     tokens: list[possibleToken],
                     freeEdgesList: list[list[tokenInstance]],
-                    numVerticesList: list[int]):
+                    numVerticesList: list[int],
+                    verbose: bool = True):
     numStrings = len(edgesList)
     if numStrings != len(freeEdgesList):
         raise ValueError("edgesList and freeEdgesList must have the same length.")
@@ -101,6 +166,13 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
     A_col_offset = 0
     B_col_offset = 0
 
+    build_start = time.perf_counter()
+    if verbose:
+        print(
+            f"[lp-blocks] Building sparse-matrix coordinate arrays for "
+            f"{numStrings:,} pre-tokens and {numTokens:,} candidate tokens"
+        )
+    progress_interval = max(1, numStrings // 10)
     for i in range(numStrings):
         edges = edgesList[i]
         freeEdges = freeEdgesList[i]
@@ -147,7 +219,21 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
         A_col_offset += numEdges
         B_col_offset += numFreeEdges
         M_row_offset += numEdges
+        completed = i + 1
+        if verbose and (completed % progress_interval == 0 or completed == numStrings):
+            print(
+                f"[lp-blocks] Coordinate-array progress: "
+                f"{completed:,}/{numStrings:,} "
+                f"({100.0 * completed / numStrings:.0f}%) in "
+                f"{time.perf_counter() - build_start:.1f}s"
+            )
 
+    matrix_start = time.perf_counter()
+    if verbose:
+        print(
+            f"[lp-blocks] Converting coordinate arrays to CSR matrices; "
+            f"non-free edges={A_col_offset:,}, free edges={B_col_offset:,}"
+        )
     BigAConstraint = sp.coo_matrix(
         (A_data, (A_rows, A_cols)),
         shape=(A_row_offset, A_col_offset),
@@ -168,6 +254,15 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
     BigFreewVector = np.hstack(BigFreewVector_parts) if BigFreewVector_parts else np.array([], dtype=float)
     BigNonFreewVector = np.hstack(BigNonFreewVector_parts) if BigNonFreewVector_parts else np.array([], dtype=float)
     tokensCap = np.ones(numTokens, dtype=float)
+    if verbose:
+        print(
+            f"[lp-blocks] CSR conversion finished in "
+            f"{time.perf_counter() - matrix_start:.1f}s; "
+            f"A={BigAConstraint.shape}, nnz={BigAConstraint.nnz:,}; "
+            f"B={BigBConstraint.shape}, nnz={BigBConstraint.nnz:,}; "
+            f"M={BigMConstraint.shape}, nnz={BigMConstraint.nnz:,}; "
+            f"LP-block total={time.perf_counter() - build_start:.1f}s"
+        )
 
     return {
         "BigAConstraint": BigAConstraint,
@@ -276,6 +371,7 @@ def _import_cuopt_problem():
 
 
 def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = True):
+    total_start = time.perf_counter()
     Problem, MINIMIZE, LinearExpression = _import_cuopt_problem()
 
     A_eq = cuopt_lp_data["A_eq"]
@@ -292,8 +388,9 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
     problem = Problem("tokenizer_lp_cuopt")
     variables = []
 
+    phase_start = time.perf_counter()
     if verbose:
-        print(f"Creating {len(c)} LP variables in cuOpt")
+        print(f"[cuopt-build] Creating {len(c):,} LP variables")
     for idx in range(len(c)):
         var = problem.addVariable(
             lb=float(lb[idx]),
@@ -302,9 +399,15 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
             name=f"x_{idx}",
         )
         variables.append(var)
-
     if verbose:
-        print(f"Adding {A_eq.shape[0]} equality constraints to cuOpt")
+        print(
+            f"[cuopt-build] Created {len(variables):,} variables in "
+            f"{time.perf_counter() - phase_start:.1f}s"
+        )
+
+    phase_start = time.perf_counter()
+    if verbose:
+        print(f"[cuopt-build] Adding {A_eq.shape[0]:,} equality constraints")
     for row_idx, cols, vals in _iter_csr_rows(A_eq):
         rhs = float(b_eq[row_idx])
         if len(cols) == 0:
@@ -313,9 +416,15 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
             continue
         expr = _build_linear_expression(variables, cols, vals)
         problem.addConstraint(expr == rhs, f"eq_{row_idx}")
-
     if verbose:
-        print(f"Adding {num_ub_rows} inequality constraints to cuOpt")
+        print(
+            f"[cuopt-build] Equality constraints finished in "
+            f"{time.perf_counter() - phase_start:.1f}s"
+        )
+
+    phase_start = time.perf_counter()
+    if verbose:
+        print(f"[cuopt-build] Adding {num_ub_rows:,} inequality constraints")
     budget_constraint = None
     for row_idx, cols, vals in _iter_csr_rows(A_ub):
         is_budget = row_idx == budget_row_idx
@@ -329,8 +438,20 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
         handle = problem.addConstraint(expr <= rhs, name)
         if is_budget:
             budget_constraint = handle
+    if verbose:
+        print(
+            f"[cuopt-build] Inequality constraints finished in "
+            f"{time.perf_counter() - phase_start:.1f}s"
+        )
 
+    phase_start = time.perf_counter()
     problem.setObjective(LinearExpression(variables, c, 0.0), MINIMIZE)
+    if verbose:
+        print(
+            f"[cuopt-build] Objective set in "
+            f"{time.perf_counter() - phase_start:.1f}s; "
+            f"cuOpt build total={time.perf_counter() - total_start:.1f}s"
+        )
 
     return {
         "problem": problem,
@@ -738,23 +859,47 @@ def prepare_cuopt_model(inputStringList: list[str],
                         maxTokenLength: int = 5,
                         all_tokens: bool = True,
                         verbose: bool = True):
+    total_start = time.perf_counter()
     filtered_edgesList, freeEdgesList, numVertices, tokens_to_keep = prepare_vocab_lp_data(
         inputStringList=inputStringList,
         inputStringFreq=inputStringFreq,
         minTokenCount=minTokenCount,
         maxTokenLength=maxTokenLength,
         all_tokens=all_tokens,
+        verbose=verbose,
     )
 
+    phase_start = time.perf_counter()
     lp_blocks = build_lp_blocks(
         edgesList=filtered_edgesList,
         edgeListWeight=inputStringFreq,
         tokens=tokens_to_keep,
         freeEdgesList=freeEdgesList,
         numVerticesList=numVertices,
+        verbose=verbose,
     )
-    cuopt_lp_data = build_cuopt_standard_form(lp_blocks, numAllowedTokens=0)
+    if verbose:
+        print(
+            f"[prepare-cuopt] LP blocks finished in "
+            f"{time.perf_counter() - phase_start:.1f}s"
+        )
 
+    phase_start = time.perf_counter()
+    if verbose:
+        print("[prepare-cuopt] Building cuOpt standard-form matrices")
+    cuopt_lp_data = build_cuopt_standard_form(lp_blocks, numAllowedTokens=0)
+    if verbose:
+        print(
+            f"[prepare-cuopt] Standard form finished in "
+            f"{time.perf_counter() - phase_start:.1f}s; "
+            f"variables={len(cuopt_lp_data['c']):,}; "
+            f"equalities={cuopt_lp_data['A_eq'].shape[0]:,}; "
+            f"inequalities={cuopt_lp_data['A_ub'].shape[0]:,}"
+        )
+
+    phase_start = time.perf_counter()
+    if verbose:
+        print("[prepare-cuopt] Building initial cuOpt problem wrapper")
     try:
         model = build_cuopt_problem(cuopt_lp_data, numAllowedTokens=0, verbose=verbose)
     except ImportError as import_error:
@@ -763,6 +908,12 @@ def prepare_cuopt_model(inputStringList: list[str],
         ) from import_error
 
     model["tokens_to_keep"] = tokens_to_keep
+    if verbose:
+        print(
+            f"[prepare-cuopt] Initial cuOpt wrapper finished in "
+            f"{time.perf_counter() - phase_start:.1f}s; "
+            f"complete model preparation={time.perf_counter() - total_start:.1f}s"
+        )
     return model
 
 
@@ -828,6 +979,10 @@ def create_vocab_cuopt(inputStringList: list[str],
         maxTokenLength=maxTokenLength,
         all_tokens=all_tokens,
         verbose=verbose,
+    )
+    print(
+        f"[create-vocab] Model preparation finished; "
+        f"starting solve with token budget={numAllowedTokens:,}"
     )
     result = solve_vocab_on_model(
         model,
