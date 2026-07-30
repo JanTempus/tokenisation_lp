@@ -2,6 +2,7 @@
 #SBATCH -A a0229
 #SBATCH -p debug
 #SBATCH -t 01:30:00
+#SBATCH --cpus-per-task=32
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 
@@ -16,6 +17,9 @@ PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
 VOCAB_SIZES="${VOCAB_SIZES:-131072}"
 NUM_PROC="${NUM_PROC:-16}"
 BATCH_SIZE="${BATCH_SIZE:-10000}"
+LP_NUM_PROC="${LP_NUM_PROC:-${SLURM_CPUS_PER_TASK:-16}}"
+LP_MAP_BATCH_SIZE="${LP_MAP_BATCH_SIZE:-1000}"
+LP_GRAPH_CACHE_DIR="${LP_GRAPH_CACHE_DIR:-}"
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 BYTE_TEST_BEHAVIOR="${BYTE_TEST_BEHAVIOR:-not_all_unk}"
 
@@ -42,6 +46,9 @@ export PRETOKENIZER_MODE
 export VOCAB_SIZES
 export NUM_PROC
 export BATCH_SIZE
+export LP_NUM_PROC
+export LP_MAP_BATCH_SIZE
+export LP_GRAPH_CACHE_DIR
 export RAW_VOCAB_PATH
 export SAVE_TOKENIZER_DIR
 export RUN_TOKENIZER_TESTS
@@ -49,6 +56,13 @@ export BYTE_TEST_BEHAVIOR
 
 echo "Run tag:              ${DATASET_TAG}"
 echo "Training dataset:     ${TRAIN_DATASET_PATH}"
+echo "LP map workers:       ${LP_NUM_PROC}"
+echo "LP map batch size:    ${LP_MAP_BATCH_SIZE}"
+if [[ -n "${LP_GRAPH_CACHE_DIR}" ]]; then
+    echo "LP graph cache:       ${LP_GRAPH_CACHE_DIR}"
+else
+    echo "LP graph cache:       ${TMPDIR:-/tmp}/tokenisation_lp_${SLURM_JOB_ID:-manual}"
+fi
 
 if [[ -f "${TRAIN_DATASET_PATH}/sampling_manifest.json" ]]; then
     echo "Step 1/3: reusing existing dataset at ${TRAIN_DATASET_PATH}"

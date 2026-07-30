@@ -9,8 +9,12 @@ import random
 import csv
 import psutil
 import os
+import gc
+import shutil
+import tempfile
 import threading
 import matplotlib.pyplot as plt
+from datasets import Dataset, Features, Sequence, Value
 #import cudf
 #import cugraph
 
@@ -29,6 +33,138 @@ from cuopt.linear_programming.solver_settings import (
 
 from lp_tokenizer.datastructures import tokenInstance, possibleToken
 import lp_tokenizer.helper_functions as hf
+
+
+LP_NUM_PROC = int(os.environ.get("LP_NUM_PROC", "16"))
+LP_MAP_BATCH_SIZE = int(os.environ.get("LP_MAP_BATCH_SIZE", "1000"))
+
+
+def _candidate_count_batch(batch,
+                           all_tokens: bool,
+                           max_token_length: int):
+    token_counts = defaultdict(int)
+    raw_edge_count = 0
+
+    for input_string, frequency in zip(batch["pretoken"], batch["frequency"]):
+        string_length = len(input_string)
+        limit = string_length if all_tokens else min(string_length, max_token_length)
+        frequency = int(frequency)
+
+        for token_length in range(2, limit + 1):
+            for start in range(string_length - token_length + 1):
+                token = input_string[start:start + token_length]
+                token_counts[token] += frequency
+                raw_edge_count += 1
+
+    return {
+        "tokens": [list(token_counts.keys())],
+        "counts": [list(token_counts.values())],
+        "raw_edge_count": [raw_edge_count],
+        "source_row_count": [len(batch["pretoken"])],
+    }
+
+
+def _graph_edge_batch(batch,
+                      indices,
+                      all_tokens: bool,
+                      max_token_length: int,
+                      token_index):
+    source_indices = []
+    string_lengths = []
+    string_frequencies = []
+    edge_counts = []
+    edge_starts = []
+    edge_ends = []
+    edge_token_ids = []
+
+    for source_index, input_string, frequency in zip(
+        indices, batch["pretoken"], batch["frequency"]
+    ):
+        string_length = len(input_string)
+        limit = string_length if all_tokens else min(string_length, max_token_length)
+        edge_count = 0
+
+        for token_length in range(2, limit + 1):
+            for start in range(string_length - token_length + 1):
+                end = start + token_length
+                token_id = token_index.get(input_string[start:end])
+                if token_id is None:
+                    continue
+                edge_starts.append(start)
+                edge_ends.append(end)
+                edge_token_ids.append(token_id)
+                edge_count += 1
+
+        source_indices.append(int(source_index))
+        string_lengths.append(string_length)
+        string_frequencies.append(int(frequency))
+        edge_counts.append(edge_count)
+
+    return {
+        "batch_start": [source_indices[0] if source_indices else -1],
+        "source_indices": [source_indices],
+        "string_lengths": [string_lengths],
+        "string_frequencies": [string_frequencies],
+        "edge_counts": [edge_counts],
+        "edge_starts": [edge_starts],
+        "edge_ends": [edge_ends],
+        "edge_token_ids": [edge_token_ids],
+        "vertex_count": [sum(length + 1 for length in string_lengths)],
+        "free_edge_count": [sum(string_lengths)],
+        "filtered_edge_count": [len(edge_token_ids)],
+    }
+
+
+def _resolve_lp_cache_dir():
+    configured_dir = os.environ.get("LP_GRAPH_CACHE_DIR")
+    if configured_dir:
+        cache_dir = os.path.abspath(configured_dir)
+    else:
+        cache_base = os.environ.get("TMPDIR") or tempfile.gettempdir()
+        job_id = os.environ.get("SLURM_JOB_ID") or str(os.getpid())
+        cache_dir = os.path.join(cache_base, f"tokenisation_lp_{job_id}")
+    os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+
+def _format_bytes(byte_count):
+    value = float(byte_count)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024.0 or unit == "TiB":
+            return f"{value:.1f} {unit}"
+        value /= 1024.0
+
+
+def _raw_graph_size(pretoken_dataset, all_tokens, max_token_length):
+    raw_edge_count = 0
+    free_edge_count = 0
+
+    if hasattr(pretoken_dataset, "iter"):
+        batches = pretoken_dataset.iter(batch_size=10_000)
+        string_batches = (batch["pretoken"] for batch in batches)
+    else:
+        string_batches = (pretoken_dataset["pretoken"],)
+
+    for strings in string_batches:
+        for input_string in strings:
+            string_length = len(input_string)
+            limit = string_length if all_tokens else min(string_length, max_token_length)
+            if limit >= 2:
+                raw_edge_count += (
+                    (limit - 1) * (string_length + 1)
+                    - (limit * (limit + 1) // 2 - 1)
+                )
+            free_edge_count += string_length
+
+    return raw_edge_count, free_edge_count
+
+
+def _dataset_cache_size(dataset):
+    return sum(
+        os.path.getsize(cache_file["filename"])
+        for cache_file in dataset.cache_files
+        if os.path.exists(cache_file["filename"])
+    )
 
 
 def prepare_vocab_lp_data(inputStringList: list[str],
@@ -276,6 +412,440 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
         "numFreeEdges": B_col_offset,
         "numTokens": numTokens,
     }
+
+
+def _build_lp_blocks_from_graph_dataset(graph_dataset,
+                                        tokens,
+                                        verbose=True):
+    build_start = time.perf_counter()
+    num_tokens = len(tokens)
+
+    if len(graph_dataset) == 0:
+        return {
+            "BigAConstraint": sp.csr_matrix((0, 0), dtype=float),
+            "BigBConstraint": sp.csr_matrix((0, 0), dtype=float),
+            "BigMConstraint": sp.csr_matrix((0, num_tokens), dtype=float),
+            "BigbVector": np.array([], dtype=float),
+            "BigFreewVector": np.array([], dtype=float),
+            "BigNonFreewVector": np.array([], dtype=float),
+            "tokensCap": np.ones(num_tokens, dtype=float),
+            "numNonFreeEdges": 0,
+            "numFreeEdges": 0,
+            "numTokens": num_tokens,
+        }
+
+    batch_starts = np.asarray(graph_dataset["batch_start"], dtype=np.int64)
+    batch_order = np.argsort(batch_starts, kind="stable")
+    num_vertices = int(sum(graph_dataset["vertex_count"]))
+    num_non_free_edges = int(sum(graph_dataset["filtered_edge_count"]))
+    num_free_edges = int(sum(graph_dataset["free_edge_count"]))
+
+    max_index_value = max(
+        num_vertices,
+        num_non_free_edges,
+        num_free_edges,
+        num_tokens,
+        2 * num_non_free_edges,
+        2 * num_free_edges,
+    )
+    index_dtype = (
+        np.int32
+        if max_index_value <= np.iinfo(np.int32).max
+        else np.int64
+    )
+
+    if verbose:
+        print(
+            f"[lp-csr] Allocating compact matrix arrays: "
+            f"vertices={num_vertices:,}, non-free edges={num_non_free_edges:,}, "
+            f"free edges={num_free_edges:,}, tokens={num_tokens:,}, "
+            f"index_dtype={np.dtype(index_dtype).name}"
+        )
+
+    a_indices = np.empty(2 * num_non_free_edges, dtype=index_dtype)
+    a_data = np.empty(2 * num_non_free_edges, dtype=np.float64)
+    a_data[0::2] = 1.0
+    a_data[1::2] = -1.0
+
+    b_indices = np.empty(2 * num_free_edges, dtype=index_dtype)
+    b_data = np.empty(2 * num_free_edges, dtype=np.float64)
+    b_data[0::2] = 1.0
+    b_data[1::2] = -1.0
+
+    m_indices = np.empty(num_non_free_edges, dtype=index_dtype)
+    m_data = np.ones(num_non_free_edges, dtype=np.float64)
+
+    big_b_vector = np.zeros(num_vertices, dtype=np.float64)
+    big_free_weight = np.empty(num_free_edges, dtype=np.float64)
+    big_non_free_weight = np.empty(num_non_free_edges, dtype=np.float64)
+
+    vertex_cursor = 0
+    edge_cursor = 0
+    free_edge_cursor = 0
+    expected_source_index = 0
+    fill_start = time.perf_counter()
+    progress_interval = max(1, len(batch_order) // 10)
+
+    for completed, dataset_index in enumerate(batch_order, start=1):
+        row = graph_dataset[int(dataset_index)]
+        source_indices = np.asarray(row["source_indices"], dtype=np.int64)
+        expected_indices = np.arange(
+            expected_source_index,
+            expected_source_index + len(source_indices),
+            dtype=np.int64,
+        )
+        if not np.array_equal(source_indices, expected_indices):
+            raise ValueError(
+                "Dataset.map graph chunks are missing or out of source-row order."
+            )
+        expected_source_index += len(source_indices)
+
+        string_lengths = np.asarray(row["string_lengths"], dtype=np.int64)
+        string_frequencies = np.asarray(row["string_frequencies"], dtype=np.float64)
+        edge_counts = np.asarray(row["edge_counts"], dtype=np.int64)
+        edge_starts = np.asarray(row["edge_starts"], dtype=index_dtype)
+        edge_ends = np.asarray(row["edge_ends"], dtype=index_dtype)
+        edge_token_ids = np.asarray(row["edge_token_ids"], dtype=index_dtype)
+
+        local_edge_count = len(edge_token_ids)
+        if (
+            int(edge_counts.sum()) != local_edge_count
+            or len(edge_starts) != local_edge_count
+            or len(edge_ends) != local_edge_count
+        ):
+            raise ValueError("Inconsistent flattened edge arrays in graph map output.")
+
+        vertex_offsets = vertex_cursor + np.concatenate(
+            (
+                np.array([0], dtype=np.int64),
+                np.cumsum(string_lengths[:-1] + 1, dtype=np.int64),
+            )
+        )
+        repeated_vertex_offsets = np.repeat(vertex_offsets, edge_counts)
+        edge_end_cursor = edge_cursor + local_edge_count
+
+        a_indices[2 * edge_cursor:2 * edge_end_cursor:2] = (
+            repeated_vertex_offsets + edge_starts
+        )
+        a_indices[2 * edge_cursor + 1:2 * edge_end_cursor:2] = (
+            repeated_vertex_offsets + edge_ends
+        )
+        m_indices[edge_cursor:edge_end_cursor] = edge_token_ids
+        big_non_free_weight[edge_cursor:edge_end_cursor] = np.repeat(
+            string_frequencies, edge_counts
+        )
+
+        local_free_edge_count = int(string_lengths.sum())
+        free_edge_end_cursor = free_edge_cursor + local_free_edge_count
+        repeated_free_offsets = np.repeat(vertex_offsets, string_lengths)
+        flat_string_starts = np.repeat(
+            np.concatenate(
+                (
+                    np.array([0], dtype=np.int64),
+                    np.cumsum(string_lengths[:-1], dtype=np.int64),
+                )
+            ),
+            string_lengths,
+        )
+        free_local_starts = (
+            np.arange(local_free_edge_count, dtype=np.int64) - flat_string_starts
+        )
+        b_indices[2 * free_edge_cursor:2 * free_edge_end_cursor:2] = (
+            repeated_free_offsets + free_local_starts
+        )
+        b_indices[2 * free_edge_cursor + 1:2 * free_edge_end_cursor:2] = (
+            repeated_free_offsets + free_local_starts + 1
+        )
+        big_free_weight[free_edge_cursor:free_edge_end_cursor] = np.repeat(
+            string_frequencies, string_lengths
+        )
+
+        big_b_vector[vertex_offsets] = 1.0
+        big_b_vector[vertex_offsets + string_lengths] = -1.0
+
+        vertex_cursor += int((string_lengths + 1).sum())
+        edge_cursor = edge_end_cursor
+        free_edge_cursor = free_edge_end_cursor
+
+        if verbose and (
+            completed % progress_interval == 0 or completed == len(batch_order)
+        ):
+            print(
+                f"[lp-csr] Array-fill progress: {completed:,}/{len(batch_order):,} "
+                f"chunks ({100.0 * completed / len(batch_order):.0f}%) in "
+                f"{time.perf_counter() - fill_start:.1f}s"
+            )
+
+    if (
+        vertex_cursor != num_vertices
+        or edge_cursor != num_non_free_edges
+        or free_edge_cursor != num_free_edges
+    ):
+        raise ValueError("Graph map totals do not match the assembled matrix arrays.")
+
+    matrix_start = time.perf_counter()
+    if verbose:
+        print("[lp-csr] Converting compact column data to CSR matrices")
+
+    a_indptr = np.arange(
+        0, 2 * num_non_free_edges + 1, 2, dtype=index_dtype
+    )
+    big_a_constraint = sp.csc_matrix(
+        (a_data, a_indices, a_indptr),
+        shape=(num_vertices, num_non_free_edges),
+    ).tocsr()
+
+    b_indptr = np.arange(
+        0, 2 * num_free_edges + 1, 2, dtype=index_dtype
+    )
+    big_b_constraint = sp.csc_matrix(
+        (b_data, b_indices, b_indptr),
+        shape=(num_vertices, num_free_edges),
+    ).tocsr()
+
+    m_indptr = np.arange(num_non_free_edges + 1, dtype=index_dtype)
+    big_m_constraint = sp.csr_matrix(
+        (m_data, m_indices, m_indptr),
+        shape=(num_non_free_edges, num_tokens),
+    )
+
+    if verbose:
+        print(
+            f"[lp-csr] CSR construction finished in "
+            f"{time.perf_counter() - matrix_start:.1f}s; "
+            f"A={big_a_constraint.shape}, nnz={big_a_constraint.nnz:,}; "
+            f"B={big_b_constraint.shape}, nnz={big_b_constraint.nnz:,}; "
+            f"M={big_m_constraint.shape}, nnz={big_m_constraint.nnz:,}; "
+            f"total={time.perf_counter() - build_start:.1f}s"
+        )
+
+    return {
+        "BigAConstraint": big_a_constraint,
+        "BigBConstraint": big_b_constraint,
+        "BigMConstraint": big_m_constraint,
+        "BigbVector": big_b_vector,
+        "BigFreewVector": big_free_weight,
+        "BigNonFreewVector": big_non_free_weight,
+        "tokensCap": np.ones(num_tokens, dtype=float),
+        "numNonFreeEdges": num_non_free_edges,
+        "numFreeEdges": num_free_edges,
+        "numTokens": num_tokens,
+    }
+
+
+def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
+                                    min_token_count=1,
+                                    max_token_length=5,
+                                    all_tokens=True,
+                                    num_proc=LP_NUM_PROC,
+                                    map_batch_size=LP_MAP_BATCH_SIZE,
+                                    verbose=True):
+    required_columns = {"pretoken", "frequency"}
+    missing_columns = required_columns.difference(pretoken_dataset.column_names)
+    if missing_columns:
+        raise ValueError(
+            f"Pretoken dataset is missing required columns: {sorted(missing_columns)}"
+        )
+
+    worker_count = min(num_proc, max(1, len(pretoken_dataset)))
+    cache_dir = _resolve_lp_cache_dir()
+
+    raw_edge_count, raw_free_edge_count = _raw_graph_size(
+        pretoken_dataset, all_tokens, max_token_length
+    )
+    numeric_edge_payload = raw_edge_count * 12
+    disk_free = shutil.disk_usage(cache_dir).free
+    mode = (
+        "all substrings"
+        if all_tokens
+        else f"substrings up to length {max_token_length}"
+    )
+    if verbose:
+        print(
+            f"[lp-map] Configuration: rows={len(pretoken_dataset):,}, "
+            f"workers={worker_count}, batch_size={map_batch_size:,}, mode={mode}"
+        )
+        print(
+            f"[lp-map] Raw graph estimate: non-free edges={raw_edge_count:,}, "
+            f"free edges={raw_free_edge_count:,}; unfiltered numeric edge "
+            f"payload≈{_format_bytes(numeric_edge_payload)}"
+        )
+        print(
+            f"[lp-map] Arrow cache: {cache_dir}; "
+            f"available={_format_bytes(disk_free)}"
+        )
+    if disk_free < numeric_edge_payload:
+        print(
+            f"[lp-map] WARNING: available cache space is below the unfiltered "
+            f"numeric edge estimate. The run can still fit if count filtering "
+            f"removes enough edges."
+        )
+
+    candidate_features = Features(
+        {
+            "tokens": Sequence(Value("string")),
+            "counts": Sequence(Value("int64")),
+            "raw_edge_count": Value("int64"),
+            "source_row_count": Value("int64"),
+        }
+    )
+    candidate_start = time.perf_counter()
+    try:
+        candidate_chunks = pretoken_dataset.map(
+            _candidate_count_batch,
+            batched=True,
+            batch_size=map_batch_size,
+            num_proc=worker_count,
+            fn_kwargs={
+                "all_tokens": all_tokens,
+                "max_token_length": max_token_length,
+            },
+            remove_columns=pretoken_dataset.column_names,
+            features=candidate_features,
+            writer_batch_size=1,
+            load_from_cache_file=False,
+            cache_file_name=os.path.join(cache_dir, "candidate_counts.arrow"),
+            new_fingerprint=f"lp-candidates-{os.getpid()}-{time.time_ns()}",
+            desc="Counting LP candidate substrings",
+        )
+    except Exception as error:
+        current_free = shutil.disk_usage(cache_dir).free
+        raise RuntimeError(
+            f"Candidate Dataset.map failed. Arrow cache={cache_dir}, "
+            f"available={_format_bytes(current_free)}"
+        ) from error
+    candidate_map_time = time.perf_counter() - candidate_start
+    candidate_cache_size = _dataset_cache_size(candidate_chunks)
+    if verbose:
+        print(
+            f"[lp-map] Candidate map finished in {candidate_map_time:.1f}s; "
+            f"chunks={len(candidate_chunks):,}; "
+            f"Arrow={_format_bytes(candidate_cache_size)}"
+        )
+
+    reduce_start = time.perf_counter()
+    token_counts = defaultdict(int)
+    mapped_raw_edge_count = 0
+    mapped_source_rows = 0
+    for row in candidate_chunks:
+        mapped_raw_edge_count += int(row["raw_edge_count"])
+        mapped_source_rows += int(row["source_row_count"])
+        for token, count in zip(row["tokens"], row["counts"]):
+            token_counts[token] += int(count)
+
+    if mapped_raw_edge_count != raw_edge_count:
+        raise ValueError(
+            f"Candidate map counted {mapped_raw_edge_count:,} raw edges, "
+            f"but {raw_edge_count:,} were expected."
+        )
+    if mapped_source_rows != len(pretoken_dataset):
+        raise ValueError(
+            f"Candidate map covered {mapped_source_rows:,} rows, "
+            f"but {len(pretoken_dataset):,} were expected."
+        )
+
+    candidate_token_count = len(token_counts)
+    kept_tokens = sorted(
+        token
+        for token, count in token_counts.items()
+        if count > min_token_count
+    )
+    kept_counts = [token_counts[token] for token in kept_tokens]
+    token_index = {
+        token: token_id
+        for token_id, token in enumerate(kept_tokens)
+    }
+    del token_counts
+    gc.collect()
+    reduce_time = time.perf_counter() - reduce_start
+    if verbose:
+        print(
+            f"[lp-reduce] Global count merge and filtering finished in "
+            f"{reduce_time:.1f}s; candidates={candidate_token_count:,}; "
+            f"kept={len(kept_tokens):,} with count > {min_token_count:,}"
+        )
+    del candidate_chunks
+    gc.collect()
+
+    graph_features = Features(
+        {
+            "batch_start": Value("int64"),
+            "source_indices": Sequence(Value("int64")),
+            "string_lengths": Sequence(Value("int32")),
+            "string_frequencies": Sequence(Value("int64")),
+            "edge_counts": Sequence(Value("int64")),
+            "edge_starts": Sequence(Value("int32")),
+            "edge_ends": Sequence(Value("int32")),
+            "edge_token_ids": Sequence(Value("int64")),
+            "vertex_count": Value("int64"),
+            "free_edge_count": Value("int64"),
+            "filtered_edge_count": Value("int64"),
+        }
+    )
+    graph_start = time.perf_counter()
+    try:
+        graph_chunks = pretoken_dataset.map(
+            _graph_edge_batch,
+            batched=True,
+            batch_size=map_batch_size,
+            num_proc=worker_count,
+            with_indices=True,
+            fn_kwargs={
+                "all_tokens": all_tokens,
+                "max_token_length": max_token_length,
+                "token_index": token_index,
+            },
+            remove_columns=pretoken_dataset.column_names,
+            features=graph_features,
+            writer_batch_size=1,
+            load_from_cache_file=False,
+            cache_file_name=os.path.join(cache_dir, "graph_edges.arrow"),
+            new_fingerprint=f"lp-graph-{os.getpid()}-{time.time_ns()}",
+            desc="Building filtered LP graph edges",
+        )
+    except Exception as error:
+        current_free = shutil.disk_usage(cache_dir).free
+        raise RuntimeError(
+            f"Graph Dataset.map failed. Arrow cache={cache_dir}, "
+            f"available={_format_bytes(current_free)}"
+        ) from error
+    del token_index
+    gc.collect()
+    tokens_to_keep = [
+        possibleToken(
+            token,
+            instance_count=count,
+            index=token_id,
+        )
+        for token_id, (token, count) in enumerate(zip(kept_tokens, kept_counts))
+    ]
+    del kept_tokens
+    del kept_counts
+    gc.collect()
+    graph_map_time = time.perf_counter() - graph_start
+    graph_cache_size = _dataset_cache_size(graph_chunks)
+    filtered_edge_count = int(sum(graph_chunks["filtered_edge_count"]))
+    if verbose:
+        print(
+            f"[lp-map] Graph map finished in {graph_map_time:.1f}s; "
+            f"chunks={len(graph_chunks):,}; filtered edges={filtered_edge_count:,}; "
+            f"Arrow={_format_bytes(graph_cache_size)}"
+        )
+
+    csr_start = time.perf_counter()
+    lp_blocks = _build_lp_blocks_from_graph_dataset(
+        graph_chunks, tokens_to_keep, verbose=verbose
+    )
+    csr_time = time.perf_counter() - csr_start
+    if verbose:
+        print(
+            f"[lp-map] LP graph pipeline timings: candidate_map={candidate_map_time:.1f}s, "
+            f"reduce={reduce_time:.1f}s, graph_map={graph_map_time:.1f}s, "
+            f"csr={csr_time:.1f}s, "
+            f"Arrow_total={_format_bytes(candidate_cache_size + graph_cache_size)}"
+        )
+
+    return lp_blocks, tokens_to_keep
 
 
 def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int):
@@ -853,35 +1423,52 @@ def create_vocab(inputStringList: list[str],
     return possibleTokens
 
 
-def prepare_cuopt_model(inputStringList: list[str],
-                        inputStringFreq: list[int],
+def prepare_cuopt_model(inputStringList: list[str] = None,
+                        inputStringFreq: list[int] = None,
                         minTokenCount: int = 1,
                         maxTokenLength: int = 5,
                         all_tokens: bool = True,
-                        verbose: bool = True):
+                        verbose: bool = True,
+                        pretoken_dataset=None,
+                        num_proc=LP_NUM_PROC,
+                        map_batch_size=LP_MAP_BATCH_SIZE):
     total_start = time.perf_counter()
-    filtered_edgesList, freeEdgesList, numVertices, tokens_to_keep = prepare_vocab_lp_data(
-        inputStringList=inputStringList,
-        inputStringFreq=inputStringFreq,
-        minTokenCount=minTokenCount,
-        maxTokenLength=maxTokenLength,
-        all_tokens=all_tokens,
-        verbose=verbose,
-    )
+    if pretoken_dataset is None:
+        if inputStringList is None or inputStringFreq is None:
+            raise ValueError(
+                "Provide either pretoken_dataset or both inputStringList "
+                "and inputStringFreq."
+            )
+        if len(inputStringList) != len(inputStringFreq):
+            raise ValueError(
+                "inputStringList and inputStringFreq must have the same length."
+            )
+        pretoken_dataset = Dataset.from_dict(
+            {
+                "pretoken": inputStringList,
+                "frequency": inputStringFreq,
+            },
+            features=Features(
+                {
+                    "pretoken": Value("string"),
+                    "frequency": Value("int64"),
+                }
+            ),
+        )
 
-    phase_start = time.perf_counter()
-    lp_blocks = build_lp_blocks(
-        edgesList=filtered_edgesList,
-        edgeListWeight=inputStringFreq,
-        tokens=tokens_to_keep,
-        freeEdgesList=freeEdgesList,
-        numVerticesList=numVertices,
+    lp_blocks, tokens_to_keep = prepare_vocab_lp_blocks_dataset(
+        pretoken_dataset=pretoken_dataset,
+        min_token_count=minTokenCount,
+        max_token_length=maxTokenLength,
+        all_tokens=all_tokens,
+        num_proc=num_proc,
+        map_batch_size=map_batch_size,
         verbose=verbose,
     )
     if verbose:
         print(
             f"[prepare-cuopt] LP blocks finished in "
-            f"{time.perf_counter() - phase_start:.1f}s"
+            f"{time.perf_counter() - total_start:.1f}s"
         )
 
     phase_start = time.perf_counter()
@@ -971,7 +1558,8 @@ def create_vocab_cuopt(inputStringList: list[str],
                        maxTokenLength: int = 5,
                        all_tokens: bool = True,
                        solver_parameters=None,
-                       verbose: bool = True):
+                       verbose: bool = True,
+                       pretoken_dataset=None):
     model = prepare_cuopt_model(
         inputStringList=inputStringList,
         inputStringFreq=inputStringFreq,
@@ -979,6 +1567,7 @@ def create_vocab_cuopt(inputStringList: list[str],
         maxTokenLength=maxTokenLength,
         all_tokens=all_tokens,
         verbose=verbose,
+        pretoken_dataset=pretoken_dataset,
     )
     print(
         f"[create-vocab] Model preparation finished; "

@@ -111,7 +111,7 @@ class Tokenizer:
         if self.corpus is None:
             raise ValueError("Must include a corpus")
 
-        input_strings,  input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
+        pretoken_dataset = self.pretokenize_and_prepare_corpus(self.corpus)
 
         special_tokens = list(self.special_tokens_list)
         lp_budget = self.vocab_size - len(self.unique_chars) - len(special_tokens)
@@ -148,7 +148,9 @@ class Tokenizer:
         if self.corpus is None:
             raise ValueError("Must include a corpus")
 
-        input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
+        pretoken_dataset = self.pretokenize_and_prepare_corpus(self.corpus)
+        input_strings = pretoken_dataset["pretoken"]
+        input_strings_frequencies = pretoken_dataset["frequency"]
 
         special_tokens = list(self.special_tokens_list)
         lp_budget = self.vocab_size - len(self.unique_chars) - len(special_tokens)
@@ -156,10 +158,11 @@ class Tokenizer:
             raise ValueError("Vocab size is too small, entire vocab already unique characters")
 
         possible_tokens = create_vocab_cuopt(
-            inputStringList=input_strings,
-            inputStringFreq=input_strings_frequencies,
+            inputStringList=None,
+            inputStringFreq=None,
             numAllowedTokens=lp_budget,
             vocab_size=self.vocab_size,
+            pretoken_dataset=pretoken_dataset,
         )
 
         return {"possible_tokens": possible_tokens, "unique_chars": self.unique_chars, "special_tokens": special_tokens}
@@ -171,18 +174,17 @@ class Tokenizer:
 
         total_start = time.perf_counter()
         print("[pipeline] Starting corpus preparation and cuOpt model construction")
-        input_strings, input_strings_frequencies = self.pretokenize_and_prepare_corpus(self.corpus)
+        pretoken_dataset = self.pretokenize_and_prepare_corpus(self.corpus)
         print(
             f"[pipeline] Corpus preparation returned "
-            f"{len(input_strings):,} unique pre-tokens after "
+            f"{len(pretoken_dataset):,} unique pre-tokens after "
             f"{time.perf_counter() - total_start:.1f}s"
         )
 
         model_start = time.perf_counter()
         print("[pipeline] Starting LP data and cuOpt model construction")
         self._cuopt_model = prepare_cuopt_model(
-            inputStringList=input_strings,
-            inputStringFreq=input_strings_frequencies,
+            pretoken_dataset=pretoken_dataset,
             verbose=verbose,
         )
         print(
@@ -329,8 +331,8 @@ class Tokenizer:
                 key=lambda example: example[0],
             )[:5]
 
-        input_strings=list(word_freqs.keys())
-        input_strings_frequencies=list(word_freqs.values())
+        input_strings = list(word_freqs.keys())
+        input_strings_frequencies = list(word_freqs.values())
         if empty_token_count > 0:
             print(
                 f"[WARN] Found {empty_token_count} empty pretokenized strings "
@@ -343,14 +345,26 @@ class Tokenizer:
                     "Empty pretokenized strings detected. "
                     "Set FAIL_ON_EMPTY_PRETOKENIZED_STRINGS=0 to continue."
                 )
+        pretoken_dataset = Dataset.from_dict(
+            {
+                "pretoken": input_strings,
+                "frequency": input_strings_frequencies,
+            },
+            features=Features(
+                {
+                    "pretoken": Value("string"),
+                    "frequency": Value("int64"),
+                }
+            ),
+        )
         print(
             f"[pretokenize] Corpus preparation finished in "
             f"{time.perf_counter() - total_start:.1f}s; "
-            f"unique pre-tokens={len(input_strings):,}; "
+            f"unique pre-tokens={len(pretoken_dataset):,}; "
             f"total pre-token occurrences={sum(input_strings_frequencies):,}"
         )
 
-        return input_strings, input_strings_frequencies
+        return pretoken_dataset
 
     def pretokenize_and_prepare_dataset(self, dataset_size,dataset,input_strings=None, save:bool=True):
         base_name = f"word_freqs_testing{self.saved_dataset_path}{dataset_size}"
