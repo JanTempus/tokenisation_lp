@@ -35,8 +35,8 @@ from lp_tokenizer.datastructures import tokenInstance, possibleToken
 import lp_tokenizer.helper_functions as hf
 
 
-LP_NUM_PROC = int(os.environ.get("LP_NUM_PROC", "16"))
-LP_MAP_BATCH_SIZE = int(os.environ.get("LP_MAP_BATCH_SIZE", "1000"))
+NUM_PROC = int(os.environ.get("NUM_PROC", "16"))
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "10000"))
 
 
 def _candidate_count_batch(batch,
@@ -637,8 +637,8 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
                                     min_token_count=1,
                                     max_token_length=5,
                                     all_tokens=True,
-                                    num_proc=LP_NUM_PROC,
-                                    map_batch_size=LP_MAP_BATCH_SIZE,
+                                    num_proc=NUM_PROC,
+                                    map_batch_size=BATCH_SIZE,
                                     verbose=True):
     required_columns = {"pretoken", "frequency"}
     missing_columns = required_columns.difference(pretoken_dataset.column_names)
@@ -1430,8 +1430,8 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
                         all_tokens: bool = True,
                         verbose: bool = True,
                         pretoken_dataset=None,
-                        num_proc=LP_NUM_PROC,
-                        map_batch_size=LP_MAP_BATCH_SIZE):
+                        num_proc=NUM_PROC,
+                        map_batch_size=BATCH_SIZE):
     total_start = time.perf_counter()
     if pretoken_dataset is None:
         if inputStringList is None or inputStringFreq is None:
