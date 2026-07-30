@@ -34,7 +34,7 @@ RAW_VOCAB_PATH="${RAW_VOCAB_PATH:-${IOPS_ROOT}/raw_vocabs/${DATASET_TAG}}"
 LP_GRAPH_CACHE_DIR="${LP_GRAPH_CACHE_DIR:-${RUN_DIR}/lp_graph}"
 SAVE_TOKENIZER_DIR="${SAVE_TOKENIZER_DIR:-${REPO_DIR}/rounded_tokenizers/${DATASET_TAG}}"
 
-TMPDIR="${RUN_DIR}/tmp"
+TMPDIR="/iopsstor/scratch/cscs/jtempus/tmp/${SLURM_JOB_ID}"
 TMP="${TMPDIR}"
 TEMP="${TMPDIR}"
 PYTHONPYCACHEPREFIX="${RUN_DIR}/pycache"
