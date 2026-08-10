@@ -13,7 +13,6 @@ REPO_DIR="${REPO_DIR:-/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp}
 TARGET_ROWS="${TARGET_ROWS:-60000}"
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
 VOCAB_SIZES="${VOCAB_SIZES:-131072}"
-TOKENIZER_TYPE="bpe"
 
 if [[ -z "${NAME}" ]]; then
     echo "ERROR: NAME is required. Submit with --export=NAME=<experiment>" >&2
@@ -22,7 +21,8 @@ fi
 
 DATASET_TAG="${NAME}_n${TARGET_ROWS}"
 TRAIN_DATASET_PATH="${TRAIN_DATASET_PATH:-${DATASET_TAG}}"
-SAVE_DIR="${SAVE_DIR:-bpe_tokenizers/${DATASET_TAG}}"
+SAVE_DIR="${SAVE_DIR:-unigram_tokenizers/${DATASET_TAG}}"
+TOKENIZER_TYPE="unigram"
 
 source /users/jtempus/miniconda3/etc/profile.d/conda.sh
 conda activate primer-py311
@@ -37,7 +37,7 @@ export TOKENIZER_TYPE
 
 echo "Run tag:          ${DATASET_TAG}"
 echo "Training dataset: ${TRAIN_DATASET_PATH}"
-echo "BPE output:       ${SAVE_DIR}"
+echo "Unigram output:   ${SAVE_DIR}"
 echo "Vocabulary sizes: ${VOCAB_SIZES}"
 
 python3 -u hf_baseline_tokenizers/train_sampled.py

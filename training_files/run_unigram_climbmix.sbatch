@@ -12,8 +12,8 @@ REPO_DIR="${REPO_DIR:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
 VOCAB_SIZE="${VOCAB_SIZE:-32768}"
 NUM_SHARDS="${NUM_SHARDS:-8}"
 MAX_CHARS="${MAX_CHARS:-2000000000}"
-SAVE_DIR="${SAVE_DIR:-bpe_tokenizers_climbmix}"
-TOKENIZER_TYPE="bpe"
+SAVE_DIR="${SAVE_DIR:-unigram_tokenizers_climbmix}"
+TOKENIZER_TYPE="unigram"
 
 # IMPORTANT: load conda manually
 source /users/jtempus/miniconda3/etc/profile.d/conda.sh
@@ -30,10 +30,11 @@ export MAX_CHARS
 export SAVE_DIR
 export TOKENIZER_TYPE
 
-echo "REPO_DIR:    ${REPO_DIR}"
-echo "VOCAB_SIZE:  ${VOCAB_SIZE}"
-echo "NUM_SHARDS:  ${NUM_SHARDS}"
-echo "MAX_CHARS:   ${MAX_CHARS}"
-echo "SAVE_DIR:    ${SAVE_DIR}"
+echo "REPO_DIR:      ${REPO_DIR}"
+echo "VOCAB_SIZE:    ${VOCAB_SIZE}"
+echo "NUM_SHARDS:    ${NUM_SHARDS}"
+echo "MAX_CHARS:     ${MAX_CHARS}"
+echo "SAVE_DIR:      ${SAVE_DIR}"
+echo "TOKENIZER_TYPE: ${TOKENIZER_TYPE}"
 
 python3 -u hf_baseline_tokenizers/train_climbmix.py

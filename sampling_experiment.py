@@ -4,9 +4,9 @@ Unified sampling experiment pipeline.
 For each sample size in SAMPLE_SIZES and each of T independent samples it:
   1. Samples SAMPLE_SIZE rows from the dataset (using a unique seed per sample)
   2. Trains the LP tokenizer for every requested vocab size
-  3. Trains the BPE tokenizer for every requested vocab size
+  3. Trains the BPE and Unigram tokenizers for every requested vocab size
   4. Computes pairwise inter-sample Jaccard distances (same vocab size, different samples)
-     for the four LP rounding schemes and for BPE, and saves the results.
+     for the LP rounding schemes, BPE, and Unigram, and saves the results.
 
 All settings are read from environment variables (see run_sampling_experiment.sbatch).
 """
@@ -53,13 +53,22 @@ from train_tokenizer import (  # noqa: E402
     pretokenizer as lp_pretokenizer,
     train_lp_tokenizer,
 )
-from bpe_tokenizer.bpe_tokenizer import train_bpe_tokenizer  # noqa: E402
+from hf_baseline_tokenizers.hf_baseline_tokenizers import (  # noqa: E402
+    train_bpe_tokenizer,
+    train_unigram_tokenizer,
+)
 import pickle
 
 from lp_tokenizer.lp_functions import (  # noqa: E402
     biased_rounding,
     deterministic_rounding,
 )
+
+
+BASELINE_TRAINERS = {
+    "bpe": train_bpe_tokenizer,
+    "unigram": train_unigram_tokenizer,
+}
 
 
 def jaccard_distance(a, b):
@@ -196,19 +205,23 @@ def step2_train_lp(samples, ss_dir):
 
 
 # ---------------------------------------------------------------------------
-# Step 3 – Train BPE tokenizers
+# Step 3 – Train baseline tokenizers
 # ---------------------------------------------------------------------------
-def step3_train_bpe(samples, ss_dir):
-    for i, dataset in enumerate(samples):
-        bpe_dir = os.path.join(ss_dir, "bpe", f"sample_{i}")
-        for vs in VOCAB_SIZES:
-            out_path = os.path.join(bpe_dir, f"bpe_{vs}")
-            if os.path.exists(os.path.join(out_path, "tokenizer.json")):
-                print(f"[BPE Sample {i} vocab={vs}] already trained at {out_path}, skipping")
-                continue
-            print(f"[BPE Sample {i} vocab={vs}] Training")
-            train_bpe_tokenizer(vs, dataset, bpe_dir)
-            print(f"[BPE Sample {i} vocab={vs}] Saved to {out_path}")
+def step3_train_baselines(samples, ss_dir):
+    for baseline, train_baseline in BASELINE_TRAINERS.items():
+        for i, dataset in enumerate(samples):
+            baseline_dir = os.path.join(ss_dir, baseline, f"sample_{i}")
+            for vs in VOCAB_SIZES:
+                out_path = os.path.join(baseline_dir, f"{baseline}_{vs}")
+                if os.path.exists(os.path.join(out_path, "tokenizer.json")):
+                    print(
+                        f"[{baseline.upper()} Sample {i} vocab={vs}] "
+                        f"already trained at {out_path}, skipping"
+                    )
+                    continue
+                print(f"[{baseline.upper()} Sample {i} vocab={vs}] Training")
+                train_baseline(vs, dataset, baseline_dir)
+                print(f"[{baseline.upper()} Sample {i} vocab={vs}] Saved to {out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -239,22 +252,33 @@ def step4_jaccard(sample_size, ss_dir):
             upper = mat[np.triu_indices(T, k=1)]
             print(f"  LP {key}: mean={upper.mean():.4f}  min={upper.min():.4f}  max={upper.max():.4f}")
 
-        # --- BPE ---
-        bpe_vocabs = []
-        for i in range(T):
-            tok_path = os.path.join(ss_dir, "bpe", f"sample_{i}", f"bpe_{vs}")
-            tok = PreTrainedTokenizerFast.from_pretrained(tok_path)
-            bpe_vocabs.append(set(tok.get_vocab().keys()))
+        # --- Baselines ---
+        for baseline in BASELINE_TRAINERS:
+            baseline_vocabs = []
+            for i in range(T):
+                tok_path = os.path.join(
+                    ss_dir,
+                    baseline,
+                    f"sample_{i}",
+                    f"{baseline}_{vs}",
+                )
+                tok = PreTrainedTokenizerFast.from_pretrained(tok_path)
+                baseline_vocabs.append(set(tok.get_vocab().keys()))
 
-        mat = np.zeros((T, T))
-        for i in range(T):
-            for j in range(i + 1, T):
-                d = jaccard_distance(list(bpe_vocabs[i]), list(bpe_vocabs[j]))
-                mat[i][j] = d
-                mat[j][i] = d
-        results[vs]["bpe"] = mat.tolist()
-        upper = mat[np.triu_indices(T, k=1)]
-        print(f"  BPE:    mean={upper.mean():.4f}  min={upper.min():.4f}  max={upper.max():.4f}")
+            mat = np.zeros((T, T))
+            for i in range(T):
+                for j in range(i + 1, T):
+                    d = jaccard_distance(
+                        list(baseline_vocabs[i]), list(baseline_vocabs[j])
+                    )
+                    mat[i][j] = d
+                    mat[j][i] = d
+            results[vs][baseline] = mat.tolist()
+            upper = mat[np.triu_indices(T, k=1)]
+            print(
+                f"  {baseline.upper()}: mean={upper.mean():.4f}  "
+                f"min={upper.min():.4f}  max={upper.max():.4f}"
+            )
 
     # --- Persist results ---
     jaccard_dir = os.path.join(ss_dir, "jaccard")
@@ -279,10 +303,15 @@ def step4_jaccard(sample_size, ss_dir):
                 upper = mat[np.triu_indices(T, k=1)]
                 f.write(f"  LP {key:8s}: mean={upper.mean():.4f}  min={upper.min():.4f}  max={upper.max():.4f}\n")
                 f.write(f"    {np.array2string(mat, precision=4)}\n")
-            mat = np.array(results[vs]["bpe"])
-            upper = mat[np.triu_indices(T, k=1)]
-            f.write(f"  BPE       : mean={upper.mean():.4f}  min={upper.min():.4f}  max={upper.max():.4f}\n")
-            f.write(f"    {np.array2string(mat, precision=4)}\n\n")
+            for baseline in BASELINE_TRAINERS:
+                mat = np.array(results[vs][baseline])
+                upper = mat[np.triu_indices(T, k=1)]
+                f.write(
+                    f"  {baseline.upper():10s}: mean={upper.mean():.4f}  "
+                    f"min={upper.min():.4f}  max={upper.max():.4f}\n"
+                )
+                f.write(f"    {np.array2string(mat, precision=4)}\n")
+            f.write("\n")
     print(f"Saved human-readable summary to {txt_path}")
 
 
@@ -314,8 +343,8 @@ if __name__ == "__main__":
         print("\n--- Step 2/4: Training LP tokenizers ---")
         step2_train_lp(samples, ss_dir)
 
-        print("\n--- Step 3/4: Training BPE tokenizers ---")
-        step3_train_bpe(samples, ss_dir)
+        print("\n--- Step 3/4: Training BPE and Unigram tokenizers ---")
+        step3_train_baselines(samples, ss_dir)
 
         print("\n--- Step 4/4: Computing Jaccard distances ---")
         step4_jaccard(sample_size, ss_dir)

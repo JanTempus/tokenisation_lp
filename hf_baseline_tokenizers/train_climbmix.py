@@ -5,7 +5,7 @@ from datasets import load_dataset, Dataset
 from huggingface_hub import list_repo_files
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bpe_tokenizer import train_bpe_tokenizer
+from hf_baseline_tokenizers import train_tokenizer
 
 BASE_URL = "https://huggingface.co/datasets/karpathy/climbmix-400b-shuffle/resolve/main"
 DATASET_ID = "karpathy/climbmix-400b-shuffle"
@@ -13,7 +13,8 @@ DATASET_ID = "karpathy/climbmix-400b-shuffle"
 NUM_SHARDS = int(os.getenv("NUM_SHARDS", "8"))
 MAX_CHARS = int(os.getenv("MAX_CHARS", "2000000000"))
 VOCAB_SIZE = int(os.getenv("VOCAB_SIZE", "32768"))
-SAVE_DIR = os.getenv("SAVE_DIR", "bpe_tokenizers_climbmix")
+TOKENIZER_TYPE = os.getenv("TOKENIZER_TYPE", "bpe").strip().lower()
+SAVE_DIR = os.getenv("SAVE_DIR", f"{TOKENIZER_TYPE}_tokenizers_climbmix")
 
 
 def main():
@@ -48,8 +49,8 @@ def main():
 
     dataset = Dataset.from_dict({"text": texts})
 
-    print(f"Training BPE tokenizer (vocab_size={VOCAB_SIZE})...")
-    train_bpe_tokenizer(VOCAB_SIZE, dataset, SAVE_DIR)
+    print(f"Training {TOKENIZER_TYPE.upper()} tokenizer (vocab_size={VOCAB_SIZE})...")
+    train_tokenizer(VOCAB_SIZE, dataset, SAVE_DIR, TOKENIZER_TYPE)
     print("Done.")
 
 

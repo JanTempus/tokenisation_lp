@@ -1,7 +1,7 @@
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset
 from tokenizers import Regex, Tokenizer
-from tokenizers.models import BPE
-from tokenizers.trainers import BpeTrainer
+from tokenizers.models import BPE, Unigram
+from tokenizers.trainers import BpeTrainer, UnigramTrainer
 import os
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 from transformers import PreTrainedTokenizerFast, AutoTokenizer
@@ -68,7 +68,7 @@ PRETOKENIZER = build_pretokenizer(PRETOKENIZER_MODE)
 
 
 # Full ByteLevel alphabet: 256 byte-level chars. Passed as initial_alphabet
-# to BpeTrainer so every byte is guaranteed present in the final vocab
+# to each trainer so every byte is guaranteed present in the final vocab
 # regardless of what the training corpus happened to contain.
 BYTE_LEVEL_ALPHABET = list(ByteLevel.alphabet())
 
@@ -93,24 +93,34 @@ BOS_TOKEN = "<|bos|>"
 UNK_TOKEN = "<|unk|>"
 
 
-def train_bpe_tokenizer(vocab_size:int,dataset,save_dir: str):
+def train_tokenizer(vocab_size: int, dataset, save_dir: str, tokenizer_type: str = "bpe"):
 
     # Create training corpus
     dataset_size=len(dataset)
     corpus = [dataset[i]["text"] for i in range(dataset_size)]
 
 
-    # Build tokenizer from scratch with BPE model
-    tokenizer = Tokenizer(BPE(unk_token=UNK_TOKEN))
+    # Build tokenizer from scratch
+    if tokenizer_type == "bpe":
+        tokenizer = Tokenizer(BPE(unk_token=UNK_TOKEN))
+        trainer = BpeTrainer(
+            vocab_size=vocab_size,
+            special_tokens=SPECIAL_TOKENS,
+            initial_alphabet=BYTE_LEVEL_ALPHABET,
+        )
+    elif tokenizer_type == "unigram":
+        tokenizer = Tokenizer(Unigram())
+        trainer = UnigramTrainer(
+            vocab_size=vocab_size,
+            special_tokens=SPECIAL_TOKENS,
+            initial_alphabet=BYTE_LEVEL_ALPHABET,
+            unk_token=UNK_TOKEN,
+        )
+    else:
+        raise ValueError(f"Unsupported tokenizer type: {tokenizer_type}")
 
     # Keep pretokenization consistent with the LP training / rounding pipeline
     tokenizer.pre_tokenizer = PRETOKENIZER.backend_tokenizer.pre_tokenizer
-
-    trainer = BpeTrainer(
-        vocab_size=vocab_size,
-        special_tokens=SPECIAL_TOKENS,
-        initial_alphabet=BYTE_LEVEL_ALPHABET,
-    )
 
     tokenizer.train_from_iterator(corpus, trainer=trainer)
 
@@ -123,7 +133,7 @@ def train_bpe_tokenizer(vocab_size:int,dataset,save_dir: str):
     )
     
     # Save in HF format
-    save_path = os.path.join(save_dir, f"bpe_{vocab_size}")
+    save_path = os.path.join(save_dir, f"{tokenizer_type}_{vocab_size}")
     os.makedirs(save_path, exist_ok=True)
     hf_tokenizer.save_pretrained(save_path)
     print(f"Saved Hugging Face–compatible tokenizer at {save_path}")
@@ -131,14 +141,22 @@ def train_bpe_tokenizer(vocab_size:int,dataset,save_dir: str):
     return hf_tokenizer
 
 
+def train_bpe_tokenizer(vocab_size: int, dataset, save_dir: str):
+    return train_tokenizer(vocab_size, dataset, save_dir, "bpe")
+
+
+def train_unigram_tokenizer(vocab_size: int, dataset, save_dir: str):
+    return train_tokenizer(vocab_size, dataset, save_dir, "unigram")
+
+
 
 if __name__ == '__main__':
-    
+    tokenizer_type = os.environ.get("TOKENIZER_TYPE", "bpe").strip().lower()
     dataset_url="pietrolesci/finewebedu-20B"
-    
-    save_dir = "bpe_tokenizers_new"
+
+    save_dir = os.environ.get("SAVE_DIR", f"{tokenizer_type}_tokenizers_new")
     vocab_sizes = [1024,2048,4096,8192,16384,32768,65536,131072]
     dataset_size = 60000
     dataset=load_dataset(dataset_url)['train'].select(range(dataset_size))
     for vs in vocab_sizes:
-        train_bpe_tokenizer(vs, dataset, save_dir)
+        train_tokenizer(vs, dataset, save_dir, tokenizer_type)

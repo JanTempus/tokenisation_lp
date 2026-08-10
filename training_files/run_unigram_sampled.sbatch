@@ -10,11 +10,10 @@ set -euo pipefail
 # Experiment parameters — fill in before submitting
 # ---------------------------------------------------------------------------
 REPO_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp
-TRAIN_DATASET_PATH=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/basic_finewebedu20B_n200000_seed42  # path to dataset saved by sample_tokenizer_data.py
-VOCAB_SIZES="8196,16384,32768,65536,131072,262144"           # comma-separated, e.g. "4096,16384,32768"
-SAVE_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/bpe_tokenizer
-TOKENIZER_TYPE="bpe"
-             # where to save the trained tokenizers
+TRAIN_DATASET_PATH=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/basic_finewebedu20B_n200000_seed42
+VOCAB_SIZES="8196,16384,32768,65536,131072,262144"
+SAVE_DIR=/iopsstor/scratch/cscs/jtempus/tokenisation_lp/unigram_tokenizers
+TOKENIZER_TYPE="unigram"
 
 # ---------------------------------------------------------------------------
 # Environment setup

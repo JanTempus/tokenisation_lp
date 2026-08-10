@@ -1,7 +1,7 @@
 import random
 from transformers import AutoTokenizer
 from datasets import load_dataset, Dataset, concatenate_datasets
-from bpe_tokenizer.bpe_tokenizer import train_bpe_tokenizer
+from hf_baseline_tokenizers.hf_baseline_tokenizers import train_bpe_tokenizer
 from lp_tokenizer.train_tokenizer import train_lp_tokenizer
 dataset_url = "pietrolesci/finewebedu-20B"
 NUM_PROC = 16
@@ -87,7 +87,6 @@ if __name__ == "__main__":
         train_lp_tokenizer(sampled_datasets[i],VOCAB_SIZE,i,save_dir)
         #save_dir=f"sampled_bpe_tokenizer"
         #train_bpe_tokenizer(32768,sampled_datasets[i],save_dir,i)
-
 
 
 
