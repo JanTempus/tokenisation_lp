@@ -32,6 +32,12 @@ from cuopt.linear_programming.solver_settings import (
 
 
 from lp_tokenizer.datastructures import tokenInstance, possibleToken
+from lp_tokenizer.celex import (
+    EnglishCelex,
+    is_morphology_violation,
+    validate_morphology_rho,
+    write_unmatched_report,
+)
 import lp_tokenizer.helper_functions as hf
 
 
@@ -68,7 +74,8 @@ def _graph_edge_batch(batch,
                       indices,
                       all_tokens: bool,
                       max_token_length: int,
-                      token_index):
+                      token_index,
+                      morphology_enabled: bool = False):
     source_indices = []
     string_lengths = []
     string_frequencies = []
@@ -76,6 +83,7 @@ def _graph_edge_batch(batch,
     edge_starts = []
     edge_ends = []
     edge_token_ids = []
+    edge_morph_violations = []
 
     for source_index, input_string, frequency in zip(
         indices, batch["pretoken"], batch["frequency"]
@@ -83,6 +91,15 @@ def _graph_edge_batch(batch,
         string_length = len(input_string)
         limit = string_length if all_tokens else min(string_length, max_token_length)
         edge_count = 0
+        if morphology_enabled:
+            row_offset = len(source_indices)
+            unmatched = bool(batch["celex_unmatched"][row_offset])
+            aligned_spans = set(
+                zip(
+                    batch["celex_aligned_span_starts"][row_offset],
+                    batch["celex_aligned_span_ends"][row_offset],
+                )
+            )
 
         for token_length in range(2, limit + 1):
             for start in range(string_length - token_length + 1):
@@ -93,6 +110,12 @@ def _graph_edge_batch(batch,
                 edge_starts.append(start)
                 edge_ends.append(end)
                 edge_token_ids.append(token_id)
+                if morphology_enabled:
+                    edge_morph_violations.append(
+                        is_morphology_violation(
+                            start, end, unmatched, aligned_spans
+                        )
+                    )
                 edge_count += 1
 
         source_indices.append(int(source_index))
@@ -100,7 +123,7 @@ def _graph_edge_batch(batch,
         string_frequencies.append(int(frequency))
         edge_counts.append(edge_count)
 
-    return {
+    result = {
         "batch_start": [source_indices[0] if source_indices else -1],
         "source_indices": [source_indices],
         "string_lengths": [string_lengths],
@@ -112,6 +135,34 @@ def _graph_edge_batch(batch,
         "vertex_count": [sum(length + 1 for length in string_lengths)],
         "free_edge_count": [sum(string_lengths)],
         "filtered_edge_count": [len(edge_token_ids)],
+    }
+    if morphology_enabled:
+        result["edge_morph_violations"] = [edge_morph_violations]
+    return result
+
+
+def _celex_annotation_batch(batch, celex):
+    decoded_forms = []
+    unmatched_flags = []
+    unmatched_reasons = []
+    aligned_span_starts = []
+    aligned_span_ends = []
+
+    for pretoken in batch["pretoken"]:
+        match = celex.match_pretoken(pretoken)
+        spans = sorted(match.aligned_spans)
+        decoded_forms.append(match.decoded_form)
+        unmatched_flags.append(match.unmatched)
+        unmatched_reasons.append(match.reason)
+        aligned_span_starts.append([start for start, _ in spans])
+        aligned_span_ends.append([end for _, end in spans])
+
+    return {
+        "celex_decoded_form": decoded_forms,
+        "celex_unmatched": unmatched_flags,
+        "celex_unmatched_reason": unmatched_reasons,
+        "celex_aligned_span_starts": aligned_span_starts,
+        "celex_aligned_span_ends": aligned_span_ends,
     }
 
 
@@ -416,9 +467,12 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
 
 def _build_lp_blocks_from_graph_dataset(graph_dataset,
                                         tokens,
+                                        morphology_rho=0.0,
                                         verbose=True):
     build_start = time.perf_counter()
     num_tokens = len(tokens)
+    morphology_rho = validate_morphology_rho(morphology_rho)
+    morphology_enabled = morphology_rho > 0.0
 
     if len(graph_dataset) == 0:
         return {
@@ -432,6 +486,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
             "numNonFreeEdges": 0,
             "numFreeEdges": 0,
             "numTokens": num_tokens,
+            "numMorphologyPenalizedEdges": 0,
         }
 
     batch_starts = np.asarray(graph_dataset["batch_start"], dtype=np.int64)
@@ -483,6 +538,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
     edge_cursor = 0
     free_edge_cursor = 0
     expected_source_index = 0
+    penalized_edge_count = 0
     fill_start = time.perf_counter()
     progress_interval = max(1, len(batch_order) // 10)
 
@@ -534,6 +590,16 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         big_non_free_weight[edge_cursor:edge_end_cursor] = np.repeat(
             string_frequencies, edge_counts
         )
+        if morphology_enabled:
+            violations = np.asarray(row["edge_morph_violations"], dtype=np.float64)
+            if len(violations) != local_edge_count:
+                raise ValueError(
+                    "Morphology violation flags do not match the flattened edges."
+                )
+            big_non_free_weight[edge_cursor:edge_end_cursor] *= (
+                1.0 + morphology_rho * violations
+            )
+            penalized_edge_count += int(violations.sum())
 
         local_free_edge_count = int(string_lengths.sum())
         free_edge_end_cursor = free_edge_cursor + local_free_edge_count
@@ -630,6 +696,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         "numNonFreeEdges": num_non_free_edges,
         "numFreeEdges": num_free_edges,
         "numTokens": num_tokens,
+        "numMorphologyPenalizedEdges": penalized_edge_count,
     }
 
 
@@ -639,6 +706,9 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
                                     all_tokens=True,
                                     num_proc=NUM_PROC,
                                     map_batch_size=BATCH_SIZE,
+                                    morphology_rho=0.0,
+                                    celex_dir=None,
+                                    unmatched_report_path=None,
                                     verbose=True):
     required_columns = {"pretoken", "frequency"}
     missing_columns = required_columns.difference(pretoken_dataset.column_names)
@@ -647,6 +717,8 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
             f"Pretoken dataset is missing required columns: {sorted(missing_columns)}"
         )
 
+    morphology_rho = validate_morphology_rho(morphology_rho)
+    morphology_enabled = morphology_rho > 0.0
     worker_count = min(num_proc, max(1, len(pretoken_dataset)))
     cache_dir = _resolve_lp_cache_dir()
 
@@ -767,6 +839,52 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
     del candidate_chunks
     gc.collect()
 
+    if morphology_enabled:
+        morphology_start = time.perf_counter()
+        if verbose:
+            print(f"[celex] Loading English morphology with rho={morphology_rho:g}")
+        celex = EnglishCelex.load(celex_dir)
+        pretoken_dataset = pretoken_dataset.map(
+            _celex_annotation_batch,
+            batched=True,
+            batch_size=map_batch_size,
+            fn_kwargs={"celex": celex},
+            load_from_cache_file=False,
+            cache_file_name=os.path.join(cache_dir, "celex_annotations.arrow"),
+            new_fingerprint=f"celex-annotations-{os.getpid()}-{time.time_ns()}",
+            desc="Matching pre-tokens against English CELEX",
+        )
+        del celex
+        gc.collect()
+        total_types = len(pretoken_dataset)
+        unmatched_types = int(sum(pretoken_dataset["celex_unmatched"]))
+        total_frequency = int(sum(pretoken_dataset["frequency"]))
+        unmatched_frequency = int(
+            sum(
+                int(frequency)
+                for frequency, unmatched in zip(
+                    pretoken_dataset["frequency"], pretoken_dataset["celex_unmatched"]
+                )
+                if unmatched
+            )
+        )
+        if unmatched_report_path:
+            report_count = write_unmatched_report(
+                pretoken_dataset, unmatched_report_path
+            )
+            if report_count != unmatched_types:
+                raise ValueError("CELEX unmatched report count is inconsistent.")
+        if verbose:
+            print(
+                f"[celex] Matched types={total_types - unmatched_types:,}/{total_types:,}; "
+                f"matched frequency={total_frequency - unmatched_frequency:,}/"
+                f"{total_frequency:,}; unmatched types={unmatched_types:,}; "
+                f"unmatched frequency={unmatched_frequency:,}; "
+                f"elapsed={time.perf_counter() - morphology_start:.1f}s"
+            )
+            if unmatched_report_path:
+                print(f"[celex] Unmatched pre-token report: {unmatched_report_path}")
+
     graph_features = Features(
         {
             "batch_start": Value("int64"),
@@ -782,6 +900,8 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
             "filtered_edge_count": Value("int64"),
         }
     )
+    if morphology_enabled:
+        graph_features["edge_morph_violations"] = Sequence(Value("bool"))
     graph_start = time.perf_counter()
     try:
         graph_chunks = pretoken_dataset.map(
@@ -794,6 +914,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
                 "all_tokens": all_tokens,
                 "max_token_length": max_token_length,
                 "token_index": token_index,
+                "morphology_enabled": morphology_enabled,
             },
             remove_columns=pretoken_dataset.column_names,
             features=graph_features,
@@ -834,7 +955,10 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
 
     csr_start = time.perf_counter()
     lp_blocks = _build_lp_blocks_from_graph_dataset(
-        graph_chunks, tokens_to_keep, verbose=verbose
+        graph_chunks,
+        tokens_to_keep,
+        morphology_rho=morphology_rho,
+        verbose=verbose,
     )
     csr_time = time.perf_counter() - csr_start
     if verbose:
@@ -844,6 +968,12 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
             f"csr={csr_time:.1f}s, "
             f"Arrow_total={_format_bytes(candidate_cache_size + graph_cache_size)}"
         )
+        if morphology_enabled:
+            print(
+                f"[celex] Penalized non-free edges="
+                f"{lp_blocks['numMorphologyPenalizedEdges']:,}/"
+                f"{lp_blocks['numNonFreeEdges']:,}"
+            )
 
     return lp_blocks, tokens_to_keep
 
@@ -1431,7 +1561,10 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
                         verbose: bool = True,
                         pretoken_dataset=None,
                         num_proc=NUM_PROC,
-                        map_batch_size=BATCH_SIZE):
+                        map_batch_size=BATCH_SIZE,
+                        morphology_rho: float = 0.0,
+                        celex_dir: str = None,
+                        unmatched_report_path: str = None):
     total_start = time.perf_counter()
     if pretoken_dataset is None:
         if inputStringList is None or inputStringFreq is None:
@@ -1463,6 +1596,9 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
         all_tokens=all_tokens,
         num_proc=num_proc,
         map_batch_size=map_batch_size,
+        morphology_rho=morphology_rho,
+        celex_dir=celex_dir,
+        unmatched_report_path=unmatched_report_path,
         verbose=verbose,
     )
     if verbose:
@@ -1495,6 +1631,10 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
         ) from import_error
 
     model["tokens_to_keep"] = tokens_to_keep
+    model["morphology_rho"] = validate_morphology_rho(morphology_rho)
+    model["num_morphology_penalized_edges"] = lp_blocks[
+        "numMorphologyPenalizedEdges"
+    ]
     if verbose:
         print(
             f"[prepare-cuopt] Initial cuOpt wrapper finished in "
@@ -1559,7 +1699,10 @@ def create_vocab_cuopt(inputStringList: list[str],
                        all_tokens: bool = True,
                        solver_parameters=None,
                        verbose: bool = True,
-                       pretoken_dataset=None):
+                       pretoken_dataset=None,
+                       morphology_rho: float = 0.0,
+                       celex_dir: str = None,
+                       unmatched_report_path: str = None):
     model = prepare_cuopt_model(
         inputStringList=inputStringList,
         inputStringFreq=inputStringFreq,
@@ -1568,6 +1711,9 @@ def create_vocab_cuopt(inputStringList: list[str],
         all_tokens=all_tokens,
         verbose=verbose,
         pretoken_dataset=pretoken_dataset,
+        morphology_rho=morphology_rho,
+        celex_dir=celex_dir,
+        unmatched_report_path=unmatched_report_path,
     )
     print(
         f"[create-vocab] Model preparation finished; "

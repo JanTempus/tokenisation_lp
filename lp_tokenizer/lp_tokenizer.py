@@ -143,7 +143,9 @@ class Tokenizer:
         # self.vocab=vocab
 
 
-    def make_vocab_cuopt(self, solver_parameters=None, verbose: bool = True):
+    def make_vocab_cuopt(self, solver_parameters=None, verbose: bool = True,
+                         morphology_rho: float = 0.0, celex_dir: str = None,
+                         unmatched_report_path: str = None):
 
         if self.corpus is None:
             raise ValueError("Must include a corpus")
@@ -163,12 +165,18 @@ class Tokenizer:
             numAllowedTokens=lp_budget,
             vocab_size=self.vocab_size,
             pretoken_dataset=pretoken_dataset,
+            morphology_rho=morphology_rho,
+            celex_dir=celex_dir,
+            unmatched_report_path=unmatched_report_path,
         )
 
         return {"possible_tokens": possible_tokens, "unique_chars": self.unique_chars, "special_tokens": special_tokens}
 
 
-    def prepare_cuopt_model(self, verbose: bool = True):
+    def prepare_cuopt_model(self, verbose: bool = True,
+                            morphology_rho: float = 0.0,
+                            celex_dir: str = None,
+                            unmatched_report_path: str = None):
         if self.corpus is None:
             raise ValueError("Must include a corpus")
 
@@ -186,6 +194,9 @@ class Tokenizer:
         self._cuopt_model = prepare_cuopt_model(
             pretoken_dataset=pretoken_dataset,
             verbose=verbose,
+            morphology_rho=morphology_rho,
+            celex_dir=celex_dir,
+            unmatched_report_path=unmatched_report_path,
         )
         print(
             f"[pipeline] cuOpt model construction finished in "

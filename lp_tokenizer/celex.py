@@ -1,0 +1,325 @@
+"""English CELEX morphology loading and ByteLevel pre-token matching."""
+
+from __future__ import annotations
+
+import csv
+import math
+import re
+from collections import defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+
+from tokenizers.decoders import ByteLevel
+
+
+BoundaryAnalysis = Tuple[int, ...]
+EncodedSpan = Tuple[int, int]
+
+
+@dataclass(frozen=True)
+class PretokenMorphology:
+    decoded_form: str
+    unmatched: bool
+    reason: str
+    aligned_spans: FrozenSet[EncodedSpan]
+
+
+def validate_morphology_rho(value: float) -> float:
+    rho = float(value)
+    if not math.isfinite(rho) or rho < 0.0:
+        raise ValueError("morphology_rho must be a finite, non-negative number.")
+    return rho
+
+
+def is_morphology_violation(
+    start: int,
+    end: int,
+    unmatched: bool,
+    aligned_spans: Iterable[EncodedSpan],
+) -> bool:
+    return not unmatched and (int(start), int(end)) not in aligned_spans
+
+
+def default_celex_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "CELEX_V2"
+
+
+def _celex_files(celex_dir: Optional[str]) -> Tuple[Path, Path]:
+    root = Path(celex_dir).expanduser().resolve() if celex_dir else default_celex_dir()
+    lemma_file = root / "english" / "eml" / "eml.cd"
+    wordform_file = root / "english" / "emw" / "emw.cd"
+    missing = [str(path) for path in (lemma_file, wordform_file) if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "English CELEX morphology is enabled, but required files are missing: "
+            + ", ".join(missing)
+        )
+    return lemma_file, wordform_file
+
+
+def _edit_prefix_costs(source: str, target: str) -> List[int]:
+    previous = list(range(len(target) + 1))
+    for source_char in source:
+        current = [previous[0] + 1]
+        for target_index, target_char in enumerate(target, start=1):
+            current.append(
+                min(
+                    previous[target_index] + 1,
+                    current[target_index - 1] + 1,
+                    previous[target_index - 1] + (source_char != target_char),
+                )
+            )
+        previous = current
+    return previous
+
+
+def _project_boundaries(
+    source: str,
+    source_boundaries: Sequence[int],
+    target: str,
+) -> Optional[BoundaryAnalysis]:
+    """Project source split points to target with deterministic edit alignment."""
+    if not source_boundaries:
+        return ()
+    if source == target:
+        return tuple(int(boundary) for boundary in source_boundaries)
+
+    projected = []
+    for boundary in source_boundaries:
+        prefix_costs = _edit_prefix_costs(source[:boundary], target)
+        reversed_suffix_costs = _edit_prefix_costs(
+            source[boundary:][::-1], target[::-1]
+        )
+        candidates = []
+        for target_boundary in range(1, len(target)):
+            suffix_cost = reversed_suffix_costs[len(target) - target_boundary]
+            candidates.append(
+                (
+                    prefix_costs[target_boundary] + suffix_cost,
+                    suffix_cost,
+                    -target_boundary,
+                    target_boundary,
+                )
+            )
+        if not candidates:
+            return None
+        projected.append(min(candidates)[-1])
+
+    if any(left >= right for left, right in zip(projected, projected[1:])):
+        return None
+    return tuple(projected)
+
+
+_CLASS_LABEL = re.compile(r"\[[^]]*\]")
+
+
+def _deep_morphemes(structure: str) -> List[str]:
+    without_classes = _CLASS_LABEL.sub("", structure)
+    flat = without_classes.replace("(", "").replace(")", "")
+    return [part for part in flat.split(",") if part]
+
+
+def _lemma_analysis(head: str, structure: str) -> Optional[BoundaryAnalysis]:
+    if not structure:
+        return ()
+    morphemes = _deep_morphemes(structure)
+    if not morphemes:
+        return None
+    source = "".join(morphemes)
+    source_boundaries = []
+    cursor = 0
+    for morpheme in morphemes[:-1]:
+        cursor += len(morpheme)
+        source_boundaries.append(cursor)
+    return _project_boundaries(source, source_boundaries, head)
+
+
+def _apply_inflection(lemma: str, transformation: str) -> Optional[Tuple[str, Optional[int]]]:
+    if not transformation.startswith("@"):
+        return None
+    stem = lemma
+    addition = ""
+    operations = transformation[1:]
+    cursor = 0
+    while cursor < len(operations):
+        operator = operations[cursor]
+        if operator not in "+-":
+            return None
+        cursor += 1
+        end = cursor
+        while end < len(operations) and operations[end] not in "+-":
+            end += 1
+        operand = operations[cursor:end].replace("@", "'")
+        if operator == "-":
+            if not operand or not stem.endswith(operand):
+                return None
+            stem = stem[:-len(operand)]
+        else:
+            addition += operand
+        cursor = end
+    boundary = len(stem) if addition else None
+    return stem + addition, boundary
+
+
+class EnglishCelex:
+    def __init__(
+        self,
+        analyses: Mapping[str, Iterable[BoundaryAnalysis]],
+        known_surfaces: Iterable[str],
+        projection_failures: Iterable[str],
+    ):
+        self.analyses: Dict[str, FrozenSet[BoundaryAnalysis]] = {
+            surface: frozenset(tuple(boundaries) for boundaries in boundary_sets)
+            for surface, boundary_sets in analyses.items()
+        }
+        self.known_surfaces = frozenset(known_surfaces)
+        self.projection_failures = frozenset(projection_failures)
+        folded = defaultdict(set)
+        for surface, boundary_sets in self.analyses.items():
+            key = surface.casefold()
+            folded[key].update(boundary_sets)
+        self._folded_analyses = {
+            key: frozenset(boundary_sets) for key, boundary_sets in folded.items()
+        }
+        self._decoder = ByteLevel()
+
+    @classmethod
+    def load(cls, celex_dir: Optional[str] = None) -> "EnglishCelex":
+        lemma_file, wordform_file = _celex_files(celex_dir)
+        analyses = defaultdict(set)
+        lemma_entries = defaultdict(list)
+        known_surfaces: Set[str] = set()
+        projection_failures: Set[str] = set()
+
+        with lemma_file.open("r", encoding="ascii", newline="") as handle:
+            reader = csv.reader(handle, delimiter="\\")
+            for fields in reader:
+                if len(fields) < 2:
+                    continue
+                lemma_id, head = fields[0], fields[1]
+                structure = fields[21] if len(fields) > 21 else ""
+                known_surfaces.add(head)
+                boundaries = _lemma_analysis(head, structure)
+                if boundaries is None:
+                    projection_failures.add(head)
+                    continue
+                analyses[head].add(boundaries)
+                lemma_entries[lemma_id].append((head, boundaries))
+
+        with wordform_file.open("r", encoding="ascii", newline="") as handle:
+            reader = csv.reader(handle, delimiter="\\")
+            for fields in reader:
+                if len(fields) < 4:
+                    continue
+                surface, lemma_id = fields[1], fields[3]
+                transformation = fields[5] if len(fields) > 5 else ""
+                known_surfaces.add(surface)
+                entries = lemma_entries.get(lemma_id, ())
+                added = False
+                for lemma, lemma_boundaries in entries:
+                    transformations = transformation.split()
+                    if not transformations or transformation == "IRR":
+                        projected = _project_boundaries(lemma, lemma_boundaries, surface)
+                        if projected is not None:
+                            analyses[surface].add(projected)
+                            added = True
+                        continue
+                    for variant in transformations:
+                        inflected = _apply_inflection(lemma, variant)
+                        if inflected is None:
+                            continue
+                        generated, inflection_boundary = inflected
+                        if generated != surface:
+                            continue
+                        stem_end = inflection_boundary if inflection_boundary is not None else len(surface)
+                        projected = _project_boundaries(
+                            lemma, lemma_boundaries, surface[:stem_end]
+                        )
+                        if projected is None:
+                            continue
+                        boundaries = list(projected)
+                        if inflection_boundary not in (None, 0, len(surface)):
+                            boundaries.append(inflection_boundary)
+                        boundaries = tuple(sorted(set(boundaries)))
+                        if all(0 < boundary < len(surface) for boundary in boundaries):
+                            analyses[surface].add(boundaries)
+                            added = True
+                if entries and not added and surface not in analyses:
+                    projection_failures.add(surface)
+
+        return cls(analyses, known_surfaces, projection_failures)
+
+    def _surface_candidate(self, decoded: str) -> Tuple[Optional[str], int]:
+        candidates = [(decoded, 0)]
+        if decoded and not decoded[0].isalnum():
+            candidates.append((decoded[1:], len(decoded[0].encode("utf-8"))))
+        for surface, byte_offset in candidates:
+            if surface in self.analyses or surface in self.known_surfaces:
+                return surface, byte_offset
+        return candidates[-1]
+
+    def match_pretoken(self, pretoken: str) -> PretokenMorphology:
+        try:
+            decoded = self._decoder.decode([pretoken])
+        except Exception:
+            return PretokenMorphology(pretoken, True, "decode_failure", frozenset())
+
+        surface, byte_offset = self._surface_candidate(decoded)
+        if not surface or any(character.isspace() for character in surface):
+            return PretokenMorphology(
+                decoded, True, "unsupported_nonlexical_form", frozenset()
+            )
+
+        boundary_sets = self.analyses.get(surface)
+        if boundary_sets is None:
+            folded = self._folded_analyses.get(surface.casefold(), frozenset())
+            if len(folded) == 1:
+                boundary_sets = folded
+            elif folded:
+                return PretokenMorphology(
+                    decoded, True, "ambiguous_casefold_match", frozenset()
+                )
+            elif surface in self.projection_failures:
+                return PretokenMorphology(
+                    decoded, True, "boundary_projection_failure", frozenset()
+                )
+            else:
+                return PretokenMorphology(decoded, True, "no_celex_entry", frozenset())
+
+        surface_byte_length = len(surface.encode("utf-8"))
+        spans = set()
+        for boundaries in boundary_sets:
+            encoded_boundaries = [
+                byte_offset + len(surface[:boundary].encode("utf-8"))
+                for boundary in boundaries
+            ]
+            positions = [byte_offset, *encoded_boundaries, byte_offset + surface_byte_length]
+            for start, end in zip(positions, positions[1:]):
+                spans.add((start, end))
+                if byte_offset and start == byte_offset:
+                    spans.add((0, end))
+        return PretokenMorphology(decoded, False, "matched", frozenset(spans))
+
+
+def write_unmatched_report(rows: Iterable[Mapping[str, object]], output_path: str) -> int:
+    unmatched = [
+        (
+            str(row["pretoken"]),
+            str(row["celex_decoded_form"]),
+            int(row["frequency"]),
+            str(row["celex_unmatched_reason"]),
+        )
+        for row in rows
+        if bool(row["celex_unmatched"])
+    ]
+    unmatched.sort(key=lambda item: (-item[2], item[0]))
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    with temporary.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(["pretoken", "decoded_form", "frequency", "reason"])
+        writer.writerows(unmatched)
+    temporary.replace(path)
+    return len(unmatched)

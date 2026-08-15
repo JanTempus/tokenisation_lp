@@ -1,4 +1,5 @@
 from lp_tokenizer.lp_tokenizer import BYTE_LEVEL_ALPHABET, Tokenizer
+from lp_tokenizer.celex import default_celex_dir, validate_morphology_rho
 from transformers import AutoTokenizer
 from datasets import Value, concatenate_datasets, load_dataset, load_from_disk
 from tokenizers import Regex
@@ -76,7 +77,8 @@ def build_pretokenizer(mode):
 pretokenizer = build_pretokenizer(PRETOKENIZER_MODE)
 
 
-def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj, special_tokens):
+def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj,
+                       special_tokens, morphology_rho=0.0, celex_dir=None):
     tokenizer = Tokenizer(
         corpus=dataset,
         vocab_size=vocab_size,
@@ -84,7 +86,16 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
         unique_chars=unique_chars,
         pretokenizer=pretokenizer_obj,
     )
-    tokens = tokenizer.make_vocab_cuopt()
+    unmatched_report_path = (
+        os.path.join(save_dir, "celex_unmatched.tsv")
+        if morphology_rho > 0.0
+        else None
+    )
+    tokens = tokenizer.make_vocab_cuopt(
+        morphology_rho=morphology_rho,
+        celex_dir=celex_dir,
+        unmatched_report_path=unmatched_report_path,
+    )
     file_name = os.path.join(save_dir, f"lp_tokens_{vocab_size}.pkl")
     os.makedirs(save_dir, exist_ok=True)
     with open(file_name, "wb") as f:
@@ -123,7 +134,8 @@ def print_lp_variable_counts(vocab_size, x_values, cuopt_model):
 
 
 def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
-                             pretokenizer_obj, special_tokens):
+                             pretokenizer_obj, special_tokens,
+                             morphology_rho=0.0, celex_dir=None):
     if not vocab_sizes:
         return
 
@@ -142,7 +154,16 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
         f"[pipeline] Tokenizer initialized: rows={len(dataset):,}, "
         f"vocab_sizes={sorted_sizes}"
     )
-    tokenizer.prepare_cuopt_model()
+    unmatched_report_path = (
+        os.path.join(save_dir, "celex_unmatched.tsv")
+        if morphology_rho > 0.0
+        else None
+    )
+    tokenizer.prepare_cuopt_model(
+        morphology_rho=morphology_rho,
+        celex_dir=celex_dir,
+        unmatched_report_path=unmatched_report_path,
+    )
 
     os.makedirs(save_dir, exist_ok=True)
     for vs in sorted_sizes:
@@ -327,9 +348,22 @@ if __name__ == "__main__":
     )
     vocab_size = [int(size) for size in os.environ.get("VOCAB_SIZES", "131072").split(",") if size.strip()]
     save_dir = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2/")
+    try:
+        morphology_rho = validate_morphology_rho(
+            float(os.environ.get("MORPHOLOGY_RHO", "0"))
+        )
+    except ValueError as error:
+        raise ValueError(
+            "MORPHOLOGY_RHO must be a finite, non-negative number."
+        ) from error
+    configured_celex_dir = os.environ.get("CELEX_DIR")
+    celex_dir = configured_celex_dir or str(default_celex_dir())
     special_tokens = get_special_tokens(PRETOKENIZER_MODE)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
     print(f"Special tokens ({len(special_tokens)}): {special_tokens}")
+    print(f"Morphology rho: {morphology_rho:g}")
+    if morphology_rho > 0.0:
+        print(f"CELEX directory: {celex_dir}")
     print(f"Loading training dataset from {TRAIN_DATASET_PATH}")
 
     dataset = load_training_dataset(TRAIN_DATASET_PATH)
@@ -338,4 +372,13 @@ if __name__ == "__main__":
     unique_chars = list(BYTE_LEVEL_ALPHABET)
     print(f"Using fixed ByteLevel alphabet ({len(unique_chars)} symbols)")
 
-    train_lp_tokenizer_sweep(dataset, unique_chars, vocab_size, save_dir, pretokenizer, special_tokens)
+    train_lp_tokenizer_sweep(
+        dataset,
+        unique_chars,
+        vocab_size,
+        save_dir,
+        pretokenizer,
+        special_tokens,
+        morphology_rho=morphology_rho,
+        celex_dir=celex_dir,
+    )

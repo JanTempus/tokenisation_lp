@@ -13,3 +13,4 @@ word_freqs*.npy
 unique*.npy
 tokenized_dataset/
 downloaded_parquet_samples/
+CELEX_V2/
