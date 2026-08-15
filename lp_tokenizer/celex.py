@@ -18,11 +18,20 @@ EncodedSpan = Tuple[int, int]
 
 
 @dataclass(frozen=True)
+class MorphologicalAnalysis:
+    morpheme_spans: Tuple[EncodedSpan, ...]
+
+
+@dataclass(frozen=True)
 class PretokenMorphology:
     decoded_form: str
     unmatched: bool
     reason: str
-    aligned_spans: FrozenSet[EncodedSpan]
+    analyses: Tuple[MorphologicalAnalysis, ...]
+
+    @property
+    def morphology_weight(self) -> float:
+        return 0.0 if self.unmatched else 1.0
 
 
 def validate_morphology_rho(value: float) -> float:
@@ -32,13 +41,32 @@ def validate_morphology_rho(value: float) -> float:
     return rho
 
 
-def is_morphology_violation(
+def endpoint_morphology_penalty(
+    position: int,
+    morpheme_spans: Sequence[EncodedSpan],
+) -> float:
+    position = int(position)
+    for left, right in morpheme_spans:
+        if position == left or position == right:
+            return 0.0
+        if left < position < right:
+            distance = min(position - left, right - position)
+            return 2.0 * distance / (right - left)
+    return 0.0
+
+
+def edge_morphology_penalty(
     start: int,
     end: int,
-    unmatched: bool,
-    aligned_spans: Iterable[EncodedSpan],
-) -> bool:
-    return not unmatched and (int(start), int(end)) not in aligned_spans
+    analyses: Sequence[MorphologicalAnalysis],
+) -> float:
+    if not analyses:
+        return 0.0
+    return min(
+        endpoint_morphology_penalty(start, analysis.morpheme_spans)
+        + endpoint_morphology_penalty(end, analysis.morpheme_spans)
+        for analysis in analyses
+    )
 
 
 def default_celex_dir() -> Path:
@@ -178,10 +206,15 @@ class EnglishCelex:
         folded = defaultdict(set)
         for surface, boundary_sets in self.analyses.items():
             key = surface.casefold()
-            folded[key].update(boundary_sets)
+            folded[key].update(
+                (surface, boundaries) for boundaries in boundary_sets
+            )
         self._folded_analyses = {
-            key: frozenset(boundary_sets) for key, boundary_sets in folded.items()
+            key: frozenset(entries) for key, entries in folded.items()
         }
+        self._folded_known_surfaces = frozenset(
+            surface.casefold() for surface in self.known_surfaces
+        )
         self._decoder = ByteLevel()
 
     @classmethod
@@ -259,47 +292,88 @@ class EnglishCelex:
                 return surface, byte_offset
         return candidates[-1]
 
+    @staticmethod
+    def _encoded_analysis(
+        surface: str,
+        boundaries: BoundaryAnalysis,
+        byte_offset: int,
+    ) -> Optional[MorphologicalAnalysis]:
+        non_increasing = any(
+            left >= right for left, right in zip(boundaries, boundaries[1:])
+        )
+        out_of_range = any(
+            boundary <= 0 or boundary >= len(surface)
+            for boundary in boundaries
+        )
+        if non_increasing or out_of_range:
+            return None
+        byte_positions = [
+            byte_offset + len(surface[:boundary].encode("utf-8"))
+            for boundary in boundaries
+        ]
+        positions = [
+            byte_offset,
+            *byte_positions,
+            byte_offset + len(surface.encode("utf-8")),
+        ]
+        spans = tuple(zip(positions, positions[1:]))
+        return MorphologicalAnalysis(spans)
+
     def match_pretoken(self, pretoken: str) -> PretokenMorphology:
         try:
             decoded = self._decoder.decode([pretoken])
         except Exception:
-            return PretokenMorphology(pretoken, True, "decode_failure", frozenset())
+            return PretokenMorphology(pretoken, True, "decode_failure", ())
 
         surface, byte_offset = self._surface_candidate(decoded)
         if not surface or any(character.isspace() for character in surface):
             return PretokenMorphology(
-                decoded, True, "unsupported_nonlexical_form", frozenset()
+                decoded, True, "unsupported_nonlexical_form", ()
             )
 
-        boundary_sets = self.analyses.get(surface)
-        if boundary_sets is None:
-            folded = self._folded_analyses.get(surface.casefold(), frozenset())
-            if len(folded) == 1:
-                boundary_sets = folded
-            elif folded:
-                return PretokenMorphology(
-                    decoded, True, "ambiguous_casefold_match", frozenset()
-                )
-            elif surface in self.projection_failures:
-                return PretokenMorphology(
-                    decoded, True, "boundary_projection_failure", frozenset()
-                )
-            else:
-                return PretokenMorphology(decoded, True, "no_celex_entry", frozenset())
+        exact_analyses = {
+            analysis
+            for boundaries in self.analyses.get(surface, ())
+            for analysis in (self._encoded_analysis(surface, boundaries, byte_offset),)
+            if analysis is not None
+        }
+        if exact_analyses:
+            return PretokenMorphology(
+                decoded,
+                False,
+                "exact_celex_match",
+                tuple(sorted(exact_analyses, key=lambda item: item.morpheme_spans)),
+            )
 
-        surface_byte_length = len(surface.encode("utf-8"))
-        spans = set()
-        for boundaries in boundary_sets:
-            encoded_boundaries = [
-                byte_offset + len(surface[:boundary].encode("utf-8"))
-                for boundary in boundaries
-            ]
-            positions = [byte_offset, *encoded_boundaries, byte_offset + surface_byte_length]
-            for start, end in zip(positions, positions[1:]):
-                spans.add((start, end))
-                if byte_offset and start == byte_offset:
-                    spans.add((0, end))
-        return PretokenMorphology(decoded, False, "matched", frozenset(spans))
+        folded_entries = self._folded_analyses.get(surface.casefold(), ())
+        folded_analyses = set()
+        for source_surface, source_boundaries in folded_entries:
+            projected = _project_boundaries(
+                source_surface, source_boundaries, surface
+            )
+            if projected is None:
+                continue
+            analysis = self._encoded_analysis(surface, projected, byte_offset)
+            if analysis is not None:
+                folded_analyses.add(analysis)
+        if folded_analyses:
+            return PretokenMorphology(
+                decoded,
+                False,
+                "casefold_celex_match",
+                tuple(sorted(folded_analyses, key=lambda item: item.morpheme_spans)),
+            )
+
+        has_celex_candidate = (
+            surface in self.known_surfaces
+            or surface.casefold() in self._folded_known_surfaces
+        )
+        reason = (
+            "boundary_projection_failure"
+            if has_celex_candidate
+            else "no_celex_entry"
+        )
+        return PretokenMorphology(decoded, True, reason, ())
 
 
 def write_unmatched_report(rows: Iterable[Mapping[str, object]], output_path: str) -> int:

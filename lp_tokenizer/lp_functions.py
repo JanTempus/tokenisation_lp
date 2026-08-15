@@ -34,7 +34,8 @@ from cuopt.linear_programming.solver_settings import (
 from lp_tokenizer.datastructures import tokenInstance, possibleToken
 from lp_tokenizer.celex import (
     EnglishCelex,
-    is_morphology_violation,
+    MorphologicalAnalysis,
+    edge_morphology_penalty,
     validate_morphology_rho,
     write_unmatched_report,
 )
@@ -83,7 +84,8 @@ def _graph_edge_batch(batch,
     edge_starts = []
     edge_ends = []
     edge_token_ids = []
-    edge_morph_violations = []
+    edge_morph_penalties = []
+    edge_morphology_weights = []
 
     for source_index, input_string, frequency in zip(
         indices, batch["pretoken"], batch["frequency"]
@@ -93,13 +95,24 @@ def _graph_edge_batch(batch,
         edge_count = 0
         if morphology_enabled:
             row_offset = len(source_indices)
-            unmatched = bool(batch["celex_unmatched"][row_offset])
-            aligned_spans = set(
-                zip(
-                    batch["celex_aligned_span_starts"][row_offset],
-                    batch["celex_aligned_span_ends"][row_offset],
+            analysis_starts = batch["celex_analysis_span_starts"][row_offset]
+            analysis_ends = batch["celex_analysis_span_ends"][row_offset]
+            if len(analysis_starts) != len(analysis_ends):
+                raise ValueError(
+                    "CELEX analysis start and end collections have different lengths."
                 )
+            analyses = tuple(
+                MorphologicalAnalysis(tuple(zip(starts, ends)))
+                for starts, ends in zip(analysis_starts, analysis_ends)
             )
+            morphology_weight = 1.0 if analyses else 0.0
+            if any(
+                len(starts) != len(ends)
+                for starts, ends in zip(analysis_starts, analysis_ends)
+            ):
+                raise ValueError(
+                    "CELEX analysis span starts and ends have different lengths."
+                )
 
         for token_length in range(2, limit + 1):
             for start in range(string_length - token_length + 1):
@@ -111,11 +124,10 @@ def _graph_edge_batch(batch,
                 edge_ends.append(end)
                 edge_token_ids.append(token_id)
                 if morphology_enabled:
-                    edge_morph_violations.append(
-                        is_morphology_violation(
-                            start, end, unmatched, aligned_spans
-                        )
+                    edge_morph_penalties.append(
+                        edge_morphology_penalty(start, end, analyses)
                     )
+                    edge_morphology_weights.append(morphology_weight)
                 edge_count += 1
 
         source_indices.append(int(source_index))
@@ -137,7 +149,8 @@ def _graph_edge_batch(batch,
         "filtered_edge_count": [len(edge_token_ids)],
     }
     if morphology_enabled:
-        result["edge_morph_violations"] = [edge_morph_violations]
+        result["edge_morph_penalties"] = [edge_morph_penalties]
+        result["edge_morphology_weights"] = [edge_morphology_weights]
     return result
 
 
@@ -145,24 +158,33 @@ def _celex_annotation_batch(batch, celex):
     decoded_forms = []
     unmatched_flags = []
     unmatched_reasons = []
-    aligned_span_starts = []
-    aligned_span_ends = []
+    analysis_span_starts = []
+    analysis_span_ends = []
 
     for pretoken in batch["pretoken"]:
         match = celex.match_pretoken(pretoken)
-        spans = sorted(match.aligned_spans)
         decoded_forms.append(match.decoded_form)
         unmatched_flags.append(match.unmatched)
         unmatched_reasons.append(match.reason)
-        aligned_span_starts.append([start for start, _ in spans])
-        aligned_span_ends.append([end for _, end in spans])
+        analysis_span_starts.append(
+            [
+                [start for start, _ in analysis.morpheme_spans]
+                for analysis in match.analyses
+            ]
+        )
+        analysis_span_ends.append(
+            [
+                [end for _, end in analysis.morpheme_spans]
+                for analysis in match.analyses
+            ]
+        )
 
     return {
         "celex_decoded_form": decoded_forms,
         "celex_unmatched": unmatched_flags,
         "celex_unmatched_reason": unmatched_reasons,
-        "celex_aligned_span_starts": aligned_span_starts,
-        "celex_aligned_span_ends": aligned_span_ends,
+        "celex_analysis_span_starts": analysis_span_starts,
+        "celex_analysis_span_ends": analysis_span_ends,
     }
 
 
@@ -487,6 +509,8 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
             "numFreeEdges": 0,
             "numTokens": num_tokens,
             "numMorphologyPenalizedEdges": 0,
+            "numMorphologyCoveredEdges": 0,
+            "sumMorphologyPenalty": 0.0,
         }
 
     batch_starts = np.asarray(graph_dataset["batch_start"], dtype=np.int64)
@@ -539,6 +563,8 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
     free_edge_cursor = 0
     expected_source_index = 0
     penalized_edge_count = 0
+    morphology_covered_edge_count = 0
+    morphology_penalty_sum = 0.0
     fill_start = time.perf_counter()
     progress_interval = max(1, len(batch_order) // 10)
 
@@ -591,15 +617,28 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
             string_frequencies, edge_counts
         )
         if morphology_enabled:
-            violations = np.asarray(row["edge_morph_violations"], dtype=np.float64)
-            if len(violations) != local_edge_count:
-                raise ValueError(
-                    "Morphology violation flags do not match the flattened edges."
-                )
-            big_non_free_weight[edge_cursor:edge_end_cursor] *= (
-                1.0 + morphology_rho * violations
+            penalties = np.asarray(row["edge_morph_penalties"], dtype=np.float64)
+            morphology_weights = np.asarray(
+                row["edge_morphology_weights"], dtype=np.float64
             )
-            penalized_edge_count += int(violations.sum())
+            if (
+                len(penalties) != local_edge_count
+                or len(morphology_weights) != local_edge_count
+            ):
+                raise ValueError(
+                    "Morphology weights and penalties do not match the flattened edges."
+                )
+            if np.any(penalties < 0.0) or np.any(penalties > 2.0 + 1e-12):
+                raise ValueError("Morphology edge penalties must be between 0 and 2.")
+            if np.any((morphology_weights != 0.0) & (morphology_weights != 1.0)):
+                raise ValueError("Morphology edge weights must be either 0 or 1.")
+            weighted_penalties = morphology_weights * penalties
+            big_non_free_weight[edge_cursor:edge_end_cursor] *= (
+                1.0 + morphology_rho * weighted_penalties
+            )
+            penalized_edge_count += int(np.count_nonzero(weighted_penalties > 0.0))
+            morphology_covered_edge_count += int(np.count_nonzero(morphology_weights))
+            morphology_penalty_sum += float(weighted_penalties.sum())
 
         local_free_edge_count = int(string_lengths.sum())
         free_edge_end_cursor = free_edge_cursor + local_free_edge_count
@@ -697,6 +736,8 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         "numFreeEdges": num_free_edges,
         "numTokens": num_tokens,
         "numMorphologyPenalizedEdges": penalized_edge_count,
+        "numMorphologyCoveredEdges": morphology_covered_edge_count,
+        "sumMorphologyPenalty": morphology_penalty_sum,
     }
 
 
@@ -719,6 +760,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
 
     morphology_rho = validate_morphology_rho(morphology_rho)
     morphology_enabled = morphology_rho > 0.0
+    morphology_diagnostics = {}
     worker_count = min(num_proc, max(1, len(pretoken_dataset)))
     cache_dir = _resolve_lp_cache_dir()
 
@@ -859,6 +901,21 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
         total_types = len(pretoken_dataset)
         unmatched_types = int(sum(pretoken_dataset["celex_unmatched"]))
         total_frequency = int(sum(pretoken_dataset["frequency"]))
+        diagnostic_type_counts = defaultdict(int)
+        diagnostic_frequency_counts = defaultdict(int)
+        for reason, frequency in zip(
+            pretoken_dataset["celex_unmatched_reason"],
+            pretoken_dataset["frequency"],
+        ):
+            diagnostic_type_counts[str(reason)] += 1
+            diagnostic_frequency_counts[str(reason)] += int(frequency)
+        morphology_diagnostics = {
+            reason: {
+                "types": diagnostic_type_counts[reason],
+                "frequency": diagnostic_frequency_counts[reason],
+            }
+            for reason in sorted(diagnostic_type_counts)
+        }
         unmatched_frequency = int(
             sum(
                 int(frequency)
@@ -884,6 +941,11 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
             )
             if unmatched_report_path:
                 print(f"[celex] Unmatched pre-token report: {unmatched_report_path}")
+            for reason, counts in morphology_diagnostics.items():
+                print(
+                    f"[celex] {reason}: types={counts['types']:,}; "
+                    f"frequency={counts['frequency']:,}"
+                )
 
     graph_features = Features(
         {
@@ -901,7 +963,8 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
         }
     )
     if morphology_enabled:
-        graph_features["edge_morph_violations"] = Sequence(Value("bool"))
+        graph_features["edge_morph_penalties"] = Sequence(Value("float64"))
+        graph_features["edge_morphology_weights"] = Sequence(Value("float64"))
     graph_start = time.perf_counter()
     try:
         graph_chunks = pretoken_dataset.map(
@@ -960,6 +1023,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
         morphology_rho=morphology_rho,
         verbose=verbose,
     )
+    lp_blocks["morphologyDiagnostics"] = morphology_diagnostics
     csr_time = time.perf_counter() - csr_start
     if verbose:
         print(
@@ -970,9 +1034,12 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
         )
         if morphology_enabled:
             print(
-                f"[celex] Penalized non-free edges="
+                f"[celex] CELEX-covered non-free edges="
+                f"{lp_blocks['numMorphologyCoveredEdges']:,}/"
+                f"{lp_blocks['numNonFreeEdges']:,}; positive-penalty edges="
                 f"{lp_blocks['numMorphologyPenalizedEdges']:,}/"
-                f"{lp_blocks['numNonFreeEdges']:,}"
+                f"{lp_blocks['numNonFreeEdges']:,}; summed penalty="
+                f"{lp_blocks['sumMorphologyPenalty']:.3f}"
             )
 
     return lp_blocks, tokens_to_keep
@@ -1635,6 +1702,11 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
     model["num_morphology_penalized_edges"] = lp_blocks[
         "numMorphologyPenalizedEdges"
     ]
+    model["num_morphology_covered_edges"] = lp_blocks[
+        "numMorphologyCoveredEdges"
+    ]
+    model["sum_morphology_penalty"] = lp_blocks["sumMorphologyPenalty"]
+    model["morphology_diagnostics"] = lp_blocks["morphologyDiagnostics"]
     if verbose:
         print(
             f"[prepare-cuopt] Initial cuOpt wrapper finished in "
