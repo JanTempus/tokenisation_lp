@@ -20,6 +20,12 @@ import numpy as np
 from datasets import load_dataset, load_from_disk
 from transformers import PreTrainedTokenizerFast
 
+from sampling_jaccard import (
+    jaccard_score,
+    pairwise_jaccard_by_length,
+    plot_length_conditioned_jaccard,
+)
+
 # ---------------------------------------------------------------------------
 # Configuration (read before any imports that consume env-vars at load time)
 # ---------------------------------------------------------------------------
@@ -72,9 +78,7 @@ BASELINE_TRAINERS = {
 
 
 def jaccard_distance(a, b):
-    inter = len(set(a) & set(b))
-    union = len(set(a) | set(b))
-    return inter / union if union > 0 else 0.0
+    return jaccard_score(a, b)
 
 
 def jaccard_distance_different_rounding(vocab_size, raw_tokens_path):
@@ -85,10 +89,14 @@ def jaccard_distance_different_rounding(vocab_size, raw_tokens_path):
     det_tokens  = deterministic_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
     bias_tokens = biased_rounding(tokens["possible_tokens"], tokens["unique_chars"], target)
     ones_tokens = [t.token for t in tokens["possible_tokens"] if t.lp_value >= 0.999]
-    det_tokens  = list(set(det_tokens  + tokens["special_tokens"]))
-    bias_tokens = list(set(bias_tokens + tokens["special_tokens"]))
-    ones_tokens = list(set(ones_tokens + tokens["unique_chars"] + tokens["special_tokens"]))
-    return {"all_ones": ones_tokens, "det": det_tokens, "bias": bias_tokens}
+    det_tokens = list(set(det_tokens))
+    bias_tokens = list(set(bias_tokens))
+    ones_tokens = list(set(ones_tokens + tokens["unique_chars"]))
+    return {
+        "all_ones": ones_tokens,
+        "det": det_tokens,
+        "bias": bias_tokens,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -230,10 +238,12 @@ def step3_train_baselines(samples, ss_dir):
 def step4_jaccard(sample_size, ss_dir):
     lp_keys = ["all_ones", "det", "bias"]
     results = {}
+    jaccard_dir = os.path.join(ss_dir, "jaccard")
+    os.makedirs(jaccard_dir, exist_ok=True)
 
     for vs in VOCAB_SIZES:
         print(f"\n[Jaccard vocab={vs}]")
-        results[vs] = {}
+        results[vs] = {"by_token_length": {}}
 
         # --- LP rounding schemes ---
         token_sets = []
@@ -248,7 +258,11 @@ def step4_jaccard(sample_size, ss_dir):
                     d = jaccard_distance(token_sets[i][key], token_sets[j][key])
                     mat[i][j] = d
                     mat[j][i] = d
-            results[vs][f"lp_{key}"] = mat.tolist()
+            method = f"lp_{key}"
+            results[vs][method] = mat.tolist()
+            results[vs]["by_token_length"][method] = pairwise_jaccard_by_length(
+                [sample_tokens[key] for sample_tokens in token_sets]
+            )
             upper = mat[np.triu_indices(T, k=1)]
             print(f"  LP {key}: mean={upper.mean():.4f}  min={upper.min():.4f}  max={upper.max():.4f}")
 
@@ -263,7 +277,9 @@ def step4_jaccard(sample_size, ss_dir):
                     f"{baseline}_{vs}",
                 )
                 tok = PreTrainedTokenizerFast.from_pretrained(tok_path)
-                baseline_vocabs.append(set(tok.get_vocab().keys()))
+                baseline_vocabs.append(
+                    set(tok.get_vocab()) - set(tok.all_special_tokens)
+                )
 
             mat = np.zeros((T, T))
             for i in range(T):
@@ -274,16 +290,26 @@ def step4_jaccard(sample_size, ss_dir):
                     mat[i][j] = d
                     mat[j][i] = d
             results[vs][baseline] = mat.tolist()
+            results[vs]["by_token_length"][baseline] = pairwise_jaccard_by_length(
+                baseline_vocabs
+            )
             upper = mat[np.triu_indices(T, k=1)]
             print(
                 f"  {baseline.upper()}: mean={upper.mean():.4f}  "
                 f"min={upper.min():.4f}  max={upper.max():.4f}"
             )
 
-    # --- Persist results ---
-    jaccard_dir = os.path.join(ss_dir, "jaccard")
-    os.makedirs(jaccard_dir, exist_ok=True)
+        plot_path = os.path.join(
+            jaccard_dir, f"jaccard_by_token_length_vocab_{vs}.png"
+        )
+        plot_length_conditioned_jaccard(
+            results[vs]["by_token_length"],
+            plot_path,
+            title=f"Jaccard by stored token length (vocab size {vs})",
+        )
+        print(f"  Saved length-conditioned plot to {plot_path}")
 
+    # --- Persist results ---
     json_path = os.path.join(jaccard_dir, "results.json")
     with open(json_path, "w") as f:
         json.dump({str(k): v for k, v in results.items()}, f, indent=2)
@@ -298,6 +324,14 @@ def step4_jaccard(sample_size, ss_dir):
         f.write(f"seed_base  : {SEED_BASE}\n\n")
         for vs in VOCAB_SIZES:
             f.write(f"=== Vocab size {vs} ===\n")
+            f.write(
+                "  Length-conditioned raw pair results: "
+                "results.json -> by_token_length\n"
+            )
+            f.write(
+                "  Length-conditioned plot: "
+                f"jaccard_by_token_length_vocab_{vs}.png\n"
+            )
             for key in lp_keys:
                 mat = np.array(results[vs][f"lp_{key}"])
                 upper = mat[np.triu_indices(T, k=1)]

@@ -1,12 +1,23 @@
+import json
+import os
 import pickle
+
 import numpy as np
-from lp_tokenizer.lp_functions import deterministic_rounding, biased_rounding,probabilistic_rounding
+
+from sampling_jaccard import (
+    jaccard_score,
+    pairwise_jaccard_by_length,
+    plot_length_conditioned_jaccard,
+)
+from lp_tokenizer.lp_functions import (
+    biased_rounding,
+    deterministic_rounding,
+    probabilistic_rounding,
+)
 
 
 def jaccard_distance(a, b):
-    inter = len(set(a) & set(b))
-    union = len(set(a) | set(b))
-    return inter / union if union > 0 else 0.0
+    return jaccard_score(a, b)
 
 
 def jaccard_distance_different_rounding(vocab_size,raw_tokens):
@@ -20,12 +31,17 @@ def jaccard_distance_different_rounding(vocab_size,raw_tokens):
     prob_tokens=probabilistic_rounding(tokens["possible_tokens"],tokens["unique_chars"],vocab_size-num_special_chars)    
     tokens_ones = [token.token for token in tokens["possible_tokens"] if token.lp_value >= 0.99]
     
-    det_tokens  = list(set(det_tokens+tokens["special_tokens"]))
-    bias_tokens = list(set(bias_tokens+tokens["special_tokens"]))
-    prob_tokens = list(set(prob_tokens+tokens["special_tokens"]))
-    tokens_ones = list(set(tokens_ones+tokens["unique_chars"]+tokens["special_tokens"]))
+    det_tokens = list(set(det_tokens))
+    bias_tokens = list(set(bias_tokens))
+    prob_tokens = list(set(prob_tokens))
+    tokens_ones = list(set(tokens_ones + tokens["unique_chars"]))
         
-    return {"all_ones":tokens_ones,"det":det_tokens,"bias":bias_tokens,"prob":prob_tokens}
+    return {
+        "all_ones": tokens_ones,
+        "det": det_tokens,
+        "bias": bias_tokens,
+        "prob": prob_tokens,
+    }
 
 
 
@@ -41,6 +57,12 @@ if __name__ == "__main__":
 
     n = 5
     keys=["all_ones","det","bias","prob"]
+    length_conditioned_results = {
+        f"lp_{key}": pairwise_jaccard_by_length(
+            [sample_tokens[key] for sample_tokens in token_sets]
+        )
+        for key in keys
+    }
 
     dist_matrix_ones = np.zeros((n-1, n-1))
     dist_matrix_det = np.zeros((n-1, n-1))
@@ -61,3 +83,30 @@ if __name__ == "__main__":
     
     for dist_matrix in dist_matrices:
         print(dist_matrix)
+
+    output_dir = os.path.dirname(
+        os.path.abspath(f"sampled_lp_tokens/lp_tokens_{VOCAB_SIZE}_0.pkl")
+    )
+    json_path = os.path.join(
+        output_dir, f"jaccard_by_token_length_{VOCAB_SIZE}.json"
+    )
+    with open(json_path, "w") as f:
+        json.dump(
+            {
+                "vocab_size": VOCAB_SIZE,
+                "by_token_length": length_conditioned_results,
+            },
+            f,
+            indent=2,
+        )
+
+    plot_path = os.path.join(
+        output_dir, f"jaccard_by_token_length_{VOCAB_SIZE}.png"
+    )
+    plot_length_conditioned_jaccard(
+        length_conditioned_results,
+        plot_path,
+        title=f"LP Jaccard by stored token length (vocab size {VOCAB_SIZE})",
+    )
+    print(f"Saved length-conditioned results to {json_path}")
+    print(f"Saved length-conditioned plot to {plot_path}")
