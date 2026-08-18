@@ -1,33 +1,44 @@
+#!/usr/bin/env python3
+
+import os
+from pathlib import Path
+
 from boundlessbpe import PickyBPE
-import time
 
-filepath = "data/minipile.jsonl"
 
-num_lines =  1000000 # 100000   # now stop due to max_bytes of 1GB
-vocab_size = 131072 # 1000 # 131072 # 500 # 40960 # 256 + 50, 131072 ~ 128k
-tau = 0.9 # deletion threshold 
+SPECIAL_TOKENS = [
+    "<|bos|>",
+    "<|user_start|>",
+    "<|user_end|>",
+    "<|assistant_start|>",
+    "<|assistant_end|>",
+    "<|python_start|>",
+    "<|python_end|>",
+    "<|output_start|>",
+    "<|output_end|>",
+    "<|unk|>",
+]
 
-# note if you set tau > 1, then this code can just be used as a regular BPE
-# tau = 1.1 # deletion threshold 
 
-print("tau:", tau)  # TODO: have two values for each
-outprefix = f"./models/pickybpe_0.9_{num_lines}_{vocab_size}_{tau}"
-print("outprefix:", outprefix)
-recalc = 100
+def main():
+    corpus_path = os.environ["PICKY_CORPUS_PATH"]
+    num_lines = int(os.environ["PICKY_NUM_LINES"])
+    vocab_size = int(os.environ["VOCAB_SIZE"])
+    save_dir = Path(os.environ["SAVE_DIR"])
+    output_prefix = save_dir / f"pickybpe_{vocab_size}"
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-tokenizer = PickyBPE()
-tokenizer.train(filepath, outprefix, num_lines, vocab_size, recalc)
-tokenizer.register_special_tokens({"<|endoftext|>": vocab_size})
-# print(tokenizer.encode("<|endoftext|>hello world", allowed_special="all"))
+    tokenizer = PickyBPE()
+    tokenizer.train(
+        corpus_path,
+        num_lines,
+        vocab_size - len(SPECIAL_TOKENS),
+        100,
+        verbose=False,
+    )
+    tokenizer.register_special_tokens(SPECIAL_TOKENS)
+    tokenizer.save(str(output_prefix))
 
-print("saving")
-tokenizer.save(outprefix)
 
-# make sure it loads
-print("loading")
-tokenizer2 = PickyBPE()
-tokenizer2.load(outprefix + ".model")
-
-print("done")
-    
-# python -u runpickybpe.py 2>&1 | tee logfile_pickbpe_0.9_1GB.txt
+if __name__ == "__main__":
+    main()

@@ -96,8 +96,7 @@ class BPEState:
 
     # work at a chunk level
     # where a document is stored as a list of chunks
-    # TODO: hardcoded max_bytes fix me!
-    def pretokenize(self, filepath : str, num_lines : int, compiled_pattern : Pattern[str], max_bytes = 1000000000) -> None:
+    def pretokenize(self, filepath: str, num_lines: int, compiled_pattern: Pattern[str]) -> None:
 
         start_time = time.time()
 
@@ -123,10 +122,6 @@ class BPEState:
 
                     total_chars += len(text)
                     total_bytes += len(text.encode("utf-8"))
-
-                    if total_bytes >= max_bytes:
-                        print('at max_bytes', i, max_bytes, total_chars, total_bytes)
-                        break
 
             # lets make parallel list of chunks and counts before we split up the chunks
             # sort descending by count for neatness, TODO: can take out later
@@ -163,10 +158,6 @@ class BPEState:
 
                     total_chars += len(text)
                     total_bytes += len(text.encode("utf-8"))
-
-                    if total_bytes >= max_bytes:
-                        print('at max_bytes', i, max_bytes, total_chars, total_bytes)
-                        break
 
             # all the counts are 1 here
             self.text_counts = [1]*len(self.text_chunks)
@@ -726,17 +717,18 @@ class BPEState:
                 # note if ios == 1 then we already deleted all occurences
                 if (len(tok) > 1) and (ios >= self.tau):
 
-                    if new_unlocked is None:
-                        nu = ""
-                    else:
-                        nu = frombytes(new_unlocked)
+                    if verbose:
+                        if new_unlocked is None:
+                            nu = ""
+                        else:
+                            nu = frombytes(new_unlocked)
 
-                    output = ["*", i+1, len(vocablist), self.prefix + "d", \
-                        frombytes(tok), direction, c_ab, c_a, c_b, round(ios, 5), round(self.tau, 5), round(time.time()-start_time,5), \
-                        len(self.pair_counts), \
-                        self.get_single_byte_cnt(), self.whole_words, nu]
-                    
-                    print("\t".join([str(x) for x in output]))
+                        output = ["*", i+1, len(vocablist), self.prefix + "d", \
+                            frombytes(tok), direction, c_ab, c_a, c_b, round(ios, 5), round(self.tau, 5), round(time.time()-start_time,5), \
+                            len(self.pair_counts), \
+                            self.get_single_byte_cnt(), self.whole_words, nu]
+
+                        print("\t".join([str(x) for x in output]))
 
                     if tok in self.deletions.values():
                         print("warning: deleting something twice", frombytes(tok))
@@ -810,11 +802,10 @@ class PickyBPE(UniformTokenizer):
     # verbose : should we print output?
     def train(self, 
               filepath : str, 
-              outprefix : str,
               num_lines : int, 
               vocab_size: int, 
               recalc : int,  # how many iterations do we recompute from scratch
-              verbose:bool = True) -> None:
+              verbose: bool = True) -> None:
 
         assert vocab_size >= 256
 
@@ -867,7 +858,8 @@ class PickyBPE(UniformTokenizer):
             if best_pair_words is not None:
                 bpw = frombytes(best_pair_words[0] + best_pair_words[1])
 
-            print("best pair:", bpw, best_cnt_words)
+            if verbose:
+                print("best pair:", bpw, best_cnt_words)
 
             total_max_value += (time.time() - start_max)
             
@@ -895,33 +887,6 @@ class PickyBPE(UniformTokenizer):
 
             i += 1
 
-            # save intermediate output
-            if len(self.vocablist) % 8192 == 0:  #  100 == 0:
-
-                self.vocab = { tok : ind for (ind, tok) in enumerate(self.vocablist)}
-                overall_time = time.time() - start_overall
-
-                print(":len(vocab):", len(self.vocab))
-                print(":single_counts:", len(self.words_state.single_counts))
-                print(":pair_counts:", len(self.words_state.pair_counts))
-                print(":single_byte_cnt:", self.words_state.get_single_byte_cnt())
-                print(":whole_words:", self.words_state.whole_words)
-                print(":merges:", len(self.words_state.merges))
-                print(":deletions:", len(self.words_state.deletions))
-                print(":training time breakdown")
-                print(":total_pretok:", total_pretok)
-                print(":total_initalize_counts:", total_ic)
-                print(":total_max_value:", total_max_value)
-                print(":total_merge:", total_merge)
-                print(":total_delete:", total_delete)
-                print(":total_verify:", total_verify)
-                print(":overall_time:", overall_time)
-                print(":missing:", overall_time - total_pretok - total_ic - total_max_value - total_merge - total_delete - total_verify)
-
-                # outprefix = f"./models/fastersuper_{num_lines}_{len(self.vocablist)}"
-                print(":outprefix:", outprefix + "_" + str(len(self.vocablist)))
-                self.save(outprefix + "_" + str(len(self.vocablist)))
-
         # training is done here
         # now finally convert to the vocab, since we're done with deletions
         self.vocab = { tok : ind for (ind, tok) in enumerate(self.vocablist)}
@@ -934,11 +899,12 @@ class PickyBPE(UniformTokenizer):
 
         # write our vocab with counts
         # TODO: have logic for supermerge vocab words too
-        print()
-        print("vocab:")
-        for tok, index in self.vocab.items():
-            print("+", index, frombytes(tok), self.words_state.single_counts.get(tok, 0))
-        print()
+        if verbose:
+            print()
+            print("vocab:")
+            for tok, index in self.vocab.items():
+                print("+", index, frombytes(tok), self.words_state.single_counts.get(tok, 0))
+            print()
 
         # this is probably too big now
         # self.print_tokenization()
