@@ -4,17 +4,26 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=288
-#SBATCH --mem=0
-#SBATCH --exclusive
-#SBATCH -t 24:00:00
+#SBATCH -t 02:00:00
+#SBATCH --output=/iopsstor/scratch/cscs/jtempus/slurm-%j.out
+#SBATCH --error=/iopsstor/scratch/cscs/jtempus/slurm-%j.err
 
 set -e
 
 REPO_DIR=/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp
-TRAIN_DATASET_PATH=${REPO_DIR}/datasets/climbmix_first7
-OUTPUT_ROOT=${REPO_DIR}/tokenizer_runs/nanochat_comparison
+WORKING_DIR=/iopsstor/scratch/cscs/jtempus
+TRAIN_DATASET_PATH=${WORKING_DIR}/datasets/climbmix_first7
+OUTPUT_ROOT=${WORKING_DIR}/tokenizer_runs/nanochat_comparison
 VOCAB_SIZES_CSV=8192,16384,32768,65536,131072,262144
 VOCAB_SIZES=(8192 16384 32768 65536 131072 262144)
+
+TMPDIR=${WORKING_DIR}/tmp/${SLURM_JOB_ID}
+XDG_CACHE_HOME=${WORKING_DIR}/cache
+HF_HOME=${XDG_CACHE_HOME}/huggingface
+HF_DATASETS_CACHE=${HF_HOME}/datasets
+HF_HUB_CACHE=${HF_HOME}/hub
+PYTHONPYCACHEPREFIX=${XDG_CACHE_HOME}/python
+export TMPDIR XDG_CACHE_HOME HF_HOME HF_DATASETS_CACHE HF_HUB_CACHE PYTHONPYCACHEPREFIX
 
 source /users/jtempus/miniconda3/etc/profile.d/conda.sh
 conda activate primer-py311
@@ -23,7 +32,7 @@ cd "${REPO_DIR}"
 UNIGRAM_DIR=${OUTPUT_ROOT}/unigram
 FREQUENT_DIR=${OUTPUT_ROOT}/frequent
 PICKY_DIR=${OUTPUT_ROOT}/picky
-SHARED_DIR=${OUTPUT_ROOT}/shared
+SHARED_DIR=${WORKING_DIR}/shared
 LOG_DIR=${OUTPUT_ROOT}/logs
 PICKY_CORPUS_PATH=${SHARED_DIR}/picky_corpus.jsonl
 
@@ -32,7 +41,11 @@ mkdir -p \
     "${FREQUENT_DIR}" \
     "${PICKY_DIR}" \
     "${SHARED_DIR}" \
-    "${LOG_DIR}"
+    "${LOG_DIR}" \
+    "${TMPDIR}" \
+    "${HF_DATASETS_CACHE}" \
+    "${HF_HUB_CACHE}" \
+    "${PYTHONPYCACHEPREFIX}"
 
 srun \
     --exclusive --exact --nodes=1 --ntasks=1 --cpus-per-task=64 --cpu-bind=cores \
