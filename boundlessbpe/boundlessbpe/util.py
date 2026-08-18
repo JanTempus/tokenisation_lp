@@ -210,18 +210,16 @@ def _read_sorted_dict_intkey(f : TextIO, ispair : bool, isstr : bool) -> dict:
 
 # find all occurences of bad_token in the list, and replace with the individual bytes
 # retuns the new tokens, and the number of deletions (can be 0)
-# replacement_pair should combine to form bad_token 
-
 # TODO: now will need to track initial words in superwords
 
-def blow_up(lst : list[bytes], bad_token : bytes, parts : list[bytes]):
+def blow_up(lst : list[bytes], bad_token : bytes):
 
     new_tokens = []
     deletions = 0
+    parts = [bytes([byte]) for byte in bad_token]
 
     for tok in lst:
         if tok == bad_token:
-            # either single bytes or a pair of bytes
             new_tokens.extend(parts) 
             deletions += 1
         else:

@@ -5,15 +5,13 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=288
 #SBATCH -t 02:00:00
-#SBATCH --output=/iopsstor/scratch/cscs/jtempus/slurm-%j.out
-#SBATCH --error=/iopsstor/scratch/cscs/jtempus/slurm-%j.err
 
 set -e
 
 REPO_DIR=/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp
 WORKING_DIR=/iopsstor/scratch/cscs/jtempus
 TRAIN_DATASET_PATH=${WORKING_DIR}/datasets/climbmix_first7
-OUTPUT_ROOT=${WORKING_DIR}/tokenizer_runs/nanochat_comparison
+OUTPUT_ROOT=${REPO_DIR}/tokenizer_runs/nanochat_comparison
 VOCAB_SIZES_CSV=8192,16384,32768,65536,131072,262144
 VOCAB_SIZES=(8192 16384 32768 65536 131072 262144)
 
@@ -23,7 +21,8 @@ HF_HOME=${XDG_CACHE_HOME}/huggingface
 HF_DATASETS_CACHE=${HF_HOME}/datasets
 HF_HUB_CACHE=${HF_HOME}/hub
 PYTHONPYCACHEPREFIX=${XDG_CACHE_HOME}/python
-export TMPDIR XDG_CACHE_HOME HF_HOME HF_DATASETS_CACHE HF_HUB_CACHE PYTHONPYCACHEPREFIX
+PYTHONPATH=${REPO_DIR}
+export TMPDIR XDG_CACHE_HOME HF_HOME HF_DATASETS_CACHE HF_HUB_CACHE PYTHONPYCACHEPREFIX PYTHONPATH
 
 source /users/jtempus/miniconda3/etc/profile.d/conda.sh
 conda activate primer-py311
