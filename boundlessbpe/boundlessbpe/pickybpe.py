@@ -4,9 +4,7 @@ Minimal (byte-level) Byte Pair Encoding tokenizer.
 Algorithmically follows along the GPT tokenizer:
 https://github.com/openai/gpt-2/blob/master/src/encoder.py
 
-Unlike BasicTokenizer:
-- RegexTokenizer handles an optional regex splitting pattern.
-- RegexTokenizer handles optional special tokens.
+PickyBPE uses the NanoChat regex splitting pattern and supports special tokens.
 
 - this will be regular BPE with Picky BPE deletions
 - with counts for merges
@@ -40,11 +38,7 @@ class BPEState:
 
     def __init__(self, prefix : str, tau: float, is_super : bool, unlocked: defaultdict[bytes,bool]):
 
-        """
-        - pattern: optional string to override the default (GPT-4 split pattern)
-        - special_tokens: str -> int dictionary of special tokens
-          example: {'<|endoftext|>': 100257}
-        """
+        """Track merge and deletion statistics for a pretoken stream."""
 
         # what we print out for a merge, i.e. w or s for word or superword
         self.prefix = prefix
@@ -759,15 +753,11 @@ class BPEState:
 
 class PickyBPE(UniformTokenizer):
 
-    def __init__(self, pattern=None):
-        """
-        - pattern: optional string to override the default (GPT-4 split pattern)
-        - special_tokens: str -> int dictionary of special tokens
-          example: {'<|endoftext|>': 100257}
-        """
+    def __init__(self):
+        """Initialize PickyBPE with NanoChat pretokenization boundaries."""
         super().__init__()
 
-        self.pattern = ULTIMATE_PATTERN if pattern is None else pattern
+        self.pattern = NANOCHAT_SPLIT_PATTERN
         self.compiled_pattern = re.compile(self.pattern)
         
         # TODO: these need more testing
@@ -1052,4 +1042,3 @@ class PickyBPE(UniformTokenizer):
         # TODO: return a bytes instead?
         text = text_bytes.decode("utf-8", errors="replace")
         return text
-
