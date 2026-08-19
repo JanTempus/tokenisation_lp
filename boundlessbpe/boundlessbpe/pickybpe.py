@@ -805,9 +805,12 @@ class PickyBPE(UniformTokenizer):
               num_lines : int, 
               vocab_size: int, 
               recalc : int,  # how many iterations do we recompute from scratch
-              verbose: bool = True) -> None:
+              verbose: bool = True,
+              progress_every: int = 1000) -> None:
 
         assert vocab_size >= 256
+        if progress_every < 0:
+            raise ValueError("progress_every must be non-negative")
 
         start_overall = time.time()
 
@@ -857,6 +860,15 @@ class PickyBPE(UniformTokenizer):
             bpw = "none"
             if best_pair_words is not None:
                 bpw = frombytes(best_pair_words[0] + best_pair_words[1])
+
+            if progress_every and i % progress_every == 0:
+                print(
+                    f"[pickybpe] iteration={i:,}, "
+                    f"vocab={len(self.vocablist):,}/{vocab_size:,}, "
+                    f"pairs={len(self.words_state.pair_counts):,}, "
+                    f"best_pair={bpw!r}, best_count={best_cnt_words:,}, "
+                    f"elapsed={time.time() - start_overall:.1f}s"
+                )
 
             if verbose:
                 print("best pair:", bpw, best_cnt_words)

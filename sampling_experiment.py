@@ -8,7 +8,10 @@ For each sample size in SAMPLE_SIZES and each of T independent samples it:
   4. Computes pairwise inter-sample Jaccard distances (same vocab size, different samples)
      for the LP rounding schemes, BPE, and Unigram, and saves the results.
 
-All settings are read from environment variables (see run_sampling_experiment.sbatch).
+Sampled datasets and scratch artifacts are written to WORK_DIR on Iopsstor.
+Trained tokenizers and final Jaccard results are written to RESULTS_DIR on
+Capstor. All settings are read from environment variables (see
+run_sampling_experiment.sbatch).
 """
 
 import json
@@ -45,8 +48,8 @@ SAMPLE_SIZES = [int(v) for v in _require_env("SAMPLE_SIZES").split(",") if v.str
 VOCAB_SIZES  = [int(v) for v in _require_env("VOCAB_SIZES").split(",") if v.strip()]
 SEED_BASE    = int(_require_env("SEED_BASE"))
 SOURCE       = _require_env("SOURCE").strip().lower()
-
-EXP_DIR = f"experiment_{NAME}"
+WORK_DIR      = _require_env("WORK_DIR")
+RESULTS_DIR   = _require_env("RESULTS_DIR")
 
 # ---------------------------------------------------------------------------
 # Imports that read env-vars at module load time (must come after env is set)
@@ -188,9 +191,9 @@ def step1_sample_datasets(sample_size, ss_dir, full_ds=None):
 # ---------------------------------------------------------------------------
 # Step 2 – Train LP tokenizers
 # ---------------------------------------------------------------------------
-def step2_train_lp(samples, ss_dir):
+def step2_train_lp(samples, result_ss_dir):
     for i, dataset in enumerate(samples):
-        lp_dir = os.path.join(ss_dir, "lp_raw", f"sample_{i}")
+        lp_dir = os.path.join(result_ss_dir, "lp_raw", f"sample_{i}")
 
         missing = [
             vs for vs in VOCAB_SIZES
@@ -215,10 +218,10 @@ def step2_train_lp(samples, ss_dir):
 # ---------------------------------------------------------------------------
 # Step 3 – Train baseline tokenizers
 # ---------------------------------------------------------------------------
-def step3_train_baselines(samples, ss_dir):
+def step3_train_baselines(samples, result_ss_dir):
     for baseline, train_baseline in BASELINE_TRAINERS.items():
         for i, dataset in enumerate(samples):
-            baseline_dir = os.path.join(ss_dir, baseline, f"sample_{i}")
+            baseline_dir = os.path.join(result_ss_dir, baseline, f"sample_{i}")
             for vs in VOCAB_SIZES:
                 out_path = os.path.join(baseline_dir, f"{baseline}_{vs}")
                 if os.path.exists(os.path.join(out_path, "tokenizer.json")):
@@ -235,10 +238,10 @@ def step3_train_baselines(samples, ss_dir):
 # ---------------------------------------------------------------------------
 # Step 4 – Compute pairwise inter-sample Jaccard distances
 # ---------------------------------------------------------------------------
-def step4_jaccard(sample_size, ss_dir):
+def step4_jaccard(sample_size, result_ss_dir):
     lp_keys = ["all_ones", "det", "bias"]
     results = {}
-    jaccard_dir = os.path.join(ss_dir, "jaccard")
+    jaccard_dir = os.path.join(result_ss_dir, "jaccard")
     os.makedirs(jaccard_dir, exist_ok=True)
 
     for vs in VOCAB_SIZES:
@@ -248,7 +251,12 @@ def step4_jaccard(sample_size, ss_dir):
         # --- LP rounding schemes ---
         token_sets = []
         for i in range(T):
-            pkl_path = os.path.join(ss_dir, "lp_raw", f"sample_{i}", f"lp_tokens_{vs}.pkl")
+            pkl_path = os.path.join(
+                result_ss_dir,
+                "lp_raw",
+                f"sample_{i}",
+                f"lp_tokens_{vs}.pkl",
+            )
             token_sets.append(jaccard_distance_different_rounding(vs, pkl_path))
 
         for key in lp_keys:
@@ -271,7 +279,7 @@ def step4_jaccard(sample_size, ss_dir):
             baseline_vocabs = []
             for i in range(T):
                 tok_path = os.path.join(
-                    ss_dir,
+                    result_ss_dir,
                     baseline,
                     f"sample_{i}",
                     f"{baseline}_{vs}",
@@ -355,7 +363,8 @@ def step4_jaccard(sample_size, ss_dir):
 if __name__ == "__main__":
     print(f"=== Sampling Experiment: {NAME} ===")
     print(f"T={T}, SAMPLE_SIZES={SAMPLE_SIZES}, VOCAB_SIZES={VOCAB_SIZES}, SEED_BASE={SEED_BASE}, SOURCE={SOURCE}")
-    print(f"Output directory: {EXP_DIR}\n")
+    print(f"Iopsstor work directory: {WORK_DIR}")
+    print(f"Capstor results directory: {RESULTS_DIR}\n")
 
     full_ds = None
     if SOURCE == "finewebedu":
@@ -365,9 +374,12 @@ if __name__ == "__main__":
 
     timings = {}
     for sample_size in SAMPLE_SIZES:
-        ss_dir = os.path.join(EXP_DIR, f"ss_{sample_size}")
+        ss_dir = os.path.join(WORK_DIR, f"ss_{sample_size}")
+        result_ss_dir = os.path.join(RESULTS_DIR, f"ss_{sample_size}")
         print(f"\n{'='*60}")
-        print(f"Sample size: {sample_size}  →  {ss_dir}")
+        print(f"Sample size: {sample_size}")
+        print(f"Intermediate work: {ss_dir}")
+        print(f"Final results: {result_ss_dir}")
         print(f"{'='*60}")
         t0 = time.perf_counter()
 
@@ -375,13 +387,13 @@ if __name__ == "__main__":
         samples = step1_sample_datasets(sample_size, ss_dir, full_ds=full_ds)
 
         print("\n--- Step 2/4: Training LP tokenizers ---")
-        step2_train_lp(samples, ss_dir)
+        step2_train_lp(samples, result_ss_dir)
 
         print("\n--- Step 3/4: Training BPE and Unigram tokenizers ---")
-        step3_train_baselines(samples, ss_dir)
+        step3_train_baselines(samples, result_ss_dir)
 
         print("\n--- Step 4/4: Computing Jaccard distances ---")
-        step4_jaccard(sample_size, ss_dir)
+        step4_jaccard(sample_size, result_ss_dir)
 
         elapsed = time.perf_counter() - t0
         timings[sample_size] = elapsed
@@ -391,4 +403,26 @@ if __name__ == "__main__":
     print("All sample sizes complete. Timings:")
     for ss, t in timings.items():
         print(f"  ss={ss:>8d}: {t:.1f}s ({t/60:.1f}min)")
+
+    summary_path = os.path.join(RESULTS_DIR, "run_summary.json")
+    with open(summary_path, "w") as f:
+        json.dump(
+            {
+                "name": NAME,
+                "samples_per_size": T,
+                "sample_sizes": SAMPLE_SIZES,
+                "vocab_sizes": VOCAB_SIZES,
+                "seed_base": SEED_BASE,
+                "source": SOURCE,
+                "work_dir": WORK_DIR,
+                "results_dir": RESULTS_DIR,
+                "timings_seconds": {
+                    str(sample_size): elapsed
+                    for sample_size, elapsed in timings.items()
+                },
+            },
+            f,
+            indent=2,
+        )
+    print(f"Run summary saved to {summary_path}")
     print("Done.")
