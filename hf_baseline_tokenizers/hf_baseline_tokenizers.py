@@ -29,7 +29,6 @@ def build_pretokenizer(mode):
     tokenizer = AutoTokenizer.from_pretrained(
         "EleutherAI/pythia-70m-deduped",
         revision="step3000",
-        cache_dir="./pythia-70m-deduped/step3000",
     )
 
     if mode == "pythia":
