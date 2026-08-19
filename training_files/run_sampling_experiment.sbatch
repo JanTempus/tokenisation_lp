@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -A a139
+#SBATCH -A a0229
 #SBATCH -p normal
 #SBATCH --gres=gpu:1
 #SBATCH -t 6:00:00
