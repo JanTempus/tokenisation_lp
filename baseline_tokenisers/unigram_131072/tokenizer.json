@@ -140,7 +140,12 @@
     ],
     "special_tokens": {}
   },
-  "decoder": null,
+  "decoder": {
+    "type": "ByteLevel",
+    "add_prefix_space": true,
+    "trim_offsets": true,
+    "use_regex": true
+  },
   "model": {
     "type": "Unigram",
     "unk_id": 9,

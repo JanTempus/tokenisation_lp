@@ -120,6 +120,10 @@ def train_tokenizer(vocab_size: int, dataset, save_dir: str, tokenizer_type: str
 
     # Keep pretokenization consistent with the LP training / rounding pipeline
     tokenizer.pre_tokenizer = PRETOKENIZER.backend_tokenizer.pre_tokenizer
+    # ByteLevel maps bytes to visible Unicode code points (for example, a
+    # leading space becomes ``Ġ``). The matching decoder is required to turn
+    # those token strings back into the original text.
+    tokenizer.decoder = PRETOKENIZER.backend_tokenizer.decoder
 
     tokenizer.train_from_iterator(corpus, trainer=trainer)
 
