@@ -4,9 +4,12 @@ from transformers import AutoTokenizer
 from datasets import Value, concatenate_datasets, load_dataset, load_from_disk
 from tokenizers import Regex
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
+from lp_tokenizer.lp_functions import solve_vocab_on_model
 import pickle
 import os
 import multiprocessing
+import gc
+import tempfile
 from pathlib import Path
 import traceback
 
@@ -75,7 +78,11 @@ def build_pretokenizer(mode):
     )
 
 
-pretokenizer = build_pretokenizer(PRETOKENIZER_MODE)
+pretokenizer = (
+    None
+    if os.environ.get("_LP_GPU_SOLVE_WORKER") == "1"
+    else build_pretokenizer(PRETOKENIZER_MODE)
+)
 
 
 def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj,
@@ -134,12 +141,34 @@ def print_lp_variable_counts(vocab_size, x_values, cuopt_model):
         )
 
 
-def _solve_and_save_lp_vocab(tokenizer, vocab_size, save_dir):
+def _solve_and_save_lp_vocab(
+    cuopt_model,
+    unique_chars,
+    special_tokens,
+    vocab_size,
+    save_dir,
+):
     print("---------------------------------------", flush=True)
     print(f"[sweep] Solving for vocab_size={vocab_size}", flush=True)
     print("---------------------------------------", flush=True)
-    tokens = tokenizer.solve_for_vocab_size(vocab_size)
-    print_lp_variable_counts(vocab_size, tokens["x_values"], tokenizer._cuopt_model)
+    lp_budget = vocab_size - len(unique_chars) - len(special_tokens)
+    if lp_budget <= 0:
+        raise ValueError(
+            f"Vocab size {vocab_size} too small: unique_chars={len(unique_chars)} "
+            f"+ special_tokens={len(special_tokens)} already exceeds budget."
+        )
+    print(
+        f"[solve_for_vocab_size] vocab_size={vocab_size} lp_budget={lp_budget}",
+        flush=True,
+    )
+    result = solve_vocab_on_model(cuopt_model, numAllowedTokens=lp_budget)
+    tokens = {
+        "possible_tokens": result["possible_tokens"],
+        "unique_chars": unique_chars,
+        "special_tokens": special_tokens,
+        "x_values": result["x_values"],
+    }
+    print_lp_variable_counts(vocab_size, tokens["x_values"], cuopt_model)
     # Drop x_values before pickling to keep output shape identical to the
     # single-size path.
     tokens.pop("x_values", None)
@@ -150,13 +179,13 @@ def _solve_and_save_lp_vocab(tokenizer, vocab_size, save_dir):
 
 
 def _solve_lp_gpu_worker(
-    tokenizer,
+    prepared_model_path,
     save_dir,
     cuda_device,
     task_queue,
     status_connection,
 ):
-    """Solve vocabulary budgets on one GPU in a forked worker process."""
+    """Solve vocabulary budgets on one GPU in a spawned worker process."""
     os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
     try:
         print(
@@ -164,11 +193,23 @@ def _solve_lp_gpu_worker(
             f"CUDA_VISIBLE_DEVICES={cuda_device}",
             flush=True,
         )
+        with open(prepared_model_path, "rb") as model_file:
+            payload = pickle.load(model_file)
+        cuopt_model = payload["cuopt_model"]
+        unique_chars = payload["unique_chars"]
+        special_tokens = payload["special_tokens"]
+        del payload
         while True:
             vocab_size = task_queue.get()
             if vocab_size is None:
                 break
-            _solve_and_save_lp_vocab(tokenizer, vocab_size, save_dir)
+            _solve_and_save_lp_vocab(
+                cuopt_model,
+                unique_chars,
+                special_tokens,
+                vocab_size,
+                save_dir,
+            )
         status_connection.send(None)
     except BaseException:
         status_connection.send(traceback.format_exc())
@@ -231,7 +272,13 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
 
     if worker_count == 1:
         for vs in sorted_sizes:
-            _solve_and_save_lp_vocab(tokenizer, vs, save_dir)
+            _solve_and_save_lp_vocab(
+                tokenizer._cuopt_model,
+                tokenizer.unique_chars,
+                list(tokenizer.special_tokens_list),
+                vs,
+                save_dir,
+            )
         return
 
     cuda_devices = _visible_cuda_devices(worker_count)
@@ -240,34 +287,83 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
         f"{worker_count} GPUs: {cuda_devices}",
         flush=True,
     )
-    context = multiprocessing.get_context("fork")
+    # CUDA and RMM cannot safely initialize in a process created with fork.
+    # Spawn gives each GPU worker a fresh interpreter and CUDA runtime.
+    context = multiprocessing.get_context("spawn")
     task_queue = context.Queue()
     workers = []
     status_connections = []
-
-    for cuda_device in cuda_devices:
-        parent_connection, child_connection = context.Pipe(duplex=False)
-        process = context.Process(
-            target=_solve_lp_gpu_worker,
-            args=(
-                tokenizer,
-                save_dir,
-                cuda_device,
-                task_queue,
-                child_connection,
-            ),
-        )
-        process.start()
-        child_connection.close()
-        workers.append(process)
-        status_connections.append(parent_connection)
-
-    for vocab_size in reversed(sorted_sizes):
-        task_queue.put(vocab_size)
-    for _ in workers:
-        task_queue.put(None)
-
+    configured_tmp_dir = os.environ.get("TMPDIR")
+    model_tmp_dir = (
+        configured_tmp_dir
+        if configured_tmp_dir and os.path.isdir(configured_tmp_dir)
+        else None
+    )
+    model_file = tempfile.NamedTemporaryFile(
+        mode="wb",
+        prefix="lp_sweep_model_",
+        suffix=".pkl",
+        dir=model_tmp_dir,
+        delete=False,
+    )
+    prepared_model_path = model_file.name
     try:
+        print(
+            f"[sweep] Serializing prepared LP model once to "
+            f"{prepared_model_path}",
+            flush=True,
+        )
+        with model_file:
+            pickle.dump(
+                {
+                    "cuopt_model": tokenizer._cuopt_model,
+                    "unique_chars": tokenizer.unique_chars,
+                    "special_tokens": list(tokenizer.special_tokens_list),
+                },
+                model_file,
+                protocol=pickle.HIGHEST_PROTOCOL,
+            )
+        tokenizer._cuopt_model = None
+        gc.collect()
+
+        original_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+        original_worker_marker = os.environ.get("_LP_GPU_SOLVE_WORKER")
+        try:
+            for cuda_device in cuda_devices:
+                parent_connection, child_connection = context.Pipe(duplex=False)
+                process = context.Process(
+                    target=_solve_lp_gpu_worker,
+                    args=(
+                        prepared_model_path,
+                        save_dir,
+                        cuda_device,
+                        task_queue,
+                        child_connection,
+                    ),
+                )
+                # Pin the environment before spawn so CUDA-aware imports during
+                # interpreter bootstrap also see exactly one GPU.
+                os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
+                os.environ["_LP_GPU_SOLVE_WORKER"] = "1"
+                process.start()
+                child_connection.close()
+                workers.append(process)
+                status_connections.append(parent_connection)
+        finally:
+            if original_visible_devices is None:
+                os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+            else:
+                os.environ["CUDA_VISIBLE_DEVICES"] = original_visible_devices
+            if original_worker_marker is None:
+                os.environ.pop("_LP_GPU_SOLVE_WORKER", None)
+            else:
+                os.environ["_LP_GPU_SOLVE_WORKER"] = original_worker_marker
+
+        for vocab_size in reversed(sorted_sizes):
+            task_queue.put(vocab_size)
+        for _ in workers:
+            task_queue.put(None)
+
         for process in workers:
             process.join()
     except BaseException:
@@ -276,10 +372,16 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
                 process.terminate()
         for process in workers:
             process.join()
+        for connection in status_connections:
+            connection.close()
         raise
     finally:
         task_queue.close()
         task_queue.join_thread()
+        if not model_file.closed:
+            model_file.close()
+        if os.path.exists(prepared_model_path):
+            os.remove(prepared_model_path)
 
     failures = []
     for process, connection in zip(workers, status_connections):
