@@ -308,7 +308,7 @@ def step4_jaccard(sample_size, result_ss_dir):
             )
 
         plot_path = os.path.join(
-            jaccard_dir, f"jaccard_by_token_length_vocab_{vs}.png"
+            jaccard_dir, f"jaccard_by_token_length_vocab_{vs}.pdf"
         )
         plot_length_conditioned_jaccard(
             results[vs]["by_token_length"],
@@ -338,7 +338,7 @@ def step4_jaccard(sample_size, result_ss_dir):
             )
             f.write(
                 "  Length-conditioned plot: "
-                f"jaccard_by_token_length_vocab_{vs}.png\n"
+                f"jaccard_by_token_length_vocab_{vs}.pdf\n"
             )
             for key in lp_keys:
                 mat = np.array(results[vs][f"lp_{key}"])

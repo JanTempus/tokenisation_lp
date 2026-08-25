@@ -101,7 +101,7 @@ if __name__ == "__main__":
         )
 
     plot_path = os.path.join(
-        output_dir, f"jaccard_by_token_length_{VOCAB_SIZE}.png"
+        output_dir, f"jaccard_by_token_length_{VOCAB_SIZE}.pdf"
     )
     plot_length_conditioned_jaccard(
         length_conditioned_results,

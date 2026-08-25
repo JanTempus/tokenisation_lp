@@ -12,7 +12,6 @@ import matplotlib
 # Sampling experiments commonly run as headless batch jobs.
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.lines import Line2D  # noqa: E402
 import numpy as np  # noqa: E402
 
 
@@ -43,20 +42,23 @@ def pairwise_jaccard_by_length(
 ) -> LengthConditionedResults:
     """Calculate every sample-pair Jaccard score independently by token length.
 
-    A record is emitted when at least one side has tokens of that length. This
-    keeps one-sided buckets (whose score is zero) while omitting comparisons in
-    which both buckets are empty.
+    Every sample pair is emitted for every token length observed in at least
+    one vocabulary. If both samples have an empty bucket, ``jaccard_score``
+    records zero, consistently with its empty-union behavior.
     """
     grouped_vocabularies = [
         group_tokens_by_length(vocabulary) for vocabulary in vocabularies
     ]
 
+    all_token_lengths = sorted(
+        set().union(*(grouped.keys() for grouped in grouped_vocabularies))
+    )
     records_by_length: defaultdict[int, list[JaccardRecord]] = defaultdict(list)
     for sample_i in range(len(grouped_vocabularies)):
         for sample_j in range(sample_i + 1, len(grouped_vocabularies)):
             grouped_i = grouped_vocabularies[sample_i]
             grouped_j = grouped_vocabularies[sample_j]
-            for token_length in sorted(grouped_i.keys() | grouped_j.keys()):
+            for token_length in all_token_lengths:
                 records_by_length[token_length].append(
                     {
                         "sample_i": sample_i,
@@ -74,43 +76,67 @@ def pairwise_jaccard_by_length(
     }
 
 
-def _records_to_pair_traces(
+def _infer_sample_count(
     results: Mapping[str, Sequence[Mapping[str, int | float]]],
-) -> tuple[list[int], dict[tuple[int, int], dict[int, float]]]:
+) -> int:
+    sample_indices = {
+        int(record[key])
+        for records in results.values()
+        for record in records
+        for key in ("sample_i", "sample_j")
+    }
+    return max(sample_indices, default=-1) + 1
+
+
+def summarize_jaccard_by_length(
+    results: Mapping[str, Sequence[Mapping[str, int | float]]],
+) -> tuple[list[int], list[float], list[float]]:
+    """Return token lengths and pairwise mean/std Jaccard at each length.
+
+    Older result files omitted a pair when both samples had no tokens of a
+    given length. ``jaccard_score`` defines that empty-union case as zero, so
+    this function restores those missing zero-valued comparisons before
+    calculating the statistics. New result files explicitly contain every
+    sample pair for every globally observed token length.
+    """
+    sample_count = _infer_sample_count(results)
+    expected_pairs = {
+        (sample_i, sample_j)
+        for sample_i in range(sample_count)
+        for sample_j in range(sample_i + 1, sample_count)
+    }
+
     lengths: list[int] = []
-    traces: defaultdict[tuple[int, int], dict[int, float]] = defaultdict(dict)
-
+    means: list[float] = []
+    standard_deviations: list[float] = []
     for length_key, records in sorted(results.items(), key=lambda item: int(item[0])):
-        token_length = int(length_key)
-        lengths.append(token_length)
-        for record in records:
-            pair = (int(record["sample_i"]), int(record["sample_j"]))
-            traces[pair][token_length] = float(record["jaccard"])
+        scores_by_pair = {
+            (int(record["sample_i"]), int(record["sample_j"])): float(
+                record["jaccard"]
+            )
+            for record in records
+        }
+        scores = np.asarray(
+            [scores_by_pair.get(pair, 0.0) for pair in sorted(expected_pairs)],
+            dtype=float,
+        )
+        if scores.size == 0:
+            continue
+        lengths.append(int(length_key))
+        means.append(float(np.mean(scores)))
+        standard_deviations.append(float(np.std(scores)))
 
-    return lengths, dict(traces)
+    return lengths, means, standard_deviations
 
 
 def create_length_conditioned_jaccard_figure(
     results_by_method: Mapping[str, LengthConditionedResults],
     title: str | None = None,
 ):
-    """Create a figure with one exact sample-pair trace per method panel."""
+    """Plot pairwise mean Jaccard with a population +/-1 SD band."""
     methods = list(results_by_method)
     if not methods:
         raise ValueError("At least one method is required to plot Jaccard results")
-
-    traces_by_method = {}
-    all_pairs: set[tuple[int, int]] = set()
-    for method, method_results in results_by_method.items():
-        lengths, traces = _records_to_pair_traces(method_results)
-        traces_by_method[method] = (lengths, traces)
-        all_pairs.update(traces)
-
-    pairs = sorted(all_pairs)
-    color_map = plt.get_cmap("tab20")
-    pair_colors = {
-        pair: color_map(index % color_map.N) for index, pair in enumerate(pairs)
-    }
 
     ncols = min(2, len(methods))
     nrows = math.ceil(len(methods) / ncols)
@@ -124,58 +150,46 @@ def create_length_conditioned_jaccard_figure(
     flat_axes = list(np.asarray(axes).ravel())
 
     for axis, method in zip(flat_axes, methods, strict=False):
-        lengths, traces = traces_by_method[method]
-        plotted_lengths = (
-            list(range(lengths[0], lengths[-1] + 1)) if lengths else []
+        lengths, means, standard_deviations = summarize_jaccard_by_length(
+            results_by_method[method]
         )
-        for pair in pairs:
-            pair_values = traces.get(pair)
-            if not pair_values:
-                continue
-            values = [
-                pair_values.get(token_length, math.nan)
-                for token_length in plotted_lengths
-            ]
-            axis.plot(
-                plotted_lengths,
-                values,
-                color=pair_colors[pair],
-                linewidth=1.0,
-                marker="o",
-                markersize=2.5,
-            )
+        means_array = np.asarray(means)
+        std_array = np.asarray(standard_deviations)
+        lower = np.clip(means_array - std_array, 0.0, 1.0)
+        upper = np.clip(means_array + std_array, 0.0, 1.0)
+
+        axis.plot(
+            lengths,
+            means_array,
+            color="C0",
+            linewidth=1.8,
+            marker="o",
+            markersize=3,
+            label="pairwise mean",
+        )
+        axis.fill_between(
+            lengths,
+            lower,
+            upper,
+            color="C0",
+            alpha=0.2,
+            label="mean +/- 1 SD",
+        )
+        axis.plot(lengths, lower, color="C0", linewidth=0.8, linestyle="--")
+        axis.plot(lengths, upper, color="C0", linewidth=0.8, linestyle="--")
         axis.set_title(method.replace("_", " "))
         axis.set_xlabel("Stored token length")
         axis.set_ylabel("Jaccard (intersection / union)")
         axis.set_ylim(-0.02, 1.02)
         axis.grid(alpha=0.25)
+        axis.legend(frameon=False)
 
     for unused_axis in flat_axes[len(methods):]:
         unused_axis.set_visible(False)
 
-    if pairs:
-        legend_handles = [
-            Line2D(
-                [0],
-                [0],
-                color=pair_colors[pair],
-                marker="o",
-                linewidth=1.0,
-                markersize=3,
-                label=f"sample {pair[0]} vs {pair[1]}",
-            )
-            for pair in pairs
-        ]
-        figure.legend(
-            handles=legend_handles,
-            loc="lower center",
-            ncol=min(5, len(legend_handles)),
-            frameon=False,
-        )
-
     if title:
         figure.suptitle(title)
-    figure.tight_layout(rect=(0, 0.08 if pairs else 0, 1, 0.96 if title else 1))
+    figure.tight_layout(rect=(0, 0, 1, 0.96 if title else 1))
     return figure
 
 
@@ -184,7 +198,7 @@ def plot_length_conditioned_jaccard(
     output_path: str,
     title: str | None = None,
 ) -> str:
-    """Save a headless PNG containing the length-conditioned pair traces."""
+    """Save a headless mean-and-standard-deviation Jaccard figure."""
     parent = os.path.dirname(os.path.abspath(output_path))
     os.makedirs(parent, exist_ok=True)
     figure = create_length_conditioned_jaccard_figure(results_by_method, title=title)
