@@ -60,7 +60,7 @@ from train_tokenizer import (  # noqa: E402
     PRETOKENIZER_MODE,
     get_special_tokens,
     pretokenizer as lp_pretokenizer,
-    train_lp_tokenizer,
+    train_lp_tokenizer_sweep,
 )
 from hf_baseline_tokenizers.hf_baseline_tokenizers import (  # noqa: E402
     train_bpe_tokenizer,
@@ -209,10 +209,14 @@ def step2_train_lp(samples, result_ss_dir):
         )
         unique_chars = list(BYTE_LEVEL_ALPHABET)
 
-        for vs in missing:
-            print(f"[LP Sample {i} vocab={vs}] Training")
-            train_lp_tokenizer(dataset, unique_chars, vs, lp_dir, lp_pretokenizer, get_special_tokens(PRETOKENIZER_MODE))
-            print(f"[LP Sample {i} vocab={vs}] Saved to {lp_dir}/lp_tokens_{vs}.pkl")
+        train_lp_tokenizer_sweep(
+            dataset,
+            unique_chars,
+            missing,
+            lp_dir,
+            lp_pretokenizer,
+            get_special_tokens(PRETOKENIZER_MODE),
+        )
 
 
 # ---------------------------------------------------------------------------

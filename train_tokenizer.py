@@ -6,6 +6,7 @@ from tokenizers import Regex
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 import pickle
 import os
+import multiprocessing
 from pathlib import Path
 import traceback
 
@@ -133,6 +134,63 @@ def print_lp_variable_counts(vocab_size, x_values, cuopt_model):
         )
 
 
+def _solve_and_save_lp_vocab(tokenizer, vocab_size, save_dir):
+    print("---------------------------------------", flush=True)
+    print(f"[sweep] Solving for vocab_size={vocab_size}", flush=True)
+    print("---------------------------------------", flush=True)
+    tokens = tokenizer.solve_for_vocab_size(vocab_size)
+    print_lp_variable_counts(vocab_size, tokens["x_values"], tokenizer._cuopt_model)
+    # Drop x_values before pickling to keep output shape identical to the
+    # single-size path.
+    tokens.pop("x_values", None)
+    file_name = os.path.join(save_dir, f"lp_tokens_{vocab_size}.pkl")
+    with open(file_name, "wb") as f:
+        pickle.dump(tokens, f)
+    print(f"[sweep] Saved vocabulary output to {file_name}", flush=True)
+
+
+def _solve_lp_gpu_worker(
+    tokenizer,
+    save_dir,
+    cuda_device,
+    task_queue,
+    status_connection,
+):
+    """Solve vocabulary budgets on one GPU in a forked worker process."""
+    os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
+    try:
+        print(
+            f"[sweep-worker] pid={os.getpid()} using "
+            f"CUDA_VISIBLE_DEVICES={cuda_device}",
+            flush=True,
+        )
+        while True:
+            vocab_size = task_queue.get()
+            if vocab_size is None:
+                break
+            _solve_and_save_lp_vocab(tokenizer, vocab_size, save_dir)
+        status_connection.send(None)
+    except BaseException:
+        status_connection.send(traceback.format_exc())
+        raise
+    finally:
+        status_connection.close()
+
+
+def _visible_cuda_devices(requested_count):
+    configured = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if configured is None:
+        devices = [str(device_index) for device_index in range(requested_count)]
+    else:
+        devices = [device.strip() for device in configured.split(",") if device.strip()]
+        if len(devices) < requested_count:
+            raise ValueError(
+                f"LP_NUM_GPUS={requested_count}, but CUDA_VISIBLE_DEVICES exposes "
+                f"only {len(devices)} device(s): {configured!r}"
+            )
+    return devices[:requested_count]
+
+
 def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
                              pretokenizer_obj, special_tokens,
                              morphology_rho=0.0, celex_dir=None):
@@ -166,19 +224,76 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
     )
 
     os.makedirs(save_dir, exist_ok=True)
-    for vs in sorted_sizes:
-        print("---------------------------------------")
-        print(f"[sweep] Solving for vocab_size={vs}")
-        print("---------------------------------------")
-        tokens = tokenizer.solve_for_vocab_size(vs)
-        print_lp_variable_counts(vs, tokens["x_values"], tokenizer._cuopt_model)
-        # Drop x_values before pickling to keep output shape identical to the
-        # single-size path.
-        tokens.pop("x_values", None)
-        file_name = os.path.join(save_dir, f"lp_tokens_{vs}.pkl")
-        with open(file_name, "wb") as f:
-            pickle.dump(tokens, f)
-        print(f"[sweep] Saved vocabulary output to {file_name}")
+    configured_gpu_count = int(os.environ.get("LP_NUM_GPUS", "1"))
+    if configured_gpu_count <= 0:
+        raise ValueError(f"LP_NUM_GPUS must be positive, got {configured_gpu_count}")
+    worker_count = min(configured_gpu_count, len(sorted_sizes))
+
+    if worker_count == 1:
+        for vs in sorted_sizes:
+            _solve_and_save_lp_vocab(tokenizer, vs, save_dir)
+        return
+
+    cuda_devices = _visible_cuda_devices(worker_count)
+    print(
+        f"[sweep] Solving {len(sorted_sizes)} vocabulary budgets across "
+        f"{worker_count} GPUs: {cuda_devices}",
+        flush=True,
+    )
+    context = multiprocessing.get_context("fork")
+    task_queue = context.Queue()
+    workers = []
+    status_connections = []
+
+    for cuda_device in cuda_devices:
+        parent_connection, child_connection = context.Pipe(duplex=False)
+        process = context.Process(
+            target=_solve_lp_gpu_worker,
+            args=(
+                tokenizer,
+                save_dir,
+                cuda_device,
+                task_queue,
+                child_connection,
+            ),
+        )
+        process.start()
+        child_connection.close()
+        workers.append(process)
+        status_connections.append(parent_connection)
+
+    for vocab_size in reversed(sorted_sizes):
+        task_queue.put(vocab_size)
+    for _ in workers:
+        task_queue.put(None)
+
+    try:
+        for process in workers:
+            process.join()
+    except BaseException:
+        for process in workers:
+            if process.is_alive():
+                process.terminate()
+        for process in workers:
+            process.join()
+        raise
+    finally:
+        task_queue.close()
+        task_queue.join_thread()
+
+    failures = []
+    for process, connection in zip(workers, status_connections):
+        message = connection.recv() if connection.poll() else None
+        connection.close()
+        if process.exitcode != 0:
+            failures.append(
+                message
+                or f"GPU worker pid={process.pid} exited with code {process.exitcode}"
+            )
+    if failures:
+        raise RuntimeError(
+            "One or more parallel LP solve workers failed:\n" + "\n".join(failures)
+        )
 
 
 def infer_text_column(dataset):

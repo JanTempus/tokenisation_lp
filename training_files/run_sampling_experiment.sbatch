@@ -44,7 +44,8 @@ NUMBA_CACHE_DIR="${XDG_CACHE_HOME}/numba"
 PYTHONPATH="${REPO_DIR}"
 
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
-NUM_PROC="${NUM_PROC:-16}"
+NUM_PROC="${NUM_PROC:-256}"
+LP_NUM_GPUS="${LP_NUM_GPUS:-4}"
 BATCH_SIZE="${BATCH_SIZE:-10000}"
 
 # ---------------------------------------------------------------------------
@@ -92,6 +93,7 @@ export NUMBA_CACHE_DIR
 export PYTHONPATH
 export PRETOKENIZER_MODE
 export NUM_PROC
+export LP_NUM_GPUS
 export BATCH_SIZE
 
 # ---------------------------------------------------------------------------
@@ -109,6 +111,7 @@ echo "Results dir: ${RESULTS_DIR}"
 echo "Shard tmp  : ${CLIMBMIX_SHARD_TMP}"
 echo "HF cache   : ${HF_HOME}"
 echo "TMPDIR     : ${TMPDIR}"
+echo "LP GPUs    : ${LP_NUM_GPUS}"
 echo "Working cwd: $(pwd)"
 
 python -u "${REPO_DIR}/sampling_experiment.py"

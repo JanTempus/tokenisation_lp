@@ -18,19 +18,6 @@ from datasets import Dataset, Features, Sequence, Value
 #import cudf
 #import cugraph
 
-from cuopt.linear_programming.solver.solver_parameters import (
-    CUOPT_METHOD,
-    CUOPT_PDLP_SOLVER_MODE,
-    CUOPT_CROSSOVER,
-)
-
-from cuopt.linear_programming.solver_settings import (
-    SolverMethod,
-    PDLPSolverMode,
-    SolverSettings,
-)
-
-
 from lp_tokenizer.datastructures import tokenInstance, possibleToken
 from lp_tokenizer.celex import (
     EnglishCelex,
@@ -1234,22 +1221,37 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
 
 def solve_cuopt_problem(model, numAllowedTokens: int,
                         solver_parameters=None, verbose: bool = True):
-    # Always rebuild the cuOpt Problem from the cached cuopt_lp_data matrices
-    # with the requested budget. In-place mutation of the budget constraint
-    # RHS on an existing cuOpt Problem was observed to silently fail (the
-    # Python-side attribute changed but the solver kept using the original
-    # RHS), so every vocab size produced identical primal/dual objectives.
-    # The expensive matrices (A_eq, A_ub, ...) are built once in
-    # prepare_cuopt_model and reused here; only the Problem/variable wrappers
-    # are recreated.
-    print(f"[solve_cuopt_problem] Building cuOpt Problem with numAllowedTokens={numAllowedTokens}")
-    rebuilt = build_cuopt_problem(
-        model["cuopt_lp_data"], numAllowedTokens, verbose=verbose
+    # Import cuOpt only inside the GPU-pinned solve process. This ensures that
+    # CUDA_VISIBLE_DEVICES is applied before the CUDA runtime is initialized.
+    from cuopt.linear_programming.solver.solver_parameters import CUOPT_CROSSOVER
+    from cuopt.linear_programming.solver_settings import SolverSettings
+
+    requested_budget = int(numAllowedTokens)
+    wrapper_is_current = (
+        model.get("problem") is not None
+        and model.get("current_budget") == requested_budget
     )
-    model["problem"] = rebuilt["problem"]
-    model["variables"] = rebuilt["variables"]
-    model["budget_constraint"] = rebuilt["budget_constraint"]
-    model["current_budget"] = int(numAllowedTokens)
+    if not wrapper_is_current:
+        # Build directly with the requested budget. In-place mutation of an
+        # existing budget constraint was observed to silently fail, so a
+        # different budget still requires a fresh wrapper. The expensive sparse
+        # matrices are retained and reused across the vocabulary sweep.
+        print(
+            "[solve_cuopt_problem] Building cuOpt Problem with "
+            f"numAllowedTokens={requested_budget}"
+        )
+        rebuilt = build_cuopt_problem(
+            model["cuopt_lp_data"], requested_budget, verbose=verbose
+        )
+        model["problem"] = rebuilt["problem"]
+        model["variables"] = rebuilt["variables"]
+        model["budget_constraint"] = rebuilt["budget_constraint"]
+        model["current_budget"] = requested_budget
+    elif verbose:
+        print(
+            "[solve_cuopt_problem] Reusing cuOpt Problem already built with "
+            f"numAllowedTokens={requested_budget}"
+        )
 
     num_f = model["num_f"]
     num_g = model["num_g"]
@@ -1687,15 +1689,20 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
             f"inequalities={cuopt_lp_data['A_ub'].shape[0]:,}"
         )
 
-    phase_start = time.perf_counter()
-    if verbose:
-        print("[prepare-cuopt] Building initial cuOpt problem wrapper")
-    try:
-        model = build_cuopt_problem(cuopt_lp_data, numAllowedTokens=0, verbose=verbose)
-    except ImportError as import_error:
-        raise ImportError(
-            "Direct cuOpt LP solve requested, but cuOpt Python modules are not available in this environment."
-        ) from import_error
+    # Defer construction of the Python cuOpt Problem wrapper until the first
+    # solve, when the real vocabulary budget is known. Constructing a budget-0
+    # wrapper here was wasted work because changing the constraint in place is
+    # unreliable and solve_cuopt_problem must rebuild it for a new budget.
+    model = {
+        "problem": None,
+        "variables": None,
+        "budget_constraint": None,
+        "cuopt_lp_data": cuopt_lp_data,
+        "num_f": cuopt_lp_data["num_f"],
+        "num_g": cuopt_lp_data["num_g"],
+        "num_t": cuopt_lp_data["num_t"],
+        "current_budget": None,
+    }
 
     model["tokens_to_keep"] = tokens_to_keep
     model["morphology_rho"] = validate_morphology_rho(morphology_rho)
@@ -1709,9 +1716,9 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
     model["morphology_diagnostics"] = lp_blocks["morphologyDiagnostics"]
     if verbose:
         print(
-            f"[prepare-cuopt] Initial cuOpt wrapper finished in "
-            f"{time.perf_counter() - phase_start:.1f}s; "
-            f"complete model preparation={time.perf_counter() - total_start:.1f}s"
+            f"[prepare-cuopt] Sparse model preparation finished in "
+            f"{time.perf_counter() - total_start:.1f}s; "
+            "cuOpt wrapper deferred until solve"
         )
     return model
 
