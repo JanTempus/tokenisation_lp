@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train equal-score Unigram tokenizers from the most frequent pretokens.
+"""Train equal-score Unigram tokenizers from ranked pretokens.
 
 Configuration is supplied through the same environment variables as the other
 tokenizer runners:
@@ -7,10 +7,13 @@ tokenizer runners:
     TRAIN_DATASET_PATH=/path/to/dataset \
     VOCAB_SIZES=8192,16384,32768 \
     SAVE_DIR=/path/to/output \
+    WEIGHT_BY_COMPRESSION=1 \
     python -u hf_baseline_tokenizers/train_frequent_pretokens.py
 
 ``NUM_PROC`` controls the Hugging Face dataset worker count and ``BATCH_SIZE``
-controls how many documents each worker processes at a time.
+controls how many documents each worker processes at a time. Set
+``WEIGHT_BY_COMPRESSION=1`` to rank by total byte-fallback tokens saved instead
+of raw pretoken frequency.
 """
 
 from __future__ import annotations
@@ -54,10 +57,22 @@ TOKENIZER_KWARGS = {
 }
 
 
+def compression_gain(pretoken: str, frequency: int) -> int:
+    """Return tokens saved by replacing byte fallback with one pretoken."""
+    return frequency * (len(pretoken) - 1)
+
+
 def rank_pretokens(
-    pretokens: Sequence[str], frequencies: Sequence[int]
+    pretokens: Sequence[str],
+    frequencies: Sequence[int],
+    weight_by_compression: bool = False,
 ) -> list[tuple[str, int]]:
-    """Rank pretokens by descending frequency, then token text."""
+    """Rank pretokens by the selected score, then token text."""
+    if weight_by_compression:
+        return sorted(
+            zip(pretokens, frequencies),
+            key=lambda item: (-compression_gain(*item), item[0]),
+        )
     return sorted(zip(pretokens, frequencies), key=lambda item: (-item[1], item[0]))
 
 
@@ -97,8 +112,9 @@ def _pretokenize_batch(batch, backend_pretokenizer):
 def collect_ranked_pretokens(
     dataset: Dataset,
     backend_pretokenizer,
+    weight_by_compression: bool = False,
 ) -> list[tuple[str, int]]:
-    """Pretokenize in worker processes, merge counts, and rank by frequency."""
+    """Pretokenize in worker processes, merge counts, and rank pretokens."""
     batch_size = int(os.environ.get("BATCH_SIZE", "1000"))
     requested_num_proc = int(os.environ.get("NUM_PROC", "1"))
     if batch_size < 1:
@@ -142,7 +158,11 @@ def collect_ranked_pretokens(
     ):
         for word, frequency in zip(tokens, frequencies):
             word_freqs[word] += frequency
-    return rank_pretokens(list(word_freqs), list(word_freqs.values()))
+    return rank_pretokens(
+        list(word_freqs),
+        list(word_freqs.values()),
+        weight_by_compression=weight_by_compression,
+    )
 
 
 def load_local_dataset(path: str) -> Dataset:
@@ -204,16 +224,35 @@ def train_frequency_baselines(
     save_dir: Path,
     backend_pretokenizer,
     backend_decoder,
+    weight_by_compression: bool = False,
 ) -> None:
     """Collect frequencies once, then build every requested tokenizer."""
-    ranked_pretokens = collect_ranked_pretokens(dataset, backend_pretokenizer)
-    print(f"Collected and ranked {len(ranked_pretokens):,} distinct pretokens")
+    ranked_pretokens = collect_ranked_pretokens(
+        dataset,
+        backend_pretokenizer,
+        weight_by_compression=weight_by_compression,
+    )
+    ranking_mode = "compression gain" if weight_by_compression else "frequency"
+    print(
+        f"Collected and ranked {len(ranked_pretokens):,} distinct pretokens "
+        f"by {ranking_mode}"
+    )
     for token, frequency in ranked_pretokens[:10]:
-        print(f"  {frequency:>12,}  {token!r}")
+        if weight_by_compression:
+            print(
+                f"  gain={compression_gain(token, frequency):>12,}  "
+                f"frequency={frequency:>12,}  "
+                f"encoded_length={len(token):>4,}  {token!r}"
+            )
+        else:
+            print(f"  {frequency:>12,}  {token!r}")
 
     save_dir.mkdir(parents=True, exist_ok=True)
+    output_prefix = (
+        "compression_pretoken" if weight_by_compression else "frequent_pretoken"
+    )
     for vocab_size in vocab_sizes:
-        output_dir = save_dir / f"frequent_pretoken_{vocab_size}"
+        output_dir = save_dir / f"{output_prefix}_{vocab_size}"
         vocab_tokens = select_vocabulary(
             ranked_pretokens,
             vocab_size,
@@ -233,7 +272,13 @@ def main() -> None:
     dataset_path = os.environ["TRAIN_DATASET_PATH"]
     vocab_sizes = [int(value) for value in os.environ["VOCAB_SIZES"].split(",")]
     save_dir = Path(os.environ["SAVE_DIR"])
+    raw_weight_by_compression = os.environ.get("WEIGHT_BY_COMPRESSION", "0")
+    if raw_weight_by_compression not in {"0", "1"}:
+        raise ValueError("WEIGHT_BY_COMPRESSION must be either 0 or 1")
+    weight_by_compression = raw_weight_by_compression == "1"
 
+    ranking_mode = "compression gain" if weight_by_compression else "frequency"
+    print(f"Using pretoken ranking: {ranking_mode}")
     print(f"Loading training dataset from {dataset_path}")
     dataset = load_local_dataset(dataset_path)
     print(f"Loaded {len(dataset):,} rows")
@@ -245,6 +290,7 @@ def main() -> None:
         save_dir=save_dir,
         backend_pretokenizer=backend_pretokenizer,
         backend_decoder=backend_decoder,
+        weight_by_compression=weight_by_compression,
     )
 
 

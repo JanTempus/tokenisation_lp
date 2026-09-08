@@ -86,7 +86,8 @@ pretokenizer = (
 
 
 def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj,
-                       special_tokens, morphology_rho=0.0, celex_dir=None):
+                       special_tokens, morphology_rho=0.0, celex_dir=None,
+                       vocab_utilisation_weight=0.0):
     tokenizer = Tokenizer(
         corpus=dataset,
         vocab_size=vocab_size,
@@ -101,6 +102,7 @@ def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer
     )
     tokens = tokenizer.make_vocab_cuopt(
         morphology_rho=morphology_rho,
+        vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
     )
@@ -234,7 +236,8 @@ def _visible_cuda_devices(requested_count):
 
 def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
                              pretokenizer_obj, special_tokens,
-                             morphology_rho=0.0, celex_dir=None):
+                             morphology_rho=0.0, celex_dir=None,
+                             vocab_utilisation_weight=0.0):
     if not vocab_sizes:
         return
 
@@ -260,6 +263,7 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
     )
     tokenizer.prepare_cuopt_model(
         morphology_rho=morphology_rho,
+        vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
     )
@@ -573,11 +577,15 @@ if __name__ == "__main__":
         raise ValueError(
             "MORPHOLOGY_RHO must be a finite, non-negative number."
         ) from error
+    # Frequency-weighted unused fraction: lambda * sum_c (t_c - U_c / N_c).
+    # Example: VOCAB_UTILISATION_WEIGHT=0.1 python train_tokenizer.py
+    vocab_utilisation_weight = float(os.environ.get("VOCAB_UTILISATION_WEIGHT", "0"))
     configured_celex_dir = os.environ.get("CELEX_DIR")
     celex_dir = configured_celex_dir or str(default_celex_dir())
     special_tokens = get_special_tokens(PRETOKENIZER_MODE)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
     print(f"Special tokens ({len(special_tokens)}): {special_tokens}")
+    print(f"Vocabulary utilisation weight: {vocab_utilisation_weight:g}")
     print(f"Morphology rho: {morphology_rho:g}")
     if morphology_rho > 0.0:
         print(f"CELEX directory: {celex_dir}")
@@ -597,5 +605,6 @@ if __name__ == "__main__":
         pretokenizer,
         special_tokens,
         morphology_rho=morphology_rho,
+        vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
     )

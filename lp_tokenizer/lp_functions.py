@@ -477,11 +477,14 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
 def _build_lp_blocks_from_graph_dataset(graph_dataset,
                                         tokens,
                                         morphology_rho=0.0,
-                                        verbose=True):
+                                        verbose=True,
+                                        vocab_utilisation_weight: float = 0.0):
     build_start = time.perf_counter()
     num_tokens = len(tokens)
     morphology_rho = validate_morphology_rho(morphology_rho)
     morphology_enabled = morphology_rho > 0.0
+
+    utilisation_enabled = vocab_utilisation_weight > 0.0
 
     if len(graph_dataset) == 0:
         return {
@@ -491,6 +494,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
             "BigbVector": np.array([], dtype=float),
             "BigFreewVector": np.array([], dtype=float),
             "BigNonFreewVector": np.array([], dtype=float),
+            **({"nonFreeEdgeFrequencies": np.array([], dtype=float)} if utilisation_enabled else {}),
             "tokensCap": np.ones(num_tokens, dtype=float),
             "numNonFreeEdges": 0,
             "numFreeEdges": 0,
@@ -544,6 +548,8 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
     big_b_vector = np.zeros(num_vertices, dtype=np.float64)
     big_free_weight = np.empty(num_free_edges, dtype=np.float64)
     big_non_free_weight = np.empty(num_non_free_edges, dtype=np.float64)
+
+    edge_frequencies = np.empty(num_non_free_edges, dtype=np.float64) if utilisation_enabled else None
 
     vertex_cursor = 0
     edge_cursor = 0
@@ -603,6 +609,8 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         big_non_free_weight[edge_cursor:edge_end_cursor] = np.repeat(
             string_frequencies, edge_counts
         )
+        if utilisation_enabled:
+            edge_frequencies[edge_cursor:edge_end_cursor] = big_non_free_weight[edge_cursor:edge_end_cursor]
         if morphology_enabled:
             penalties = np.asarray(row["edge_morph_penalties"], dtype=np.float64)
             morphology_weights = np.asarray(
@@ -718,6 +726,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         "BigbVector": big_b_vector,
         "BigFreewVector": big_free_weight,
         "BigNonFreewVector": big_non_free_weight,
+        **({"nonFreeEdgeFrequencies": edge_frequencies} if utilisation_enabled else {}),
         "tokensCap": np.ones(num_tokens, dtype=float),
         "numNonFreeEdges": num_non_free_edges,
         "numFreeEdges": num_free_edges,
@@ -737,7 +746,8 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
                                     morphology_rho=0.0,
                                     celex_dir=None,
                                     unmatched_report_path=None,
-                                    verbose=True):
+                                    verbose=True,
+                                    vocab_utilisation_weight: float = 0.0):
     required_columns = {"pretoken", "frequency"}
     missing_columns = required_columns.difference(pretoken_dataset.column_names)
     if missing_columns:
@@ -1008,6 +1018,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
         graph_chunks,
         tokens_to_keep,
         morphology_rho=morphology_rho,
+        vocab_utilisation_weight=vocab_utilisation_weight,
         verbose=verbose,
     )
     lp_blocks["morphologyDiagnostics"] = morphology_diagnostics
@@ -1032,7 +1043,13 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
     return lp_blocks, tokens_to_keep
 
 
-def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int):
+def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int,
+                              vocab_utilisation_weight: float = 0.0):
+    """Build min L_existing + lambda * sum_c (t_c - U_c / N_c).
+
+    Positive weights require nonFreeEdgeFrequencies containing raw corpus
+    frequencies, independent of any morphology costs in BigNonFreewVector.
+    """
     BigAConstraint = lp_blocks["BigAConstraint"]
     BigBConstraint = lp_blocks["BigBConstraint"]
     BigMConstraint = lp_blocks["BigMConstraint"]
@@ -1073,6 +1090,14 @@ def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int):
     # Weighted objective: minimize sum_i w_i * f_i + sum_j w_j * g_j
     # where weights come from pretokenized-string frequencies.
     c = np.hstack([BigNonFreewVector, BigFreewVector, np.zeros(num_t, dtype=float)])
+    if vocab_utilisation_weight > 0.0:
+        # Raw frequencies are separate from morphology-adjusted edge costs.
+        frequencies = lp_blocks["nonFreeEdgeFrequencies"]
+        occurrence_counts = np.asarray(BigMConstraint.T @ frequencies).ravel()
+        # Each edge belongs to one colour; normalise by that colour's total.
+        edge_occurrence_counts = np.asarray(BigMConstraint @ occurrence_counts).ravel()
+        c[:num_f] -= vocab_utilisation_weight * (frequencies / edge_occurrence_counts)
+        c[num_f + num_g:] = vocab_utilisation_weight
     lower_bounds = np.zeros(num_x, dtype=float)
     upper_bounds = np.full(num_x, 1.0, dtype=float)
     upper_bounds[num_f + num_g:] = 1.0
@@ -1633,7 +1658,8 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
                         map_batch_size=BATCH_SIZE,
                         morphology_rho: float = 0.0,
                         celex_dir: str = None,
-                        unmatched_report_path: str = None):
+                        unmatched_report_path: str = None,
+                        vocab_utilisation_weight: float = 0.0):
     total_start = time.perf_counter()
     if pretoken_dataset is None:
         if inputStringList is None or inputStringFreq is None:
@@ -1666,6 +1692,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
         num_proc=num_proc,
         map_batch_size=map_batch_size,
         morphology_rho=morphology_rho,
+        vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
         verbose=verbose,
@@ -1679,7 +1706,10 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
     phase_start = time.perf_counter()
     if verbose:
         print("[prepare-cuopt] Building cuOpt standard-form matrices")
-    cuopt_lp_data = build_cuopt_standard_form(lp_blocks, numAllowedTokens=0)
+    cuopt_lp_data = build_cuopt_standard_form(
+        lp_blocks, numAllowedTokens=0,
+        vocab_utilisation_weight=vocab_utilisation_weight,
+    )
     if verbose:
         print(
             f"[prepare-cuopt] Standard form finished in "
@@ -1705,6 +1735,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
     }
 
     model["tokens_to_keep"] = tokens_to_keep
+    model["vocab_utilisation_weight"] = vocab_utilisation_weight
     model["morphology_rho"] = validate_morphology_rho(morphology_rho)
     model["num_morphology_penalized_edges"] = lp_blocks[
         "numMorphologyPenalizedEdges"
@@ -1781,7 +1812,8 @@ def create_vocab_cuopt(inputStringList: list[str],
                        pretoken_dataset=None,
                        morphology_rho: float = 0.0,
                        celex_dir: str = None,
-                       unmatched_report_path: str = None):
+                       unmatched_report_path: str = None,
+                       vocab_utilisation_weight: float = 0.0):
     model = prepare_cuopt_model(
         inputStringList=inputStringList,
         inputStringFreq=inputStringFreq,
@@ -1791,6 +1823,7 @@ def create_vocab_cuopt(inputStringList: list[str],
         verbose=verbose,
         pretoken_dataset=pretoken_dataset,
         morphology_rho=morphology_rho,
+        vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
     )

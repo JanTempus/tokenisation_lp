@@ -145,7 +145,8 @@ class Tokenizer:
 
     def make_vocab_cuopt(self, solver_parameters=None, verbose: bool = True,
                          morphology_rho: float = 0.0, celex_dir: str = None,
-                         unmatched_report_path: str = None):
+                         unmatched_report_path: str = None,
+                         vocab_utilisation_weight=0.0):
 
         if self.corpus is None:
             raise ValueError("Must include a corpus")
@@ -166,6 +167,7 @@ class Tokenizer:
             vocab_size=self.vocab_size,
             pretoken_dataset=pretoken_dataset,
             morphology_rho=morphology_rho,
+            vocab_utilisation_weight=vocab_utilisation_weight,
             celex_dir=celex_dir,
             unmatched_report_path=unmatched_report_path,
         )
@@ -176,7 +178,8 @@ class Tokenizer:
     def prepare_cuopt_model(self, verbose: bool = True,
                             morphology_rho: float = 0.0,
                             celex_dir: str = None,
-                            unmatched_report_path: str = None):
+                            unmatched_report_path: str = None,
+                            vocab_utilisation_weight=0.0):
         if self.corpus is None:
             raise ValueError("Must include a corpus")
 
@@ -195,6 +198,7 @@ class Tokenizer:
             pretoken_dataset=pretoken_dataset,
             verbose=verbose,
             morphology_rho=morphology_rho,
+            vocab_utilisation_weight=vocab_utilisation_weight,
             celex_dir=celex_dir,
             unmatched_report_path=unmatched_report_path,
         )

@@ -63,7 +63,11 @@ def build_pretokenizer(mode):
     )
 
 
-PRETOKENIZER = build_pretokenizer(PRETOKENIZER_MODE)
+PRETOKENIZER = (
+    None
+    if os.environ.get("_LP_GPU_SOLVE_WORKER") == "1"
+    else build_pretokenizer(PRETOKENIZER_MODE)
+)
 
 
 # Full ByteLevel alphabet: 256 byte-level chars. Passed as initial_alphabet

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import os
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -13,6 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+from matplotlib.ticker import FormatStrFormatter, LogLocator  # noqa: E402
 
 
 JaccardRecord = dict[str, int | float]
@@ -132,60 +132,74 @@ def summarize_jaccard_by_length(
 def create_length_conditioned_jaccard_figure(
     results_by_method: Mapping[str, LengthConditionedResults],
     title: str | None = None,
+    xscale: str = "linear",
 ):
-    """Plot pairwise mean Jaccard with a population +/-1 SD band."""
+    """Plot every method's pairwise mean Jaccard and population +/-1 SD."""
     methods = list(results_by_method)
     if not methods:
         raise ValueError("At least one method is required to plot Jaccard results")
 
-    ncols = min(2, len(methods))
-    nrows = math.ceil(len(methods) / ncols)
-    figure, axes = plt.subplots(
-        nrows,
-        ncols,
-        figsize=(7 * ncols, 3.8 * nrows),
-        sharey=True,
-        squeeze=False,
-    )
-    flat_axes = list(np.asarray(axes).ravel())
+    figure, axis = plt.subplots(figsize=(11, 6.5))
+    color_map = plt.get_cmap("tab10")
 
-    for axis, method in zip(flat_axes, methods, strict=False):
+    for method_index, method in enumerate(methods):
         lengths, means, standard_deviations = summarize_jaccard_by_length(
             results_by_method[method]
         )
         means_array = np.asarray(means)
         std_array = np.asarray(standard_deviations)
-        lower = np.clip(means_array - std_array, 0.0, 1.0)
-        upper = np.clip(means_array + std_array, 0.0, 1.0)
+        lower_one_sd = np.clip(means_array - std_array, 0.0, 1.0)
+        upper_one_sd = np.clip(means_array + std_array, 0.0, 1.0)
+        color = color_map(method_index % color_map.N)
 
+        axis.fill_between(
+            lengths,
+            lower_one_sd,
+            upper_one_sd,
+            color=color,
+            alpha=0.1,
+        )
+        axis.plot(
+            lengths,
+            lower_one_sd,
+            color=color,
+            linewidth=0.7,
+            linestyle="--",
+            alpha=0.65,
+        )
+        axis.plot(
+            lengths,
+            upper_one_sd,
+            color=color,
+            linewidth=0.7,
+            linestyle="--",
+            alpha=0.65,
+        )
         axis.plot(
             lengths,
             means_array,
-            color="C0",
-            linewidth=1.8,
+            color=color,
+            linewidth=2.0,
             marker="o",
             markersize=3,
-            label="pairwise mean",
+            label=method.replace("_", " "),
         )
-        axis.fill_between(
-            lengths,
-            lower,
-            upper,
-            color="C0",
-            alpha=0.2,
-            label="mean +/- 1 SD",
-        )
-        axis.plot(lengths, lower, color="C0", linewidth=0.8, linestyle="--")
-        axis.plot(lengths, upper, color="C0", linewidth=0.8, linestyle="--")
-        axis.set_title(method.replace("_", " "))
-        axis.set_xlabel("Stored token length")
-        axis.set_ylabel("Jaccard (intersection / union)")
-        axis.set_ylim(-0.02, 1.02)
-        axis.grid(alpha=0.25)
-        axis.legend(frameon=False)
 
-    for unused_axis in flat_axes[len(methods):]:
-        unused_axis.set_visible(False)
+    axis.set_xlabel("Stored token length")
+    axis.set_xscale(xscale)
+    if xscale == "log":
+        axis.xaxis.set_major_locator(
+            LogLocator(base=10, subs=(1.0, 2.0, 5.0))
+        )
+        axis.xaxis.set_major_formatter(FormatStrFormatter("%d"))
+    axis.set_ylabel("Jaccard (intersection / union)")
+    axis.set_ylim(-0.02, 1.02)
+    axis.grid(alpha=0.25)
+    axis.legend(
+        title="Method (solid: mean; dashed/band: +/- 1 SD)",
+        frameon=False,
+        ncol=2,
+    )
 
     if title:
         figure.suptitle(title)
@@ -197,11 +211,16 @@ def plot_length_conditioned_jaccard(
     results_by_method: Mapping[str, LengthConditionedResults],
     output_path: str,
     title: str | None = None,
+    xscale: str = "linear",
 ) -> str:
     """Save a headless mean-and-standard-deviation Jaccard figure."""
     parent = os.path.dirname(os.path.abspath(output_path))
     os.makedirs(parent, exist_ok=True)
-    figure = create_length_conditioned_jaccard_figure(results_by_method, title=title)
+    figure = create_length_conditioned_jaccard_figure(
+        results_by_method,
+        title=title,
+        xscale=xscale,
+    )
     try:
         figure.savefig(output_path, dpi=180, bbox_inches="tight")
     finally:
