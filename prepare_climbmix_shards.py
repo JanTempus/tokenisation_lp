@@ -7,9 +7,9 @@ from datasets import load_dataset
 from huggingface_hub import hf_hub_download, list_repo_files
 
 
-DATASET_ID = "karpathy/climbmix-400b-shuffle"
-NUM_SHARDS = 7
-NUM_PROC = 64
+DATASET_ID = os.environ.get("DATASET_ID", "karpathy/climbmix-400b-shuffle")
+NUM_SHARDS = int(os.environ.get("NUM_SHARDS", "7"))
+NUM_PROC = int(os.environ.get("NUM_PROC", "64"))
 
 
 def main():

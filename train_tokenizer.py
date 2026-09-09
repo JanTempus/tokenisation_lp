@@ -163,7 +163,9 @@ def _solve_and_save_lp_vocab(
         f"[solve_for_vocab_size] vocab_size={vocab_size} lp_budget={lp_budget}",
         flush=True,
     )
-    result = solve_vocab_on_model(cuopt_model, numAllowedTokens=lp_budget)
+    result = solve_vocab_on_model(
+        cuopt_model, numAllowedTokens=lp_budget, vocab_size=vocab_size,
+    )
     tokens = {
         "possible_tokens": result["possible_tokens"],
         "unique_chars": unique_chars,
@@ -577,7 +579,7 @@ if __name__ == "__main__":
         raise ValueError(
             "MORPHOLOGY_RHO must be a finite, non-negative number."
         ) from error
-    # Frequency-weighted unused fraction: lambda * sum_c (t_c - U_c / N_c).
+    # Normalised objective: L_existing / D_V + lambda / LP_budget * sum_c (t_c - U_c / N_c).
     # Example: VOCAB_UTILISATION_WEIGHT=0.1 python train_tokenizer.py
     vocab_utilisation_weight = float(os.environ.get("VOCAB_UTILISATION_WEIGHT", "0"))
     configured_celex_dir = os.environ.get("CELEX_DIR")

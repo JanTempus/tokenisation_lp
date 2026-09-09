@@ -32,6 +32,15 @@ import lp_tokenizer.helper_functions as hf
 NUM_PROC = int(os.environ.get("NUM_PROC", "16"))
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "10000"))
 
+COMPRESSION_DIVISORS = {
+    8192: 427366252,
+    16384: 393224648,
+    32768: 371886133,
+    65536: 359626839,
+    131072: 352723064,
+    262144: 349028128,
+}
+
 
 def _candidate_count_batch(batch,
                            all_tokens: bool,
@@ -1045,7 +1054,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
 
 def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int,
                               vocab_utilisation_weight: float = 0.0):
-    """Build min L_existing + lambda * sum_c (t_c - U_c / N_c).
+    """Prepare original costs and reusable unused-fraction coefficients.
 
     Positive weights require nonFreeEdgeFrequencies containing raw corpus
     frequencies, independent of any morphology costs in BigNonFreewVector.
@@ -1096,8 +1105,7 @@ def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int,
         occurrence_counts = np.asarray(BigMConstraint.T @ frequencies).ravel()
         # Each edge belongs to one colour; normalise by that colour's total.
         edge_occurrence_counts = np.asarray(BigMConstraint @ occurrence_counts).ravel()
-        c[:num_f] -= vocab_utilisation_weight * (frequencies / edge_occurrence_counts)
-        c[num_f + num_g:] = vocab_utilisation_weight
+        utilisation_coefficients = frequencies / edge_occurrence_counts
     lower_bounds = np.zeros(num_x, dtype=float)
     upper_bounds = np.full(num_x, 1.0, dtype=float)
     upper_bounds[num_f + num_g:] = 1.0
@@ -1108,12 +1116,29 @@ def build_cuopt_standard_form(lp_blocks, numAllowedTokens: int,
         "A_ub": A_ub,
         "b_ub": b_ub,
         "c": c,
+        "vocab_utilisation_weight": vocab_utilisation_weight,
+        **({"utilisation_coefficients": utilisation_coefficients}
+           if vocab_utilisation_weight > 0.0 else {}),
         "lb": lower_bounds,
         "ub": upper_bounds,
         "num_f": num_f,
         "num_g": num_g,
         "num_t": num_t,
     }
+
+
+def _cuopt_objective(cuopt_lp_data, numAllowedTokens, vocab_size):
+    """Normalise original costs by D_V and unused fractions by LP budget B."""
+    weight = cuopt_lp_data.get("vocab_utilisation_weight", 0.0)
+    if weight <= 0.0:
+        return cuopt_lp_data["c"]
+    num_f = cuopt_lp_data["num_f"]
+    num_g = cuopt_lp_data["num_g"]
+    c = cuopt_lp_data["c"] / COMPRESSION_DIVISORS[vocab_size]
+    utilisation_scale = weight / numAllowedTokens
+    c[:num_f] -= utilisation_scale * cuopt_lp_data["utilisation_coefficients"]
+    c[num_f + num_g:] = utilisation_scale
+    return c
 
 
 def _build_linear_expression(variables, coeff_indices, coeff_values):
@@ -1149,7 +1174,8 @@ def _import_cuopt_problem():
     return Problem, MINIMIZE, LinearExpression
 
 
-def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = True):
+def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = True,
+                        vocab_size: int = None):
     total_start = time.perf_counter()
     Problem, MINIMIZE, LinearExpression = _import_cuopt_problem()
 
@@ -1157,7 +1183,7 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
     b_eq = cuopt_lp_data["b_eq"]
     A_ub = cuopt_lp_data["A_ub"]
     b_ub = cuopt_lp_data["b_ub"]
-    c = cuopt_lp_data["c"]
+    c = _cuopt_objective(cuopt_lp_data, numAllowedTokens, vocab_size)
     lb = cuopt_lp_data["lb"]
     ub = cuopt_lp_data["ub"]
 
@@ -1241,20 +1267,29 @@ def build_cuopt_problem(cuopt_lp_data, numAllowedTokens: int, verbose: bool = Tr
         "num_g": cuopt_lp_data["num_g"],
         "num_t": cuopt_lp_data["num_t"],
         "current_budget": int(numAllowedTokens),
+        "current_vocab_size": vocab_size,
     }
 
 
 def solve_cuopt_problem(model, numAllowedTokens: int,
-                        solver_parameters=None, verbose: bool = True):
+                        solver_parameters=None, verbose: bool = True,
+                        vocab_size: int = None):
     # Import cuOpt only inside the GPU-pinned solve process. This ensures that
     # CUDA_VISIBLE_DEVICES is applied before the CUDA runtime is initialized.
     from cuopt.linear_programming.solver.solver_parameters import CUOPT_CROSSOVER
     from cuopt.linear_programming.solver_settings import SolverSettings
 
     requested_budget = int(numAllowedTokens)
+    if model["cuopt_lp_data"].get("vocab_utilisation_weight", 0.0) > 0.0:
+        print(
+            f"[lp-objective] vocab_size={vocab_size} "
+            f"compression_divisor={COMPRESSION_DIVISORS[vocab_size]} "
+            f"utilisation_divisor={requested_budget}"
+        )
     wrapper_is_current = (
         model.get("problem") is not None
         and model.get("current_budget") == requested_budget
+        and model.get("current_vocab_size") == vocab_size
     )
     if not wrapper_is_current:
         # Build directly with the requested budget. In-place mutation of an
@@ -1266,12 +1301,14 @@ def solve_cuopt_problem(model, numAllowedTokens: int,
             f"numAllowedTokens={requested_budget}"
         )
         rebuilt = build_cuopt_problem(
-            model["cuopt_lp_data"], requested_budget, verbose=verbose
+            model["cuopt_lp_data"], requested_budget, verbose=verbose,
+            vocab_size=vocab_size,
         )
         model["problem"] = rebuilt["problem"]
         model["variables"] = rebuilt["variables"]
         model["budget_constraint"] = rebuilt["budget_constraint"]
         model["current_budget"] = requested_budget
+        model["current_vocab_size"] = vocab_size
     elif verbose:
         print(
             "[solve_cuopt_problem] Reusing cuOpt Problem already built with "
@@ -1316,12 +1353,15 @@ def solve_cuopt_problem(model, numAllowedTokens: int,
     }
 
 
-def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool = True):
+def solve_lp_direct_cuopt(cuopt_lp_data, solver_parameters=None, verbose: bool = True,
+                           vocab_size: int = None):
     numAllowedTokens = int(cuopt_lp_data["b_ub"][-1])
-    model = build_cuopt_problem(cuopt_lp_data, numAllowedTokens, verbose=verbose)
+    model = build_cuopt_problem(
+        cuopt_lp_data, numAllowedTokens, verbose=verbose, vocab_size=vocab_size,
+    )
     return solve_cuopt_problem(
         model, numAllowedTokens,
-        solver_parameters=solver_parameters, verbose=verbose,
+        solver_parameters=solver_parameters, verbose=verbose, vocab_size=vocab_size,
     )
 
 def setup_LP_tokenization(edgesList: list[list[tokenInstance]] , 
@@ -1732,6 +1772,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
         "num_g": cuopt_lp_data["num_g"],
         "num_t": cuopt_lp_data["num_t"],
         "current_budget": None,
+        "current_vocab_size": None,
     }
 
     model["tokens_to_keep"] = tokens_to_keep
@@ -1769,10 +1810,12 @@ def _possible_tokens_from_tvar(tokens_to_keep, tVar):
 
 
 def solve_vocab_on_model(model, numAllowedTokens: int,
-                         solver_parameters=None, verbose: bool = True):
+                         solver_parameters=None, verbose: bool = True,
+                         vocab_size: int = None):
     solve_output = solve_cuopt_problem(
         model,
         numAllowedTokens=numAllowedTokens,
+        vocab_size=vocab_size,
         solver_parameters=solver_parameters,
         verbose=verbose,
     )
@@ -1834,6 +1877,7 @@ def create_vocab_cuopt(inputStringList: list[str],
     result = solve_vocab_on_model(
         model,
         numAllowedTokens=numAllowedTokens,
+        vocab_size=vocab_size,
         solver_parameters=solver_parameters,
         verbose=verbose,
     )

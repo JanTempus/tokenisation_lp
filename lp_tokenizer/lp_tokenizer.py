@@ -228,6 +228,7 @@ class Tokenizer:
         result = solve_vocab_on_model(
             self._cuopt_model,
             numAllowedTokens=lp_budget,
+            vocab_size=vocab_size,
             solver_parameters=solver_parameters,
             verbose=verbose,
         )
