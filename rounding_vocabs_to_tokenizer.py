@@ -169,10 +169,19 @@ def parse_vocab_size_from_path(path):
     return int(match.group(1))
 
 
-def list_raw_vocab_files(raw_vocab_dir):
+def list_raw_vocab_files(raw_vocab_dir, vocab_sizes=None):
     raw_dir = Path(raw_vocab_dir)
     if not raw_dir.exists():
         raise FileNotFoundError(f"Raw vocab directory not found: {raw_vocab_dir}")
+
+    if vocab_sizes is not None:
+        files = [raw_dir / f"lp_tokens_{size}.pkl" for size in sorted(set(vocab_sizes))]
+        if not files:
+            raise ValueError("VOCAB_SIZES must contain at least one vocabulary size")
+        missing = [str(path) for path in files if not path.is_file()]
+        if missing:
+            raise FileNotFoundError(f"Requested raw vocab files not found: {missing}")
+        return [str(path) for path in files]
 
     files = sorted(raw_dir.glob("lp_tokens_*.pkl"))
     if not files:
@@ -302,7 +311,11 @@ def test_special_tokens(tokenizer):
             return False
 
     additional_special_tokens = TOKEN_KWARGS.get("additional_special_tokens", [])
-    if list(tokenizer.additional_special_tokens) != additional_special_tokens:
+    # Transformers v5 renamed this attribute; v4 still exposes the old name.
+    actual_special_tokens = getattr(tokenizer, "additional_special_tokens", None)
+    if actual_special_tokens is None:
+        actual_special_tokens = getattr(tokenizer, "extra_special_tokens", [])
+    if list(actual_special_tokens) != additional_special_tokens:
         return False
 
     for token in SPECIAL_TOKENS:
@@ -528,7 +541,12 @@ if __name__ == "__main__":
 
     #smoke_test()
 
-    raw_files = list_raw_vocab_files(raw_vocab_path)
+    vocab_sizes_env = os.environ.get("VOCAB_SIZES")
+    vocab_sizes = (
+        [int(size) for size in vocab_sizes_env.split(",") if size.strip()]
+        if vocab_sizes_env is not None else None
+    )
+    raw_files = list_raw_vocab_files(raw_vocab_path, vocab_sizes)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
     print(f"Found {len(raw_files)} raw vocab file(s) in {raw_vocab_path}")
 

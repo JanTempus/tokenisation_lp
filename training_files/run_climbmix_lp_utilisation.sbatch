@@ -12,22 +12,38 @@
 set -euo pipefail
 
 # Submit: sbatch training_files/run_climbmix_lp_utilisation.sbatch
+# Defaults resume export of every saved size from util_bias, weight 0.01.
+# Set EXPORT_ONLY=0 below to run dataset preparation and LP training again.
 # Override weight: sbatch --export=ALL,VOCAB_UTILISATION_WEIGHT=10 training_files/run_climbmix_lp_utilisation.sbatch
+# Resume export for every saved vocabulary in the util_bias run:
+# sbatch --export=ALL,EXPORT_ONLY=1,NAME=util_bias,VOCAB_UTILISATION_WEIGHT=0.01 training_files/run_climbmix_lp_utilisation.sbatch
+# To restrict export, set VOCAB_SIZES in the export-only branch below.
 # User-tunable settings
-NAME="${NAME:-climbmix_vocab_utilisation}"
+NAME="${NAME:-util_bias}"
 REPO_DIR="${REPO_DIR:-/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp}"
 IOPS_ROOT="${IOPS_ROOT:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
 NUM_SHARDS="${NUM_SHARDS:-7}"
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
 # Unused-fraction penalty: lambda * sum_c (t_c - U_c / N_c).
-VOCAB_UTILISATION_WEIGHT="${VOCAB_UTILISATION_WEIGHT:-1}"
+VOCAB_UTILISATION_WEIGHT="${VOCAB_UTILISATION_WEIGHT:-0.01}"
 LP_NUM_GPUS=1
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
-VOCAB_SIZES="${VOCAB_SIZES:-8192,16384,32768,65536,131072,262144}"
+EXPORT_ONLY="${EXPORT_ONLY:-1}"
+if [[ "${EXPORT_ONLY}" == "1" ]]; then
+    # Empty means discover every saved vocabulary, including sizes from earlier jobs.
+    VOCAB_SIZES=""
+else
+    VOCAB_SIZES="${VOCAB_SIZES:-8192,16384,32768,65536,131072,262144}"
+fi
 NUM_PROC="${NUM_PROC:-32}"
 BATCH_SIZE="${BATCH_SIZE:-10000}"
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 BYTE_TEST_BEHAVIOR="${BYTE_TEST_BEHAVIOR:-not_all_unk}"
+
+if [[ "${EXPORT_ONLY}" != "0" && "${EXPORT_ONLY}" != "1" ]]; then
+    echo "ERROR: EXPORT_ONLY must be 0 (full pipeline) or 1 (round/export saved vocabularies)." >&2
+    exit 1
+fi
 
 if [[ -z "${NAME}" ]]; then
     echo "ERROR: NAME is required. Submit with --export=NAME=<experiment>" >&2
@@ -115,12 +131,21 @@ echo "LP graph cache:       ${LP_GRAPH_CACHE_DIR}"
 echo "Final tokenizers:     ${SAVE_TOKENIZER_DIR}"
 echo "Map workers:          ${NUM_PROC}"
 echo "Map batch size:       ${BATCH_SIZE}"
+echo "Vocabulary sizes:     ${VOCAB_SIZES:-all saved sizes}"
+echo "Export only:          ${EXPORT_ONLY}"
 
-echo "Step 1/3: preparing first ${NUM_SHARDS} ClimbMix shards (reuse if dataset exists)"
-python3 -u "${REPO_DIR}/prepare_climbmix_shards.py"
+if [[ "${EXPORT_ONLY}" == "1" ]]; then
+    echo "Skipping steps 1/3 and 2/3; exporting saved vocabularies from ${RAW_VOCAB_PATH}"
+else
+    echo "Step 1/3: preparing first ${NUM_SHARDS} ClimbMix shards (reuse if dataset exists)"
+    python3 -u "${REPO_DIR}/prepare_climbmix_shards.py"
 
-echo "Step 2/3: training LP vocab(s) -> ${RAW_VOCAB_PATH}"
-python3 -u "${REPO_DIR}/train_tokenizer.py"
+    echo "Step 2/3: training LP vocab(s) -> ${RAW_VOCAB_PATH}"
+    python3 -u "${REPO_DIR}/train_tokenizer.py"
+fi
 
 echo "Step 3/3: rounding/exporting LP tokenizer(s) -> ${SAVE_TOKENIZER_DIR}"
+if [[ "${EXPORT_ONLY}" == "1" && -z "${VOCAB_SIZES}" ]]; then
+    unset VOCAB_SIZES
+fi
 python3 -u "${REPO_DIR}/rounding_vocabs_to_tokenizer.py"
