@@ -3,28 +3,31 @@
 #SBATCH -p normal
 #SBATCH -t 03:30:00
 #SBATCH --cpus-per-task=32
-#SBATCH --output=/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp/logs/slurm-%j.out
-#SBATCH --error=/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp/logs/slurm-%j.err
+#SBATCH --output=/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp/logs/multilingual_output_%j.out
+#SBATCH --error=/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp/logs/multilingual_output_%j.err
 
 
 set -euo pipefail
+
+# Rename the open Slurm logs at startup; SBATCH directives do not expand dates.
+LOG_DIR="/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp/logs"
+LOG_DATE="$(date +%Y-%m-%d_%H-%M-%S)"
+for LOG_EXT in out err; do
+    mv -- "${LOG_DIR}/multilingual_output_${SLURM_JOB_ID}.${LOG_EXT}" \
+        "${LOG_DIR}/multilingual_output_${LOG_DATE}_${SLURM_JOB_ID}.${LOG_EXT}"
+done
 
 # User-tunable settings
 NAME="${NAME:-Multilingual}"
 REPO_DIR="${REPO_DIR:-/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp}"
 IOPS_ROOT="${IOPS_ROOT:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
-TARGET_ROWS="${TARGET_ROWS:-60000}"
+TARGET_ROWS="${TARGET_ROWS:-8000}"
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
-VOCAB_SIZES="${VOCAB_SIZES:-8192,16384,32768,65536,26}"
-NUM_PROC="${NUM_PROC:-32}"
+VOCAB_SIZES="${VOCAB_SIZES:-196608,262144}"
+NUM_PROC="${NUM_PROC:-256}"
 BATCH_SIZE="${BATCH_SIZE:-10000}"
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 BYTE_TEST_BEHAVIOR="${BYTE_TEST_BEHAVIOR:-not_all_unk}"
-
-if [[ -z "${NAME}" ]]; then
-    echo "ERROR: NAME is required. Submit with --export=NAME=<experiment>" >&2
-    exit 1
-fi
 
 DATASET_TAG="${NAME}_n${TARGET_ROWS}"
 RUN_DIR="${IOPS_ROOT}/runs/${DATASET_TAG}_${SLURM_JOB_ID}"
