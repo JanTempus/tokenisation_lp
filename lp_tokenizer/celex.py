@@ -1,4 +1,4 @@
-"""English CELEX morphology loading and ByteLevel pre-token matching."""
+"""English CELEX matching and binary morphology/ByteLevel Unicode penalties."""
 
 from __future__ import annotations
 
@@ -34,10 +34,11 @@ class PretokenMorphology:
         return 0.0 if self.unmatched else 1.0
 
 
-def validate_morphology_rho(value: float) -> float:
+def validate_pently_rho(value: float) -> float:
+    """Validate the shared weight for CELEX and incomplete Unicode penalties."""
     rho = float(value)
     if not math.isfinite(rho) or rho < 0.0:
-        raise ValueError("morphology_rho must be a finite, non-negative number.")
+        raise ValueError("pently_rho must be a finite, non-negative number.")
     return rho
 
 
@@ -45,13 +46,13 @@ def endpoint_morphology_penalty(
     position: int,
     morpheme_spans: Sequence[EncodedSpan],
 ) -> float:
+    """Return 1 when the endpoint lies strictly inside a morpheme."""
     position = int(position)
     for left, right in morpheme_spans:
         if position == left or position == right:
             return 0.0
         if left < position < right:
-            distance = min(position - left, right - position)
-            return 2.0 * distance / (right - left)
+            return 1.0
     return 0.0
 
 
@@ -60,13 +61,57 @@ def edge_morphology_penalty(
     end: int,
     analyses: Sequence[MorphologicalAnalysis],
 ) -> float:
+    """Penalize crossing an internal boundary with a partial morpheme.
+
+    Fragments contained within one morpheme and unions of whole morphemes
+    are exempt. Each analysis contributes at most 1, even if both endpoints
+    cut morphemes; the most permissive CELEX analysis wins.
+    """
     if not analyses:
         return 0.0
     return min(
-        endpoint_morphology_penalty(start, analysis.morpheme_spans)
-        + endpoint_morphology_penalty(end, analysis.morpheme_spans)
+        float(
+            any(start < right < end for _, right in analysis.morpheme_spans[:-1])
+            and (
+                endpoint_morphology_penalty(start, analysis.morpheme_spans)
+                or endpoint_morphology_penalty(end, analysis.morpheme_spans)
+            )
+        )
         for analysis in analyses
     )
+
+
+def _bytelevel_decoder() -> Dict[str, int]:
+    # ByteLevel preserves these visible byte values and maps the rest, in
+    # byte order, to code points starting at U+0100. Invert that mapping
+    # directly: the text decoder replaces invalid UTF-8 and loses bytes.
+    visible_bytes = [*range(33, 127), *range(161, 173), *range(174, 256)]
+    decoder = {chr(byte): byte for byte in visible_bytes}
+    next_codepoint = 256
+    for byte in range(256):
+        if chr(byte) not in decoder:
+            decoder[chr(next_codepoint)] = byte
+            next_codepoint += 1
+    return decoder
+
+
+_BYTELEVEL_DECODER = _bytelevel_decoder()
+
+
+def token_unicode_penalty(token: str) -> float:
+    """Return 1 for merged ByteLevel tokens with incomplete UTF-8 code points.
+
+    Single-byte fallback tokens are exempt. Complete code points, including
+    combining marks and a literal replacement character, are valid.
+    """
+    if len(token) < 2:
+        return 0.0
+    raw_bytes = bytes(_BYTELEVEL_DECODER[symbol] for symbol in token)
+    try:
+        raw_bytes.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return 1.0
+    return 0.0
 
 
 def default_celex_dir() -> Path:

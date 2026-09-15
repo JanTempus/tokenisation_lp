@@ -23,7 +23,8 @@ from lp_tokenizer.celex import (
     EnglishCelex,
     MorphologicalAnalysis,
     edge_morphology_penalty,
-    validate_morphology_rho,
+    token_unicode_penalty,
+    validate_pently_rho,
     write_unmatched_report,
 )
 import lp_tokenizer.helper_functions as hf
@@ -485,13 +486,18 @@ def build_lp_blocks(edgesList: list[list[tokenInstance]],
 
 def _build_lp_blocks_from_graph_dataset(graph_dataset,
                                         tokens,
-                                        morphology_rho=0.0,
+                                        pently_rho=0.0,
                                         verbose=True,
                                         vocab_utilisation_weight: float = 0.0):
+    """Build costs as frequency * (1 + pently_rho * (CELEX + Unicode)).
+
+    Both penalties are binary per merged edge; single-byte edges keep their
+    raw frequency cost. Unicode penalties do not depend on CELEX coverage.
+    """
     build_start = time.perf_counter()
     num_tokens = len(tokens)
-    morphology_rho = validate_morphology_rho(morphology_rho)
-    morphology_enabled = morphology_rho > 0.0
+    pently_rho = validate_pently_rho(pently_rho)
+    penalties_enabled = pently_rho > 0.0
 
     utilisation_enabled = vocab_utilisation_weight > 0.0
 
@@ -511,7 +517,19 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
             "numMorphologyPenalizedEdges": 0,
             "numMorphologyCoveredEdges": 0,
             "sumMorphologyPenalty": 0.0,
+            "numUnicodePenalizedEdges": 0,
         }
+
+    # Unicode validity is intrinsic to a candidate token. Decode each
+    # candidate once, then reuse its penalty across all graph occurrences.
+    unicode_token_penalties = (
+        np.fromiter(
+            (token_unicode_penalty(token.get_token()) for token in tokens),
+            dtype=np.float64,
+            count=num_tokens,
+        )
+        if penalties_enabled else None
+    )
 
     batch_starts = np.asarray(graph_dataset["batch_start"], dtype=np.int64)
     batch_order = np.argsort(batch_starts, kind="stable")
@@ -567,6 +585,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
     penalized_edge_count = 0
     morphology_covered_edge_count = 0
     morphology_penalty_sum = 0.0
+    unicode_penalized_edge_count = 0
     fill_start = time.perf_counter()
     progress_interval = max(1, len(batch_order) // 10)
 
@@ -620,7 +639,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         )
         if utilisation_enabled:
             edge_frequencies[edge_cursor:edge_end_cursor] = big_non_free_weight[edge_cursor:edge_end_cursor]
-        if morphology_enabled:
+        if penalties_enabled:
             penalties = np.asarray(row["edge_morph_penalties"], dtype=np.float64)
             morphology_weights = np.asarray(
                 row["edge_morphology_weights"], dtype=np.float64
@@ -632,17 +651,19 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
                 raise ValueError(
                     "Morphology weights and penalties do not match the flattened edges."
                 )
-            if np.any(penalties < 0.0) or np.any(penalties > 2.0 + 1e-12):
-                raise ValueError("Morphology edge penalties must be between 0 and 2.")
+            if np.any((penalties != 0.0) & (penalties != 1.0)):
+                raise ValueError("Morphology edge penalties must be either 0 or 1.")
             if np.any((morphology_weights != 0.0) & (morphology_weights != 1.0)):
                 raise ValueError("Morphology edge weights must be either 0 or 1.")
             weighted_penalties = morphology_weights * penalties
+            unicode_penalties = unicode_token_penalties[edge_token_ids]
             big_non_free_weight[edge_cursor:edge_end_cursor] *= (
-                1.0 + morphology_rho * weighted_penalties
+                1.0 + pently_rho * (weighted_penalties + unicode_penalties)
             )
             penalized_edge_count += int(np.count_nonzero(weighted_penalties > 0.0))
             morphology_covered_edge_count += int(np.count_nonzero(morphology_weights))
             morphology_penalty_sum += float(weighted_penalties.sum())
+            unicode_penalized_edge_count += int(np.count_nonzero(unicode_penalties))
 
         local_free_edge_count = int(string_lengths.sum())
         free_edge_end_cursor = free_edge_cursor + local_free_edge_count
@@ -743,6 +764,7 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
         "numMorphologyPenalizedEdges": penalized_edge_count,
         "numMorphologyCoveredEdges": morphology_covered_edge_count,
         "sumMorphologyPenalty": morphology_penalty_sum,
+        "numUnicodePenalizedEdges": unicode_penalized_edge_count,
     }
 
 
@@ -752,11 +774,15 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
                                     all_tokens=True,
                                     num_proc=NUM_PROC,
                                     map_batch_size=BATCH_SIZE,
-                                    morphology_rho=0.0,
+                                    pently_rho=0.0,
                                     celex_dir=None,
                                     unmatched_report_path=None,
                                     verbose=True,
                                     vocab_utilisation_weight: float = 0.0):
+    """Prepare LP blocks with CELEX and Unicode costs scaled by pently_rho.
+
+    A zero weight disables both penalties and skips CELEX loading.
+    """
     required_columns = {"pretoken", "frequency"}
     missing_columns = required_columns.difference(pretoken_dataset.column_names)
     if missing_columns:
@@ -764,9 +790,21 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
             f"Pretoken dataset is missing required columns: {sorted(missing_columns)}"
         )
 
-    morphology_rho = validate_morphology_rho(morphology_rho)
-    morphology_enabled = morphology_rho > 0.0
+    pently_rho = validate_pently_rho(pently_rho)
+    morphology_enabled = pently_rho > 0.0
     morphology_diagnostics = {}
+    if len(pretoken_dataset) == 0:
+        # Dataset.map does not run callbacks or create their output columns
+        # on an empty dataset. Return the empty blocks directly instead.
+        lp_blocks = _build_lp_blocks_from_graph_dataset(
+            [], [], pently_rho=pently_rho, verbose=verbose,
+            vocab_utilisation_weight=vocab_utilisation_weight,
+        )
+        lp_blocks["morphologyDiagnostics"] = morphology_diagnostics
+        if morphology_enabled and unmatched_report_path:
+            write_unmatched_report([], unmatched_report_path)
+        return lp_blocks, []
+
     worker_count = min(num_proc, max(1, len(pretoken_dataset)))
     cache_dir = _resolve_lp_cache_dir()
 
@@ -890,7 +928,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
     if morphology_enabled:
         morphology_start = time.perf_counter()
         if verbose:
-            print(f"[celex] Loading English morphology with rho={morphology_rho:g}")
+            print(f"[celex] Loading English morphology with rho={pently_rho:g}")
         celex = EnglishCelex.load(celex_dir)
         pretoken_dataset = pretoken_dataset.map(
             _celex_annotation_batch,
@@ -1026,7 +1064,7 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
     lp_blocks = _build_lp_blocks_from_graph_dataset(
         graph_chunks,
         tokens_to_keep,
-        morphology_rho=morphology_rho,
+        pently_rho=pently_rho,
         vocab_utilisation_weight=vocab_utilisation_weight,
         verbose=verbose,
     )
@@ -1047,6 +1085,11 @@ def prepare_vocab_lp_blocks_dataset(pretoken_dataset,
                 f"{lp_blocks['numMorphologyPenalizedEdges']:,}/"
                 f"{lp_blocks['numNonFreeEdges']:,}; summed penalty="
                 f"{lp_blocks['sumMorphologyPenalty']:.3f}"
+            )
+            print(
+                f"[unicode] Incomplete UTF-8 non-free edges="
+                f"{lp_blocks['numUnicodePenalizedEdges']:,}/"
+                f"{lp_blocks['numNonFreeEdges']:,}"
             )
 
     return lp_blocks, tokens_to_keep
@@ -1696,7 +1739,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
                         pretoken_dataset=None,
                         num_proc=NUM_PROC,
                         map_batch_size=BATCH_SIZE,
-                        morphology_rho: float = 0.0,
+                        pently_rho: float = 0.0,
                         celex_dir: str = None,
                         unmatched_report_path: str = None,
                         vocab_utilisation_weight: float = 0.0):
@@ -1731,7 +1774,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
         all_tokens=all_tokens,
         num_proc=num_proc,
         map_batch_size=map_batch_size,
-        morphology_rho=morphology_rho,
+        pently_rho=pently_rho,
         vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
@@ -1777,7 +1820,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
 
     model["tokens_to_keep"] = tokens_to_keep
     model["vocab_utilisation_weight"] = vocab_utilisation_weight
-    model["morphology_rho"] = validate_morphology_rho(morphology_rho)
+    model["pently_rho"] = validate_pently_rho(pently_rho)
     model["num_morphology_penalized_edges"] = lp_blocks[
         "numMorphologyPenalizedEdges"
     ]
@@ -1786,6 +1829,7 @@ def prepare_cuopt_model(inputStringList: list[str] = None,
     ]
     model["sum_morphology_penalty"] = lp_blocks["sumMorphologyPenalty"]
     model["morphology_diagnostics"] = lp_blocks["morphologyDiagnostics"]
+    model["num_unicode_penalized_edges"] = lp_blocks["numUnicodePenalizedEdges"]
     if verbose:
         print(
             f"[prepare-cuopt] Sparse model preparation finished in "
@@ -1853,7 +1897,7 @@ def create_vocab_cuopt(inputStringList: list[str],
                        solver_parameters=None,
                        verbose: bool = True,
                        pretoken_dataset=None,
-                       morphology_rho: float = 0.0,
+                       pently_rho: float = 0.0,
                        celex_dir: str = None,
                        unmatched_report_path: str = None,
                        vocab_utilisation_weight: float = 0.0):
@@ -1865,7 +1909,7 @@ def create_vocab_cuopt(inputStringList: list[str],
         all_tokens=all_tokens,
         verbose=verbose,
         pretoken_dataset=pretoken_dataset,
-        morphology_rho=morphology_rho,
+        pently_rho=pently_rho,
         vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
