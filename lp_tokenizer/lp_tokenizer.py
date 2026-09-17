@@ -84,7 +84,15 @@ class Tokenizer:
                  vocab_size,
                  special_tokens,
                  unique_chars=None,
-                 pretokenizer=None):
+                 pretokenizer=None,
+                 training_mode="standard",
+                 max_token_bytes=None,
+                 super_base_vocab_size=None):
+
+        from lp_tokenizer.document_tokenizer import TrainingOptions
+        self.training_options = TrainingOptions(training_mode, max_token_bytes, super_base_vocab_size)
+        if training_mode != "standard" and unique_chars is not None and set(unique_chars) != set(BYTE_LEVEL_ALPHABET):
+            raise ValueError("Document LP modes require the full 256-symbol ByteLevel alphabet")
 
         if pretokenizer is None:
             self.pretokenizer=AutoTokenizer.from_pretrained(
@@ -97,7 +105,7 @@ class Tokenizer:
 
         self.unique_chars = (
             list(BYTE_LEVEL_ALPHABET)
-            if unique_chars is None
+            if unique_chars is None or training_mode != "standard"
             else list(unique_chars)
         )
         self.corpus=corpus
@@ -107,6 +115,9 @@ class Tokenizer:
       
        
     def make_vocab(self):
+
+        if self.training_options.training_mode != "standard":
+            raise ValueError("Document LP modes use make_vocab_cuopt()")
 
         if self.corpus is None:
             raise ValueError("Must include a corpus")
@@ -148,6 +159,13 @@ class Tokenizer:
                          unmatched_report_path: str = None,
                          vocab_utilisation_weight=0.0):
 
+        self.training_options.validate_penalties(pently_rho, vocab_utilisation_weight)
+        if self.training_options.training_mode != "standard":
+            self.prepare_cuopt_model(verbose=verbose)
+            result = self.solve_for_vocab_size(self.vocab_size, solver_parameters, verbose)
+            result.pop("x_values", None)
+            return result
+
         if self.corpus is None:
             raise ValueError("Must include a corpus")
 
@@ -180,8 +198,21 @@ class Tokenizer:
                             celex_dir: str = None,
                             unmatched_report_path: str = None,
                             vocab_utilisation_weight=0.0):
+        self.training_options.validate_penalties(pently_rho, vocab_utilisation_weight)
         if self.corpus is None:
             raise ValueError("Must include a corpus")
+
+        if self.training_options.training_mode != "standard":
+            from lp_tokenizer.document_training import prepare_document_training
+            reserved = len(self.unique_chars) + len(self.special_tokens_list)
+            if self.vocab_size <= reserved:
+                raise ValueError(f"Vocabulary size must exceed {reserved} reserved tokens")
+            if self.training_options.training_mode == "super":
+                self.training_options.base_size(self.vocab_size, reserved)
+            self._cuopt_model = prepare_document_training(
+                self.corpus, self.pretokenizer, self.special_tokens_list, self.training_options, verbose,
+            )
+            return self._cuopt_model
 
         total_start = time.perf_counter()
         print("[pipeline] Starting corpus preparation and cuOpt model construction")
@@ -214,6 +245,11 @@ class Tokenizer:
                              solver_parameters=None, verbose: bool = True):
         if not hasattr(self, "_cuopt_model") or self._cuopt_model is None:
             raise RuntimeError("Call prepare_cuopt_model() before solve_for_vocab_size().")
+
+        if self.training_options.training_mode != "standard":
+            from lp_tokenizer.document_training import solve_document_vocab
+            return solve_document_vocab(self._cuopt_model, vocab_size, solve_vocab_on_model,
+                                         solver_parameters, verbose)
 
         special_tokens = list(self.special_tokens_list)
         lp_budget = vocab_size - len(self.unique_chars) - len(special_tokens)

@@ -9,6 +9,7 @@ from tokenizers.models import Unigram
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
+from lp_tokenizer.document_tokenizer import DocumentLPTokenizer, BYTE_ALPHABET, round_document_vocab, mode_directory
 
 
 NANOCHAT_SPECIAL_TOKENS = [
@@ -129,7 +130,13 @@ def build_pretokenizer(mode):
     )
 
 
-PRETOKENIZER, DECODER = build_pretokenizer(PRETOKENIZER_MODE)
+PRETOKENIZER = DECODER = None
+
+
+def _ensure_standard_pretokenizer():
+    global PRETOKENIZER, DECODER
+    if PRETOKENIZER is None:
+        PRETOKENIZER, DECODER = build_pretokenizer(PRETOKENIZER_MODE)
 
 if PRETOKENIZER_MODE not in SPECIAL_TOKEN_CONFIGS:
     raise ValueError(
@@ -213,6 +220,7 @@ def include_special_tokens(vocab_tokens):
 
 
 def build_tokenizer(vocab_tokens):
+    _ensure_standard_pretokenizer()
     all_tokens = include_special_tokens(vocab_tokens)
     unk_id = all_tokens.index(UNK_TOKEN)
 
@@ -249,6 +257,16 @@ def round_vocabs(raw_tokens_path, vocab_size):
         raise KeyError(f"'possible_tokens' missing in {raw_tokens_path}")
     if "unique_chars" not in tokens:
         raise KeyError(f"'unique_chars' missing in {raw_tokens_path}")
+    metadata = tokens.get("metadata", {})
+    if metadata.get("training_mode", "standard") != "standard":
+        if metadata["special_tokens"] != tokens["special_tokens"]:
+            raise ValueError("Raw special tokens disagree with document LP metadata")
+        if metadata.get("vocab_size", vocab_size) != vocab_size:
+            raise ValueError("Requested vocabulary size disagrees with document LP metadata")
+        fixed = (metadata["base_vocabulary"] if metadata["training_mode"] == "super"
+                 else metadata["special_tokens"] + BYTE_ALPHABET)
+        return {scheme: round_document_vocab(tokens["possible_tokens"], fixed, vocab_size, scheme)
+                for scheme in ROUNDING_SCHEMES}
     validate_raw_special_tokens(tokens, raw_tokens_path)
 
     # Replace the corpus-derived unique_chars with the full ByteLevel alphabet.
@@ -486,6 +504,7 @@ def smoke_test():
     built from SPECIAL_TOKENS plus a handful of single-char tokens can encode and
     decode some sample text. Fails fast before touching any raw vocab files."""
     print("[SMOKE] Compiling SPLIT_PATTERN and building pretokenizer...")
+    _ensure_standard_pretokenizer()
     pretok = PRETOKENIZER
 
     samples = [
@@ -536,6 +555,10 @@ def smoke_test():
 if __name__ == "__main__":
     raw_vocab_path = os.environ.get("RAW_VOCAB_PATH")
     save_dir = os.environ.get("SAVE_TOKENIZER_DIR")
+    training_mode = os.environ.get("LP_TRAINING_MODE", "standard").strip().lower()
+    if training_mode not in {"standard", "boundless", "super"}:
+        raise ValueError("LP_TRAINING_MODE must be standard, boundless, or super")
+    raw_vocab_path = str(mode_directory(raw_vocab_path, training_mode))
     run_tests = os.environ.get("RUN_TOKENIZER_TESTS", "1") == "1"
     byte_test_behavior = os.environ.get("BYTE_TEST_BEHAVIOR", "strict_roundtrip")
 
@@ -555,21 +578,34 @@ if __name__ == "__main__":
 
     for raw_file in raw_files:
         vocab_size = parse_vocab_size_from_path(raw_file)
+        with open(raw_file, "rb") as handle:
+            metadata = pickle.load(handle).get("metadata", {})
+        artifact_mode = metadata.get("training_mode", "standard")
+        if training_mode != "standard" and artifact_mode != training_mode:
+            raise ValueError(f"Requested {training_mode} but {raw_file} contains {artifact_mode}")
         print(f"\nProcessing {Path(raw_file).name} (target vocab size={vocab_size})")
-        vocab_output_dir = os.path.join(save_dir, f"vocab_{vocab_size}")
+        mode_output = str(mode_directory(save_dir, artifact_mode))
+        vocab_output_dir = os.path.join(mode_output, f"vocab_{vocab_size}")
         os.makedirs(vocab_output_dir, exist_ok=True)
         print(f"Saving under: {vocab_output_dir}")
 
         vocabs = round_vocabs(raw_file, vocab_size)
         for rnd_scheme in ROUNDING_SCHEMES:
-            tokenizer = build_tokenizer(vocabs[rnd_scheme])
+            tokenizer = (DocumentLPTokenizer(vocabs[rnd_scheme], metadata)
+                         if artifact_mode != "standard" else build_tokenizer(vocabs[rnd_scheme]))
             tokenizer_name = f"lp_{vocab_size}_{rnd_scheme}"
             print(f"Working on {tokenizer_name}")
             assert_expected_tokenizer_len(tokenizer, tokenizer_name, vocab_size, rnd_scheme)
-            save_tokenizer(tokenizer, vocab_output_dir, vocab_size, rnd_scheme)
+            saved_path = save_tokenizer(tokenizer, vocab_output_dir, vocab_size, rnd_scheme)
 
             total_tokenizers += 1
-            if run_tests and rnd_scheme == "bias":
+            if run_tests and artifact_mode != "standard":
+                from smoke_test_tokenizers import smoke_test_document
+                from lp_tokenizer.document_tokenizer import TOKENIZER_FILENAME
+                smoke_test_document(Path(saved_path) / TOKENIZER_FILENAME,
+                                    tuple(sample for _, sample in ROUND_TRIP_SAMPLES), True, False, False, False)
+                passed_tokenizers += 1
+            elif run_tests and rnd_scheme == "bias":
                 if run_tokenizer_tests(tokenizer_name, tokenizer, byte_test_behavior):
                     passed_tokenizers += 1
             else:

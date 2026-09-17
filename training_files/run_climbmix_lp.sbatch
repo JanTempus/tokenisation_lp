@@ -12,9 +12,15 @@ REPO_DIR="/iopsstor/scratch/cscs/jtempus/tokenisation_lp"
 NUM_SHARDS="${NUM_SHARDS:-8}"
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
 PRETOKENIZER_MODE="${PRETOKENIZER_MODE:-nanochat}"
+LP_TRAINING_MODE="${LP_TRAINING_MODE:-standard}"
+LP_MAX_TOKEN_BYTES="${LP_MAX_TOKEN_BYTES:-64}"
 VOCAB_SIZES="${VOCAB_SIZES:-32768}"
 NUM_PROC="${NUM_PROC:-16}"
-BATCH_SIZE="${BATCH_SIZE:-10000}"
+if [[ "${LP_TRAINING_MODE}" == "standard" ]]; then
+    BATCH_SIZE="${BATCH_SIZE:-10000}"
+else
+    BATCH_SIZE="${BATCH_SIZE:-64}"
+fi
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 BYTE_TEST_BEHAVIOR="${BYTE_TEST_BEHAVIOR:-not_all_unk}"
 
@@ -40,6 +46,8 @@ export DATASET_ID
 export OUTPUT_DIR
 export TRAIN_DATASET_PATH
 export PRETOKENIZER_MODE
+export LP_TRAINING_MODE LP_MAX_TOKEN_BYTES
+# LP_SUPER_BASE_VOCAB_SIZE, when supplied by the caller, is inherited.
 export VOCAB_SIZES
 export NUM_PROC
 export BATCH_SIZE

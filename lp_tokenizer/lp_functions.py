@@ -665,29 +665,32 @@ def _build_lp_blocks_from_graph_dataset(graph_dataset,
             morphology_penalty_sum += float(weighted_penalties.sum())
             unicode_penalized_edge_count += int(np.count_nonzero(unicode_penalties))
 
-        local_free_edge_count = int(string_lengths.sum())
+        # Document LP may use retained, multi-byte base tokens as fixed edges.
+        # Legacy pretoken graphs still use the implicit one-byte chain.
+        free_counts = np.asarray(row.get("fixed_edge_counts", string_lengths), dtype=np.int64)
+        local_free_edge_count = int(free_counts.sum())
         free_edge_end_cursor = free_edge_cursor + local_free_edge_count
-        repeated_free_offsets = np.repeat(vertex_offsets, string_lengths)
-        flat_string_starts = np.repeat(
-            np.concatenate(
-                (
-                    np.array([0], dtype=np.int64),
-                    np.cumsum(string_lengths[:-1], dtype=np.int64),
-                )
-            ),
-            string_lengths,
-        )
-        free_local_starts = (
-            np.arange(local_free_edge_count, dtype=np.int64) - flat_string_starts
-        )
+        repeated_free_offsets = np.repeat(vertex_offsets, free_counts)
+        if "fixed_edge_starts" in row:
+            free_local_starts = np.asarray(row["fixed_edge_starts"], dtype=index_dtype)
+            free_local_ends = np.asarray(row["fixed_edge_ends"], dtype=index_dtype)
+            if len(free_local_starts) != local_free_edge_count or len(free_local_ends) != local_free_edge_count:
+                raise ValueError("Fixed edge counts do not match their start/end arrays")
+        else:
+            flat_string_starts = np.repeat(
+                np.concatenate((np.array([0], dtype=np.int64), np.cumsum(string_lengths[:-1], dtype=np.int64))),
+                string_lengths,
+            )
+            free_local_starts = np.arange(local_free_edge_count, dtype=np.int64) - flat_string_starts
+            free_local_ends = free_local_starts + 1
         b_indices[2 * free_edge_cursor:2 * free_edge_end_cursor:2] = (
             repeated_free_offsets + free_local_starts
         )
         b_indices[2 * free_edge_cursor + 1:2 * free_edge_end_cursor:2] = (
-            repeated_free_offsets + free_local_starts + 1
+            repeated_free_offsets + free_local_ends
         )
         big_free_weight[free_edge_cursor:free_edge_end_cursor] = np.repeat(
-            string_frequencies, string_lengths
+            string_frequencies, free_counts
         )
 
         big_b_vector[vertex_offsets] = 1.0

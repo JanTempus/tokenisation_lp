@@ -1,10 +1,14 @@
 from lp_tokenizer.lp_tokenizer import BYTE_LEVEL_ALPHABET, Tokenizer
-from lp_tokenizer.celex import default_celex_dir, validate_morphology_rho
+from lp_tokenizer.celex import default_celex_dir, validate_pently_rho
 from transformers import AutoTokenizer
 from datasets import Value, concatenate_datasets, load_dataset, load_from_disk
 from tokenizers import Regex
 from tokenizers.pre_tokenizers import ByteLevel, Sequence, Split
 from lp_tokenizer.lp_functions import solve_vocab_on_model
+from lp_tokenizer.document_tokenizer import TrainingOptions, mode_directory
+from tokenizers import Tokenizer as BackendTokenizer
+from tokenizers.models import BPE
+from types import SimpleNamespace
 import pickle
 import os
 import multiprocessing
@@ -14,7 +18,7 @@ from pathlib import Path
 import traceback
 
 
-PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "custom").strip().lower()
+PRETOKENIZER_MODE = os.environ.get("PRETOKENIZER_MODE", "nanochat").strip().lower()
 _APERTUS_SPLIT_PATTERN = (
     r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+"
     r"|[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*"
@@ -36,13 +40,13 @@ SOURCE_TEXT_COLUMN = {
 
 
 def build_pretokenizer(mode):
-    tokenizer = AutoTokenizer.from_pretrained(
-        "EleutherAI/pythia-70m-deduped",
-        revision="step3000",
-    )
-
     if mode == "pythia":
-        return tokenizer
+        return AutoTokenizer.from_pretrained(
+            "EleutherAI/pythia-70m-deduped", revision="step3000",
+        )
+
+    # These modes need only a local pretokenizer, not Pythia's model files.
+    tokenizer = SimpleNamespace(backend_tokenizer=BackendTokenizer(BPE()))
 
     if mode == "split_bytelevel":
         tokenizer.backend_tokenizer.pre_tokenizer = Sequence(
@@ -86,22 +90,29 @@ pretokenizer = (
 
 
 def train_lp_tokenizer(dataset, unique_chars, vocab_size, save_dir, pretokenizer_obj,
-                       special_tokens, morphology_rho=0.0, celex_dir=None,
-                       vocab_utilisation_weight=0.0):
+                       special_tokens, pently_rho=0.0, celex_dir=None,
+                       vocab_utilisation_weight=0.0, training_mode="standard",
+                       max_token_bytes=None, super_base_vocab_size=None):
+    options = TrainingOptions(training_mode, max_token_bytes, super_base_vocab_size)
+    options.validate_penalties(pently_rho, vocab_utilisation_weight)
+    if training_mode != "standard":
+        save_dir = str(mode_directory(save_dir, training_mode))
     tokenizer = Tokenizer(
         corpus=dataset,
         vocab_size=vocab_size,
         special_tokens=special_tokens,
         unique_chars=unique_chars,
         pretokenizer=pretokenizer_obj,
+        training_mode=training_mode, max_token_bytes=max_token_bytes,
+        super_base_vocab_size=super_base_vocab_size,
     )
     unmatched_report_path = (
         os.path.join(save_dir, "celex_unmatched.tsv")
-        if morphology_rho > 0.0
+        if pently_rho > 0.0
         else None
     )
     tokens = tokenizer.make_vocab_cuopt(
-        morphology_rho=morphology_rho,
+        pently_rho=pently_rho,
         vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
@@ -153,6 +164,15 @@ def _solve_and_save_lp_vocab(
     print("---------------------------------------", flush=True)
     print(f"[sweep] Solving for vocab_size={vocab_size}", flush=True)
     print("---------------------------------------", flush=True)
+    if cuopt_model.get("document_training"):
+        from lp_tokenizer.document_training import solve_document_vocab
+        tokens = solve_document_vocab(cuopt_model, vocab_size, solve_vocab_on_model)
+        tokens.pop("x_values", None)
+        file_name = os.path.join(save_dir, f"lp_tokens_{vocab_size}.pkl")
+        with open(file_name, "wb") as f:
+            pickle.dump(tokens, f)
+        print(f"[sweep] Saved document vocabulary to {file_name}", flush=True)
+        return
     lp_budget = vocab_size - len(unique_chars) - len(special_tokens)
     if lp_budget <= 0:
         raise ValueError(
@@ -238,14 +258,25 @@ def _visible_cuda_devices(requested_count):
 
 def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
                              pretokenizer_obj, special_tokens,
-                             morphology_rho=0.0, celex_dir=None,
-                             vocab_utilisation_weight=0.0):
+                             pently_rho=0.0, celex_dir=None,
+                             vocab_utilisation_weight=0.0, training_mode="standard",
+                             max_token_bytes=None, super_base_vocab_size=None):
+    options = TrainingOptions(training_mode, max_token_bytes, super_base_vocab_size)
+    options.validate_penalties(pently_rho, vocab_utilisation_weight)
     if not vocab_sizes:
         return
 
     # Build the LP once with the largest vocab size so the lp_budget > 0 check
     # in the Tokenizer holds for every entry in the sweep.
     sorted_sizes = sorted(set(int(vs) for vs in vocab_sizes))
+    if training_mode != "standard":
+        reserved = len(BYTE_LEVEL_ALPHABET) + len(special_tokens)
+        for size in sorted_sizes:
+            if size <= reserved:
+                raise ValueError(f"Vocabulary size must exceed {reserved} reserved tokens")
+            if training_mode == "super":
+                options.base_size(size, reserved)
+        save_dir = str(mode_directory(save_dir, training_mode))
 
     tokenizer = Tokenizer(
         corpus=dataset,
@@ -253,6 +284,8 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
         special_tokens=special_tokens,
         unique_chars=unique_chars,
         pretokenizer=pretokenizer_obj,
+        training_mode=training_mode, max_token_bytes=max_token_bytes,
+        super_base_vocab_size=super_base_vocab_size,
     )
     print(
         f"[pipeline] Tokenizer initialized: rows={len(dataset):,}, "
@@ -260,11 +293,11 @@ def train_lp_tokenizer_sweep(dataset, unique_chars, vocab_sizes, save_dir,
     )
     unmatched_report_path = (
         os.path.join(save_dir, "celex_unmatched.tsv")
-        if morphology_rho > 0.0
+        if pently_rho > 0.0
         else None
     )
     tokenizer.prepare_cuopt_model(
-        morphology_rho=morphology_rho,
+        pently_rho=pently_rho,
         vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
         unmatched_report_path=unmatched_report_path,
@@ -571,25 +604,35 @@ if __name__ == "__main__":
     )
     vocab_size = [int(size) for size in os.environ.get("VOCAB_SIZES", "131072").split(",") if size.strip()]
     save_dir = os.environ.get("RAW_VOCAB_PATH", "rounding_vocabs_apertus_2/")
+    # Shared CELEX/Unicode weight: frequency * (1 + rho * (CELEX + Unicode)).
+    # PENTLY_RHO=0 disables both penalties; positive values enable both.
     try:
-        morphology_rho = validate_morphology_rho(
-            float(os.environ.get("MORPHOLOGY_RHO", "0"))
+        pently_rho = validate_pently_rho(
+            float(os.environ.get("PENTLY_RHO", "0"))
         )
     except ValueError as error:
         raise ValueError(
-            "MORPHOLOGY_RHO must be a finite, non-negative number."
+            "PENTLY_RHO must be a finite, non-negative number."
         ) from error
     # Normalised objective: L_existing / D_V + lambda / LP_budget * sum_c (t_c - U_c / N_c).
     # Example: VOCAB_UTILISATION_WEIGHT=0.1 python train_tokenizer.py
     vocab_utilisation_weight = float(os.environ.get("VOCAB_UTILISATION_WEIGHT", "0"))
+    training_mode = os.environ.get("LP_TRAINING_MODE", "standard").strip().lower()
+    max_token_bytes = os.environ.get("LP_MAX_TOKEN_BYTES")
+    max_token_bytes = int(max_token_bytes) if max_token_bytes is not None else None
+    super_base_vocab_size = os.environ.get("LP_SUPER_BASE_VOCAB_SIZE")
+    super_base_vocab_size = int(super_base_vocab_size) if super_base_vocab_size is not None else None
+    training_options = TrainingOptions(training_mode, max_token_bytes, super_base_vocab_size)
+    training_options.validate_penalties(pently_rho, vocab_utilisation_weight)
     configured_celex_dir = os.environ.get("CELEX_DIR")
     celex_dir = configured_celex_dir or str(default_celex_dir())
     special_tokens = get_special_tokens(PRETOKENIZER_MODE)
     print(f"Using PRETOKENIZER_MODE={PRETOKENIZER_MODE}")
+    print(f"Using LP_TRAINING_MODE={training_mode}, max_token_bytes={training_options.max_token_bytes}")
     print(f"Special tokens ({len(special_tokens)}): {special_tokens}")
     print(f"Vocabulary utilisation weight: {vocab_utilisation_weight:g}")
-    print(f"Morphology rho: {morphology_rho:g}")
-    if morphology_rho > 0.0:
+    print(f"Penalty rho (CELEX + Unicode): {pently_rho:g}")
+    if pently_rho > 0.0:
         print(f"CELEX directory: {celex_dir}")
     print(f"Loading training dataset from {TRAIN_DATASET_PATH}")
 
@@ -606,7 +649,10 @@ if __name__ == "__main__":
         save_dir,
         pretokenizer,
         special_tokens,
-        morphology_rho=morphology_rho,
+        pently_rho=pently_rho,
         vocab_utilisation_weight=vocab_utilisation_weight,
         celex_dir=celex_dir,
+        training_mode=training_mode,
+        max_token_bytes=max_token_bytes,
+        super_base_vocab_size=super_base_vocab_size,
     )
