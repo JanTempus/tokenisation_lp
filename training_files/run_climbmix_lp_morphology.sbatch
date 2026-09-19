@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH -A a0229
-#SBATCH -p normal
+#SBATCH -p debug
 #SBATCH --job-name=climbmix-lp-morphology
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
-#SBATCH -t 08:30:00
+#SBATCH -t 00:30:00
 #SBATCH --output=/iopsstor/scratch/cscs/jtempus/morphology-lp-%j.out
 #SBATCH --error=/iopsstor/scratch/cscs/jtempus/morphology-lp-%j.err
 
@@ -19,6 +19,7 @@ set -euo pipefail
 NAME="${NAME:-morphology}"
 REPO_DIR="${REPO_DIR:-/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp}"
 IOPS_ROOT="${IOPS_ROOT:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
+TMP_ROOT="${TMP_ROOT:-/iopsstor/scratch/cscs/jtempus/tmp}"
 CONDA_ROOT="${CONDA_ROOT:-/users/jtempus/miniconda3}"
 DATASET_ID="${DATASET_ID:-karpathy/climbmix-400b-shuffle}"
 NUM_SHARDS="${NUM_SHARDS:-7}"
@@ -33,7 +34,7 @@ BATCH_SIZE="${BATCH_SIZE:-10000}"
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 BYTE_TEST_BEHAVIOR="${BYTE_TEST_BEHAVIOR:-not_all_unk}"
 
-DATASET_TAG="climbmix400b_s${NUM_SHARDS}"
+DATASET_TAG="climbmix400b_s${NUM_SHARDS}_parque"
 EXPERIMENT_TAG="${NAME}_${PRETOKENIZER_MODE}_${DATASET_TAG}_rho${PENTLY_RHO}"
 RUN_DIR="${IOPS_ROOT}/runs/${EXPERIMENT_TAG}_${SLURM_JOB_ID}"
 TRAIN_DATASET_PATH="${TRAIN_DATASET_PATH:-${IOPS_ROOT}/datasets/${DATASET_TAG}}"
@@ -41,7 +42,9 @@ RAW_VOCAB_PATH="${RAW_VOCAB_PATH:-${IOPS_ROOT}/raw_vocabs/${EXPERIMENT_TAG}}"
 SAVE_TOKENIZER_DIR="${SAVE_TOKENIZER_DIR:-${REPO_DIR}/rounded_tokenizers/${EXPERIMENT_TAG}}"
 LP_GRAPH_CACHE_DIR="${LP_GRAPH_CACHE_DIR:-${RUN_DIR}/lp_graph}"
 
-TMPDIR="${RUN_DIR}/tmp"
+# Multiprocessing creates AF_UNIX sockets below TMPDIR.  Keep this path short:
+# RUN_DIR includes the experiment tag and can exceed the 108-byte socket limit.
+TMPDIR="${TMP_ROOT}/${SLURM_JOB_ID}"
 TMP="${TMPDIR}"
 TEMP="${TMPDIR}"
 PYTHONPYCACHEPREFIX="${RUN_DIR}/pycache"
