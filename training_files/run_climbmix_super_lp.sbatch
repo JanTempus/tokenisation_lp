@@ -1,25 +1,19 @@
 #!/bin/bash
 #SBATCH -A a0229
 #SBATCH -p debug
-#SBATCH --job-name=climbmix-document-lp
-#SBATCH --array=0-1%1
+#SBATCH --job-name=climbmix-super-lp
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH -t 01:20:00
-#SBATCH --output=/iopsstor/scratch/cscs/jtempus/document-lp-%A_%a.out
-#SBATCH --error=/iopsstor/scratch/cscs/jtempus/document-lp-%A_%a.err
+#SBATCH --output=/iopsstor/scratch/cscs/jtempus/super-lp-%j.out
+#SBATCH --error=/iopsstor/scratch/cscs/jtempus/super-lp-%j.err
 
 set -euo pipefail
 
-# Submit once to train both modes, one at a time:
-# sbatch training_files/run_climbmix_boundless_super_lp.sbatch
-case "${SLURM_ARRAY_TASK_ID:?Submit this file with sbatch}" in
-    0) LP_TRAINING_MODE=boundless ;;
-    1) LP_TRAINING_MODE=super ;;
-    *) echo "Unexpected array task: ${SLURM_ARRAY_TASK_ID}" >&2; exit 1 ;;
-esac
+# Submit: sbatch training_files/run_climbmix_super_lp.sbatch
+LP_TRAINING_MODE=super
 
 REPO_DIR="${REPO_DIR:-/capstor/store/cscs/swissai/a0229/jtempus/tokenisation_lp}"
 IOPS_ROOT="${IOPS_ROOT:-/iopsstor/scratch/cscs/jtempus/tokenisation_lp}"
@@ -37,13 +31,13 @@ VOCAB_UTILISATION_WEIGHT=0
 RUN_TOKENIZER_TESTS="${RUN_TOKENIZER_TESTS:-1}"
 
 EXPERIMENT_TAG="climbmix400b_s${NUM_SHARDS}_${PRETOKENIZER_MODE}_document_lp"
-RUN_DIR="${IOPS_ROOT}/runs/${EXPERIMENT_TAG}_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+RUN_DIR="${IOPS_ROOT}/runs/${EXPERIMENT_TAG}_${SLURM_JOB_ID}"
 TRAIN_DATASET_PATH="${TRAIN_DATASET_PATH:-${IOPS_ROOT}/datasets/climbmix400b_s${NUM_SHARDS}}"
 RAW_VOCAB_PATH="${RAW_VOCAB_PATH:-${IOPS_ROOT}/raw_vocabs/${EXPERIMENT_TAG}}"
 SAVE_TOKENIZER_DIR="${SAVE_TOKENIZER_DIR:-${REPO_DIR}/rounded_tokenizers/${EXPERIMENT_TAG}}"
 LP_GRAPH_CACHE_DIR="${RUN_DIR}/lp_graph"
 
-TMPDIR="${IOPS_ROOT}/tmp/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+TMPDIR="${IOPS_ROOT}/tmp/${SLURM_JOB_ID}"
 PYTHONPYCACHEPREFIX="${RUN_DIR}/pycache"
 XDG_CACHE_HOME="${IOPS_ROOT}/cache"
 HF_HOME="${XDG_CACHE_HOME}/huggingface"
@@ -77,7 +71,8 @@ echo "Raw vocabularies: ${RAW_VOCAB_PATH}/${LP_TRAINING_MODE}"
 echo "Final tokenizers: ${SAVE_TOKENIZER_DIR}/${LP_TRAINING_MODE}"
 
 echo "Step 1/3: preparing ClimbMix dataset if needed"
-python3 -u "${REPO_DIR}/prepare_climbmix_shards.py"
+mkdir -p "$(dirname "${TRAIN_DATASET_PATH%/}")"
+flock -x "${TRAIN_DATASET_PATH%/}.prepare.lock" python3 -u "${REPO_DIR}/prepare_climbmix_shards.py"
 
 echo "Step 2/3: training ${LP_TRAINING_MODE} LP vocabularies"
 python3 -u "${REPO_DIR}/train_tokenizer.py"
