@@ -10,9 +10,13 @@ from huggingface_hub import hf_hub_download, list_repo_files
 DATASET_ID = os.environ.get("DATASET_ID", "karpathy/climbmix-400b-shuffle")
 NUM_SHARDS = int(os.environ.get("NUM_SHARDS", "7"))
 NUM_PROC = int(os.environ.get("NUM_PROC", "64"))
+ROW_FRACTION = float(os.environ.get("CLIMBMIX_ROW_FRACTION", "1"))
 
 
 def main():
+    if not 0 < ROW_FRACTION <= 1:
+        raise ValueError("CLIMBMIX_ROW_FRACTION must be greater than 0 and at most 1")
+
     output_dir = Path(os.environ["TRAIN_DATASET_PATH"])
     if output_dir.exists():
         print(f"Using existing dataset: {output_dir}")
@@ -44,6 +48,13 @@ def main():
         split="train",
         num_proc=NUM_SHARDS,
     ).select_columns(["text"])
+    if ROW_FRACTION < 1:
+        selected_rows = max(1, int(len(dataset) * ROW_FRACTION))
+        dataset = dataset.select(range(selected_rows))
+        print(
+            f"Selected the first {selected_rows:,} rows "
+            f"({ROW_FRACTION:.1%}) of the downloaded data"
+        )
     dataset.save_to_disk(output_dir, num_proc=NUM_PROC)
     print(f"Saved {len(dataset):,} rows to {output_dir}")
 
