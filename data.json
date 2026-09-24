@@ -1,0 +1,2524 @@
+{
+ "lp_en": {
+  "8": {
+   "steps": 65000.0,
+   "time": 889.927,
+   "lp": 427366252.0,
+   "pct1": 66.41,
+   "pctnz": 151.01,
+   "f1": 1466122.0,
+   "fnz": 5889259.0,
+   "p1": 577768.0,
+   "pnz": 16244391.0
+  },
+  "16": {
+   "steps": 5600.0,
+   "time": 182.661,
+   "lp": 393224648.0,
+   "pct1": 73.22,
+   "pctnz": 142.31,
+   "f1": 1021750.0,
+   "fnz": 4724165.0,
+   "p1": 750072.0,
+   "pnz": 15712089.0
+  },
+  "32": {
+   "steps": 6800.0,
+   "time": 196.123,
+   "lp": 371886133.0,
+   "pct1": 81.5,
+   "pctnz": 129.95,
+   "f1": 678332.0,
+   "fnz": 3263220.0,
+   "p1": 1247839.0,
+   "pnz": 13796121.0
+  },
+  "64": {
+   "steps": 6400.0,
+   "time": 181.455,
+   "lp": 359626839.0,
+   "pct1": 84.39,
+   "pctnz": 126.26,
+   "f1": 349172.0,
+   "fnz": 2402815.0,
+   "p1": 1380456.0,
+   "pnz": 12738868.0
+  },
+  "128": {
+   "steps": 9700.0,
+   "time": 226.768,
+   "lp": 352723064.0,
+   "pct1": 90.91,
+   "pctnz": 113.97,
+   "f1": 204014.0,
+   "fnz": 1556595.0,
+   "p1": 1717709.0,
+   "pnz": 10338653.0
+  },
+  "256": {
+   "steps": 9500.0,
+   "time": 230.92,
+   "lp": 349028128.0,
+   "pct1": 90.53,
+   "pctnz": 114.59,
+   "f1": 121694.0,
+   "fnz": 1207058.0,
+   "p1": 1560819.0,
+   "pnz": 9564059.0
+  }
+ },
+ "lp_multi": {
+  "128": {
+   "steps": 3000.0,
+   "time": 93.273,
+   "lp": 9157900.11,
+   "pct1": 83.91,
+   "pctnz": 123.78,
+   "f1": 30131.0,
+   "fnz": 180274.0,
+   "p1": 102774.0,
+   "pnz": 3372084.0
+  },
+  "192": {
+   "steps": 3000.0,
+   "time": 96.167,
+   "lp": 8812689.23,
+   "pct1": 82.4,
+   "pctnz": 131.77,
+   "f1": 23296.0,
+   "fnz": 140976.0,
+   "p1": 927370.0,
+   "pnz": 3081093.0
+  },
+  "256": {
+   "steps": 3100.0,
+   "time": 125.103,
+   "lp": 8591165.17,
+   "pct1": 76.94,
+   "pctnz": 121.14,
+   "f1": 20524.0,
+   "fnz": 120565.0,
+   "p1": 885685.0,
+   "pnz": 2879414.0
+  }
+ },
+ "lp_morph": {
+  "8": {
+   "steps": 113000.0,
+   "time": 1405.74,
+   "lp": 430875712.0,
+   "pct1": 71.56,
+   "pctnz": 140.8,
+   "f1": 1523062.0,
+   "fnz": 5754807.0,
+   "p1": 703642.0,
+   "pnz": 15330185.0
+  },
+  "16": {
+   "steps": 43200.0,
+   "time": 563.552,
+   "lp": 394939168.0,
+   "pct1": 79.89,
+   "pctnz": 128.75,
+   "f1": 1196589.0,
+   "fnz": 4575999.0,
+   "p1": 1214400.0,
+   "pnz": 14459374.0
+  },
+  "32": {
+   "steps": 6800.0,
+   "time": 176.759,
+   "lp": 372730826.0,
+   "pct1": 85.3,
+   "pctnz": 123.43,
+   "f1": 753166.0,
+   "fnz": 3094186.0,
+   "p1": 1535031.0,
+   "pnz": 12762789.0
+  },
+  "64": {
+   "steps": 7100.0,
+   "time": 149.716,
+   "lp": 359886107.0,
+   "pct1": 87.85,
+   "pctnz": 120.8,
+   "f1": 412468.0,
+   "fnz": 2258369.0,
+   "p1": 1640147.0,
+   "pnz": 11685263.0
+  },
+  "128": {
+   "steps": 7500.0,
+   "time": 194.177,
+   "lp": 352909553.0,
+   "pct1": 87.45,
+   "pctnz": 121.03,
+   "f1": 220082.0,
+   "fnz": 1712036.0,
+   "p1": 1531328.0,
+   "pnz": 11054461.0
+  },
+  "256": {
+   "steps": 9500.0,
+   "time": 186.04,
+   "lp": 349042343.0,
+   "pct1": 91.08,
+   "pctnz": 114.46,
+   "f1": 150881.0,
+   "fnz": 1202375.0,
+   "p1": 1624707.0,
+   "pnz": 9338450.0
+  }
+ },
+ "gap_en": {
+  "8": {
+   "lp": 427366252.0,
+   "tok": {
+    "BPE": 441677724.0,
+    "Det": 431045026.0,
+    "Bias": 448151069.0,
+    "Int": 524085422.0,
+    "UnigramLM": 484819725.0,
+    "PathPiece": 438972410.0,
+    "Freq": 529028205.0
+   },
+   "ratio_reported": {
+    "BPE": 103.349,
+    "Det": 100.86,
+    "Bias": 104.863,
+    "Int": 122.631,
+    "UnigramLM": 113.444,
+    "PathPiece": 102.716,
+    "Freq": 123.788
+   }
+  },
+  "64": {
+   "lp": 359626839.0,
+   "tok": {
+    "BPE": 362089042.0,
+    "Det": 359690431.0,
+    "Bias": 361962390.0,
+    "Int": 366041138.0,
+    "UnigramLM": 405746323.0,
+    "PathPiece": 361263876.0,
+    "Freq": 369990704.0
+   },
+   "ratio_reported": {
+    "BPE": 100.685,
+    "Det": 100.018,
+    "Bias": 100.649,
+    "Int": 101.784,
+    "UnigramLM": 112.824,
+    "PathPiece": 100.455,
+    "Freq": 102.882
+   }
+  },
+  "16": {
+   "lp": 393224648.0,
+   "tok": {
+    "BPE": 401805519.0,
+    "Det": 394344618.0,
+    "Bias": 403757674.0,
+    "Int": 439773017.0,
+    "UnigramLM": 441966444.0,
+    "PathPiece": 399902612.0,
+    "Freq": 453684154.0
+   },
+   "ratio_reported": {
+    "BPE": 102.182,
+    "Det": 100.285,
+    "Bias": 102.679,
+    "Int": 111.838,
+    "UnigramLM": 112.395,
+    "PathPiece": 101.698,
+    "Freq": 115.375
+   }
+  },
+  "128": {
+   "lp": 352723064.0,
+   "tok": {
+    "BPE": 354079724.0,
+    "Det": 353538264.0,
+    "Bias": 352753850.0,
+    "Int": 354160993.0,
+    "UnigramLM": 400811027.0,
+    "PathPiece": 353600543.0,
+    "Freq": 356781397.0
+   },
+   "ratio_reported": {
+    "BPE": 100.385,
+    "Det": 100.231,
+    "Bias": 100.009,
+    "Int": 100.408,
+    "UnigramLM": 113.633,
+    "PathPiece": 100.249,
+    "Freq": 101.151
+   }
+  },
+  "32": {
+   "lp": 371886133.0,
+   "tok": {
+    "BPE": 376681580.0,
+    "Det": 372156050.0,
+    "Bias": 375996735.0,
+    "Int": 386575802.0,
+    "UnigramLM": 417810267.0,
+    "PathPiece": 375375924.0,
+    "Freq": 399875524.0
+   },
+   "ratio_reported": {
+    "BPE": 101.289,
+    "Det": 100.073,
+    "Bias": 101.105,
+    "Int": 103.95,
+    "UnigramLM": 112.349,
+    "PathPiece": 100.938,
+    "Freq": 107.526
+   }
+  },
+  "256": {
+   "lp": 349028128.0,
+   "tok": {
+    "BPE": 349745795.0,
+    "Det": 349020177.0,
+    "Bias": 349264651.0,
+    "Int": 350090533.0,
+    "UnigramLM": 399172871.0,
+    "PathPiece": 349477642.0,
+    "Freq": 350874040.0
+   },
+   "ratio_reported": {
+    "BPE": 100.206,
+    "Det": 99.997,
+    "Bias": 100.068,
+    "Int": 100.304,
+    "UnigramLM": 114.367,
+    "PathPiece": 100.129,
+    "Freq": 100.529
+   }
+  }
+ },
+ "gap_multi": {
+  "128": {
+   "lp": 9157900.0,
+   "tok": {
+    "BPE": 9364235.0,
+    "Det": 9176047.0,
+    "Bias": 9247705.0,
+    "Int": 9586922.0,
+    "UnigramLM": 11343421.0,
+    "PathPiece": 9313079.0
+   },
+   "ratio_reported": {
+    "BPE": 102.253,
+    "Det": 100.198,
+    "Bias": 100.981,
+    "Int": 104.684,
+    "UnigramLM": 123.865,
+    "PathPiece": 101.695
+   }
+  },
+  "192": {
+   "lp": 8812689.0,
+   "tok": {
+    "BPE": 8991643.0,
+    "Det": 8829669.0,
+    "Bias": 8883293.0,
+    "Int": 9152260.0,
+    "UnigramLM": 11248099.0,
+    "PathPiece": 8953890.0
+   },
+   "ratio_reported": {
+    "BPE": 102.031,
+    "Det": 100.193,
+    "Bias": 100.801,
+    "Int": 103.853,
+    "UnigramLM": 127.635,
+    "PathPiece": 101.602
+   }
+  },
+  "256": {
+   "lp": 8591165.0,
+   "tok": {
+    "BPE": 8760970.0,
+    "Det": 8602841.0,
+    "Bias": 8678606.0,
+    "Int": 8926269.0,
+    "UnigramLM": 11294082.0,
+    "PathPiece": 8733318.0
+   },
+   "ratio_reported": {
+    "BPE": 101.977,
+    "Det": 100.136,
+    "Bias": 101.0178,
+    "Int": 103.901,
+    "UnigramLM": 131.462,
+    "PathPiece": 101.655
+   }
+  }
+ },
+ "intr_in": {
+  "8": {
+   "BPE": {
+    "vocab_util": 98.4,
+    "ttr": 0.0054,
+    "renyi1": 10.59,
+    "renyi25": 7.08,
+    "avg_rank": 1111.3,
+    "tok_len": 4.02,
+    "tok_per_line": 71.8,
+    "compression": 0.0013
+   },
+   "Freq": {
+    "vocab_util": 98.9,
+    "ttr": 0.0046,
+    "renyi1": 9.17,
+    "renyi25": 6.47,
+    "avg_rank": 600.0,
+    "tok_len": 3.4,
+    "tok_per_line": 85.1,
+    "compression": 0.0011
+   },
+   "PathPiece": {
+    "vocab_util": 98.3,
+    "ttr": 0.0054,
+    "renyi1": 10.63,
+    "renyi25": 7.06,
+    "avg_rank": 1160.5,
+    "tok_len": 4.04,
+    "tok_per_line": 71.3,
+    "compression": 0.0013
+   },
+   "UnigramLM": {
+    "vocab_util": 98.7,
+    "ttr": 0.0049,
+    "renyi1": 9.5,
+    "renyi25": 5.89,
+    "avg_rank": 778.1,
+    "tok_len": 3.68,
+    "tok_per_line": 79.1,
+    "compression": 0.0012
+   },
+   "Det": {
+    "vocab_util": 98.9,
+    "ttr": 0.0056,
+    "renyi1": 10.59,
+    "renyi25": 7.0,
+    "avg_rank": 1135.9,
+    "tok_len": 4.12,
+    "tok_per_line": 70.0,
+    "compression": 0.0014
+   },
+   "Bias": {
+    "vocab_util": 98.8,
+    "ttr": 0.0053,
+    "renyi1": 10.66,
+    "renyi25": 7.09,
+    "avg_rank": 1154.0,
+    "tok_len": 3.96,
+    "tok_per_line": 72.7,
+    "compression": 0.0013
+   },
+   "Int": {
+    "vocab_util": 98.3,
+    "ttr": 0.0031,
+    "renyi1": 9.34,
+    "renyi25": 6.93,
+    "avg_rank": 499.1,
+    "tok_len": 3.41,
+    "tok_per_line": 84.6,
+    "compression": 0.0011
+   }
+  },
+  "16": {
+   "BPE": {
+    "vocab_util": 97.8,
+    "ttr": 0.0118,
+    "renyi1": 10.86,
+    "renyi25": 6.87,
+    "avg_rank": 1747.9,
+    "tok_len": 4.41,
+    "tok_per_line": 65.5,
+    "compression": 0.0015
+   },
+   "Freq": {
+    "vocab_util": 98.1,
+    "ttr": 0.0105,
+    "renyi1": 9.93,
+    "renyi25": 6.82,
+    "avg_rank": 1096.8,
+    "tok_len": 3.95,
+    "tok_per_line": 73.3,
+    "compression": 0.0013
+   },
+   "PathPiece": {
+    "vocab_util": 97.7,
+    "ttr": 0.0118,
+    "renyi1": 10.89,
+    "renyi25": 6.85,
+    "avg_rank": 1819.2,
+    "tok_len": 4.43,
+    "tok_per_line": 65.1,
+    "compression": 0.0015
+   },
+   "UnigramLM": {
+    "vocab_util": 97.2,
+    "ttr": 0.0107,
+    "renyi1": 9.89,
+    "renyi25": 5.92,
+    "avg_rank": 1269.2,
+    "tok_len": 4.03,
+    "tok_per_line": 72.4,
+    "compression": 0.0013
+   },
+   "Det": {
+    "vocab_util": 98.7,
+    "ttr": 0.0121,
+    "renyi1": 10.86,
+    "renyi25": 6.82,
+    "avg_rank": 1798.9,
+    "tok_len": 4.5,
+    "tok_per_line": 64.2,
+    "compression": 0.0015
+   },
+   "Bias": {
+    "vocab_util": 98.7,
+    "ttr": 0.0118,
+    "renyi1": 10.9,
+    "renyi25": 6.87,
+    "avg_rank": 1814.4,
+    "tok_len": 4.39,
+    "tok_per_line": 65.8,
+    "compression": 0.0015
+   },
+   "Int": {
+    "vocab_util": 98.7,
+    "ttr": 0.0081,
+    "renyi1": 10.19,
+    "renyi25": 6.98,
+    "avg_rank": 1039.3,
+    "tok_len": 4.06,
+    "tok_per_line": 71.3,
+    "compression": 0.0014
+   }
+  },
+  "32": {
+   "BPE": {
+    "vocab_util": 91.9,
+    "ttr": 0.0236,
+    "renyi1": 10.98,
+    "renyi25": 6.72,
+    "avg_rank": 2438.0,
+    "tok_len": 4.71,
+    "tok_per_line": 61.5,
+    "compression": 0.0016
+   },
+   "Freq": {
+    "vocab_util": 87.9,
+    "ttr": 0.0214,
+    "renyi1": 10.55,
+    "renyi25": 6.82,
+    "avg_rank": 1805.1,
+    "tok_len": 4.46,
+    "tok_per_line": 65.0,
+    "compression": 0.0015
+   },
+   "PathPiece": {
+    "vocab_util": 91.9,
+    "ttr": 0.0237,
+    "renyi1": 11.0,
+    "renyi25": 6.71,
+    "avg_rank": 2529.4,
+    "tok_len": 4.72,
+    "tok_per_line": 61.3,
+    "compression": 0.0016
+   },
+   "UnigramLM": {
+    "vocab_util": 86.2,
+    "ttr": 0.02,
+    "renyi1": 10.07,
+    "renyi25": 5.88,
+    "avg_rank": 1772.6,
+    "tok_len": 4.26,
+    "tok_per_line": 68.7,
+    "compression": 0.0014
+   },
+   "Det": {
+    "vocab_util": 92.2,
+    "ttr": 0.024,
+    "renyi1": 10.97,
+    "renyi25": 6.69,
+    "avg_rank": 2505.5,
+    "tok_len": 4.76,
+    "tok_per_line": 60.8,
+    "compression": 0.0016
+   },
+   "Bias": {
+    "vocab_util": 92.4,
+    "ttr": 0.0238,
+    "renyi1": 10.99,
+    "renyi25": 6.72,
+    "avg_rank": 2520.8,
+    "tok_len": 4.71,
+    "tok_per_line": 61.4,
+    "compression": 0.0016
+   },
+   "Int": {
+    "vocab_util": 93.3,
+    "ttr": 0.0192,
+    "renyi1": 10.78,
+    "renyi25": 6.77,
+    "avg_rank": 1939.9,
+    "tok_len": 4.59,
+    "tok_per_line": 63.1,
+    "compression": 0.0015
+   }
+  },
+  "64": {
+   "BPE": {
+    "vocab_util": 70.2,
+    "ttr": 0.0375,
+    "renyi1": 11.0,
+    "renyi25": 6.64,
+    "avg_rank": 3009.4,
+    "tok_len": 4.89,
+    "tok_per_line": 59.3,
+    "compression": 0.0016
+   },
+   "Freq": {
+    "vocab_util": 64.5,
+    "ttr": 0.0338,
+    "renyi1": 10.86,
+    "renyi25": 6.68,
+    "avg_rank": 2537.3,
+    "tok_len": 4.8,
+    "tok_per_line": 60.4,
+    "compression": 0.0016
+   },
+   "PathPiece": {
+    "vocab_util": 71.1,
+    "ttr": 0.038,
+    "renyi1": 11.01,
+    "renyi25": 6.63,
+    "avg_rank": 3100.1,
+    "tok_len": 4.9,
+    "tok_per_line": 59.1,
+    "compression": 0.0016
+   },
+   "UnigramLM": {
+    "vocab_util": 61.4,
+    "ttr": 0.0293,
+    "renyi1": 10.13,
+    "renyi25": 5.83,
+    "avg_rank": 2126.9,
+    "tok_len": 4.39,
+    "tok_per_line": 66.8,
+    "compression": 0.0015
+   },
+   "Det": {
+    "vocab_util": 70.6,
+    "ttr": 0.0379,
+    "renyi1": 10.98,
+    "renyi25": 6.62,
+    "avg_rank": 3067.2,
+    "tok_len": 4.92,
+    "tok_per_line": 58.9,
+    "compression": 0.0016
+   },
+   "Bias": {
+    "vocab_util": 70.7,
+    "ttr": 0.0377,
+    "renyi1": 10.99,
+    "renyi25": 6.63,
+    "avg_rank": 3073.3,
+    "tok_len": 4.89,
+    "tok_per_line": 59.3,
+    "compression": 0.0016
+   },
+   "Int": {
+    "vocab_util": 73.4,
+    "ttr": 0.0329,
+    "renyi1": 10.92,
+    "renyi25": 6.66,
+    "avg_rank": 2665.7,
+    "tok_len": 4.84,
+    "tok_per_line": 59.9,
+    "compression": 0.0016
+   }
+  },
+  "128": {
+   "BPE": {
+    "vocab_util": 42.6,
+    "ttr": 0.0464,
+    "renyi1": 10.97,
+    "renyi25": 6.59,
+    "avg_rank": 3317.1,
+    "tok_len": 4.99,
+    "tok_per_line": 58.1,
+    "compression": 0.0017
+   },
+   "Freq": {
+    "vocab_util": 39.8,
+    "ttr": 0.0432,
+    "renyi1": 10.93,
+    "renyi25": 6.6,
+    "avg_rank": 3043.7,
+    "tok_len": 4.97,
+    "tok_per_line": 58.4,
+    "compression": 0.0017
+   },
+   "PathPiece": {
+    "vocab_util": 43.4,
+    "ttr": 0.0474,
+    "renyi1": 10.97,
+    "renyi25": 6.58,
+    "avg_rank": 3386.4,
+    "tok_len": 5.0,
+    "tok_per_line": 58.0,
+    "compression": 0.0017
+   },
+   "UnigramLM": {
+    "vocab_util": 35.2,
+    "ttr": 0.0339,
+    "renyi1": 10.15,
+    "renyi25": 5.82,
+    "avg_rank": 2270.5,
+    "tok_len": 4.44,
+    "tok_per_line": 66.1,
+    "compression": 0.0015
+   },
+   "Det": {
+    "vocab_util": 43.2,
+    "ttr": 0.0472,
+    "renyi1": 10.96,
+    "renyi25": 6.58,
+    "avg_rank": 3358.7,
+    "tok_len": 5.01,
+    "tok_per_line": 57.9,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 43.3,
+    "ttr": 0.0473,
+    "renyi1": 10.96,
+    "renyi25": 6.58,
+    "avg_rank": 3368.9,
+    "tok_len": 5.0,
+    "tok_per_line": 58.0,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 45.3,
+    "ttr": 0.0449,
+    "renyi1": 10.96,
+    "renyi25": 6.59,
+    "avg_rank": 3243.3,
+    "tok_len": 4.99,
+    "tok_per_line": 58.1,
+    "compression": 0.0017
+   }
+  },
+  "256": {
+   "BPE": {
+    "vocab_util": 22.8,
+    "ttr": 0.0504,
+    "renyi1": 10.94,
+    "renyi25": 6.56,
+    "avg_rank": 3415.6,
+    "tok_len": 5.05,
+    "tok_per_line": 57.4,
+    "compression": 0.0017
+   },
+   "Freq": {
+    "vocab_util": 22.0,
+    "ttr": 0.0483,
+    "renyi1": 10.93,
+    "renyi25": 6.57,
+    "avg_rank": 3287.5,
+    "tok_len": 5.04,
+    "tok_per_line": 57.5,
+    "compression": 0.0017
+   },
+   "PathPiece": {
+    "vocab_util": 23.2,
+    "ttr": 0.0512,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3446.1,
+    "tok_len": 5.06,
+    "tok_per_line": 57.4,
+    "compression": 0.0017
+   },
+   "UnigramLM": {
+    "vocab_util": 18.2,
+    "ttr": 0.0352,
+    "renyi1": 10.15,
+    "renyi25": 5.8,
+    "avg_rank": 2310.4,
+    "tok_len": 4.45,
+    "tok_per_line": 65.8,
+    "compression": 0.0015
+   },
+   "Det": {
+    "vocab_util": 23.1,
+    "ttr": 0.051,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3430.7,
+    "tok_len": 5.06,
+    "tok_per_line": 57.3,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 23.2,
+    "ttr": 0.0511,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3437.6,
+    "tok_len": 5.06,
+    "tok_per_line": 57.3,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 24.7,
+    "ttr": 0.0494,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3356.0,
+    "tok_len": 5.05,
+    "tok_per_line": 57.5,
+    "compression": 0.0017
+   }
+  }
+ },
+ "intr_multi": {
+  "128": {
+   "BPE": {
+    "vocab_util": 99.1,
+    "ttr": 0.0139,
+    "renyi1": 13.56,
+    "renyi25": 9.04,
+    "avg_rank": 13802.7,
+    "tok_len": 3.45,
+    "tok_per_line": 75.8,
+    "compression": 0.0009
+   },
+   "PathPiece": {
+    "vocab_util": 98.7,
+    "ttr": 0.0139,
+    "renyi1": 13.59,
+    "renyi25": 8.97,
+    "avg_rank": 14395.7,
+    "tok_len": 3.48,
+    "tok_per_line": 75.4,
+    "compression": 0.0009
+   },
+   "UnigramLM": {
+    "vocab_util": 99.1,
+    "ttr": 0.0114,
+    "renyi1": 12.2,
+    "renyi25": 6.46,
+    "avg_rank": 8193.6,
+    "tok_len": 2.76,
+    "tok_per_line": 91.8,
+    "compression": 0.0007
+   },
+   "Det": {
+    "vocab_util": 99.8,
+    "ttr": 0.0143,
+    "renyi1": 13.53,
+    "renyi25": 8.94,
+    "avg_rank": 13856.4,
+    "tok_len": 3.54,
+    "tok_per_line": 74.3,
+    "compression": 0.0009
+   },
+   "Bias": {
+    "vocab_util": 99.8,
+    "ttr": 0.0141,
+    "renyi1": 13.56,
+    "renyi25": 8.95,
+    "avg_rank": 14048.3,
+    "tok_len": 3.51,
+    "tok_per_line": 74.8,
+    "compression": 0.0009
+   },
+   "Int": {
+    "vocab_util": 99.9,
+    "ttr": 0.0115,
+    "renyi1": 13.31,
+    "renyi25": 9.0,
+    "avg_rank": 10987.7,
+    "tok_len": 3.36,
+    "tok_per_line": 77.1,
+    "compression": 0.0008
+   }
+  },
+  "192": {
+   "BPE": {
+    "vocab_util": 98.5,
+    "ttr": 0.0215,
+    "renyi1": 13.7,
+    "renyi25": 8.96,
+    "avg_rank": 18570.8,
+    "tok_len": 3.63,
+    "tok_per_line": 73.1,
+    "compression": 0.0009
+   },
+   "PathPiece": {
+    "vocab_util": 98.0,
+    "ttr": 0.0215,
+    "renyi1": 13.72,
+    "renyi25": 8.91,
+    "avg_rank": 19339.4,
+    "tok_len": 3.65,
+    "tok_per_line": 72.8,
+    "compression": 0.0009
+   },
+   "UnigramLM": {
+    "vocab_util": 94.7,
+    "ttr": 0.0165,
+    "renyi1": 12.29,
+    "renyi25": 6.48,
+    "avg_rank": 9548.3,
+    "tok_len": 2.79,
+    "tok_per_line": 91.1,
+    "compression": 0.0007
+   },
+   "Det": {
+    "vocab_util": 99.7,
+    "ttr": 0.0222,
+    "renyi1": 13.66,
+    "renyi25": 8.87,
+    "avg_rank": 18499.1,
+    "tok_len": 3.71,
+    "tok_per_line": 71.8,
+    "compression": 0.0009
+   },
+   "Bias": {
+    "vocab_util": 99.7,
+    "ttr": 0.0221,
+    "renyi1": 13.68,
+    "renyi25": 8.88,
+    "avg_rank": 18709.2,
+    "tok_len": 3.68,
+    "tok_per_line": 72.2,
+    "compression": 0.0009
+   },
+   "Int": {
+    "vocab_util": 100.0,
+    "ttr": 0.0177,
+    "renyi1": 13.51,
+    "renyi25": 8.93,
+    "avg_rank": 15003.2,
+    "tok_len": 3.56,
+    "tok_per_line": 74.0,
+    "compression": 0.0009
+   }
+  },
+  "256": {
+   "BPE": {
+    "vocab_util": 97.9,
+    "ttr": 0.0293,
+    "renyi1": 13.79,
+    "renyi25": 8.9,
+    "avg_rank": 22999.5,
+    "tok_len": 3.75,
+    "tok_per_line": 71.4,
+    "compression": 0.0009
+   },
+   "PathPiece": {
+    "vocab_util": 97.3,
+    "ttr": 0.0292,
+    "renyi1": 13.81,
+    "renyi25": 8.86,
+    "avg_rank": 23832.8,
+    "tok_len": 3.76,
+    "tok_per_line": 71.1,
+    "compression": 0.0009
+   },
+   "UnigramLM": {
+    "vocab_util": 79.0,
+    "ttr": 0.0183,
+    "renyi1": 12.33,
+    "renyi25": 6.44,
+    "avg_rank": 10121.3,
+    "tok_len": 2.78,
+    "tok_per_line": 91.5,
+    "compression": 0.0007
+   },
+   "Det": {
+    "vocab_util": 100.0,
+    "ttr": 0.0305,
+    "renyi1": 13.73,
+    "renyi25": 8.82,
+    "avg_rank": 22921.0,
+    "tok_len": 3.84,
+    "tok_per_line": 70.2,
+    "compression": 0.0009
+   },
+   "Bias": {
+    "vocab_util": 99.7,
+    "ttr": 0.0301,
+    "renyi1": 13.76,
+    "renyi25": 8.85,
+    "avg_rank": 22848.6,
+    "tok_len": 3.79,
+    "tok_per_line": 70.7,
+    "compression": 0.0009
+   },
+   "Int": {
+    "vocab_util": 100.0,
+    "ttr": 0.0227,
+    "renyi1": 13.59,
+    "renyi25": 8.89,
+    "avg_rank": 17692.7,
+    "tok_len": 3.67,
+    "tok_per_line": 72.4,
+    "compression": 0.0009
+   }
+  }
+ },
+ "intr_morph": {
+  "8": {
+   "Det": {
+    "vocab_util": 98.9,
+    "ttr": 0.0056,
+    "renyi1": 10.57,
+    "renyi25": 7.0,
+    "avg_rank": 1124.8,
+    "tok_len": 4.12,
+    "tok_per_line": 70.0,
+    "compression": 0.0014
+   },
+   "Bias": {
+    "vocab_util": 98.8,
+    "ttr": 0.0054,
+    "renyi1": 10.63,
+    "renyi25": 7.07,
+    "avg_rank": 1140.2,
+    "tok_len": 3.98,
+    "tok_per_line": 72.4,
+    "compression": 0.0013
+   },
+   "Int": {
+    "vocab_util": 98.5,
+    "ttr": 0.0035,
+    "renyi1": 9.6,
+    "renyi25": 7.03,
+    "avg_rank": 573.0,
+    "tok_len": 3.57,
+    "tok_per_line": 80.8,
+    "compression": 0.0012
+   }
+  },
+  "16": {
+   "Det": {
+    "vocab_util": 98.6,
+    "ttr": 0.0121,
+    "renyi1": 10.84,
+    "renyi25": 6.81,
+    "avg_rank": 1773.3,
+    "tok_len": 4.5,
+    "tok_per_line": 64.3,
+    "compression": 0.0015
+   },
+   "Bias": {
+    "vocab_util": 98.7,
+    "ttr": 0.012,
+    "renyi1": 10.88,
+    "renyi25": 6.84,
+    "avg_rank": 1803.1,
+    "tok_len": 4.44,
+    "tok_per_line": 65.1,
+    "compression": 0.0015
+   },
+   "Int": {
+    "vocab_util": 98.7,
+    "ttr": 0.009,
+    "renyi1": 10.38,
+    "renyi25": 6.95,
+    "avg_rank": 1192.1,
+    "tok_len": 4.18,
+    "tok_per_line": 69.2,
+    "compression": 0.0014
+   }
+  },
+  "32": {
+   "Det": {
+    "vocab_util": 92.1,
+    "ttr": 0.0239,
+    "renyi1": 10.96,
+    "renyi25": 6.69,
+    "avg_rank": 2476.2,
+    "tok_len": 4.76,
+    "tok_per_line": 60.8,
+    "compression": 0.0016
+   },
+   "Bias": {
+    "vocab_util": 92.3,
+    "ttr": 0.0238,
+    "renyi1": 10.97,
+    "renyi25": 6.71,
+    "avg_rank": 2493.1,
+    "tok_len": 4.73,
+    "tok_per_line": 61.2,
+    "compression": 0.0016
+   },
+   "Int": {
+    "vocab_util": 93.1,
+    "ttr": 0.0203,
+    "renyi1": 10.84,
+    "renyi25": 6.75,
+    "avg_rank": 2063.2,
+    "tok_len": 4.65,
+    "tok_per_line": 62.3,
+    "compression": 0.0015
+   }
+  },
+  "64": {
+   "Det": {
+    "vocab_util": 70.3,
+    "ttr": 0.0378,
+    "renyi1": 10.98,
+    "renyi25": 6.62,
+    "avg_rank": 3043.7,
+    "tok_len": 4.92,
+    "tok_per_line": 58.9,
+    "compression": 0.0016
+   },
+   "Bias": {
+    "vocab_util": 70.5,
+    "ttr": 0.0376,
+    "renyi1": 10.99,
+    "renyi25": 6.63,
+    "avg_rank": 3049.3,
+    "tok_len": 4.89,
+    "tok_per_line": 59.2,
+    "compression": 0.0016
+   },
+   "Int": {
+    "vocab_util": 72.6,
+    "ttr": 0.034,
+    "renyi1": 10.94,
+    "renyi25": 6.65,
+    "avg_rank": 2746.6,
+    "tok_len": 4.86,
+    "tok_per_line": 59.6,
+    "compression": 0.0016
+   }
+  },
+  "128": {
+   "Det": {
+    "vocab_util": 43.1,
+    "ttr": 0.0471,
+    "renyi1": 10.96,
+    "renyi25": 6.58,
+    "avg_rank": 3351.9,
+    "tok_len": 5.01,
+    "tok_per_line": 57.9,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 43.3,
+    "ttr": 0.0472,
+    "renyi1": 10.96,
+    "renyi25": 6.58,
+    "avg_rank": 3363.3,
+    "tok_len": 5.0,
+    "tok_per_line": 58.0,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 45.9,
+    "ttr": 0.0437,
+    "renyi1": 10.94,
+    "renyi25": 6.59,
+    "avg_rank": 3132.9,
+    "tok_len": 4.97,
+    "tok_per_line": 58.3,
+    "compression": 0.0017
+   }
+  },
+  "256": {
+   "Det": {
+    "vocab_util": 23.1,
+    "ttr": 0.0509,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3425.3,
+    "tok_len": 5.06,
+    "tok_per_line": 57.3,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 23.1,
+    "ttr": 0.051,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3433.4,
+    "tok_len": 5.06,
+    "tok_per_line": 57.4,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 24.6,
+    "ttr": 0.0494,
+    "renyi1": 10.93,
+    "renyi25": 6.56,
+    "avg_rank": 3350.0,
+    "tok_len": 5.05,
+    "tok_per_line": 57.5,
+    "compression": 0.0017
+   }
+  }
+ },
+ "intr_out": {
+  "8": {
+   "BPE": {
+    "vocab_util": 98.6,
+    "ttr": 0.0055,
+    "renyi1": 10.61,
+    "renyi25": 7.09,
+    "avg_rank": 1121.5,
+    "tok_len": 3.99,
+    "tok_per_line": 63.8,
+    "compression": 0.0014
+   },
+   "Freq": {
+    "vocab_util": 99.1,
+    "ttr": 0.0046,
+    "renyi1": 9.12,
+    "renyi25": 6.42,
+    "avg_rank": 590.8,
+    "tok_len": 3.37,
+    "tok_per_line": 76.1,
+    "compression": 0.0011
+   },
+   "PathPiece": {
+    "vocab_util": 98.5,
+    "ttr": 0.0055,
+    "renyi1": 10.65,
+    "renyi25": 7.07,
+    "avg_rank": 1169.6,
+    "tok_len": 4.01,
+    "tok_per_line": 63.4,
+    "compression": 0.0014
+   },
+   "UnigramLM": {
+    "vocab_util": 98.9,
+    "ttr": 0.005,
+    "renyi1": 9.51,
+    "renyi25": 5.89,
+    "avg_rank": 781.7,
+    "tok_len": 3.65,
+    "tok_per_line": 70.2,
+    "compression": 0.0012
+   },
+   "Det": {
+    "vocab_util": 99.0,
+    "ttr": 0.0056,
+    "renyi1": 10.61,
+    "renyi25": 7.02,
+    "avg_rank": 1141.3,
+    "tok_len": 4.09,
+    "tok_per_line": 62.3,
+    "compression": 0.0014
+   },
+   "Bias": {
+    "vocab_util": 99.0,
+    "ttr": 0.0054,
+    "renyi1": 10.69,
+    "renyi25": 7.1,
+    "avg_rank": 1171.0,
+    "tok_len": 3.93,
+    "tok_per_line": 64.6,
+    "compression": 0.0013
+   },
+   "Int": {
+    "vocab_util": 98.6,
+    "ttr": 0.0031,
+    "renyi1": 9.31,
+    "renyi25": 6.9,
+    "avg_rank": 492.3,
+    "tok_len": 3.39,
+    "tok_per_line": 75.6,
+    "compression": 0.0011
+   }
+  },
+  "16": {
+   "BPE": {
+    "vocab_util": 98.1,
+    "ttr": 0.012,
+    "renyi1": 10.9,
+    "renyi25": 6.88,
+    "avg_rank": 1780.4,
+    "tok_len": 4.38,
+    "tok_per_line": 58.1,
+    "compression": 0.0015
+   },
+   "Freq": {
+    "vocab_util": 98.1,
+    "ttr": 0.0106,
+    "renyi1": 9.89,
+    "renyi25": 6.8,
+    "avg_rank": 1086.5,
+    "tok_len": 3.92,
+    "tok_per_line": 65.5,
+    "compression": 0.0013
+   },
+   "PathPiece": {
+    "vocab_util": 97.9,
+    "ttr": 0.012,
+    "renyi1": 10.94,
+    "renyi25": 6.86,
+    "avg_rank": 1855.2,
+    "tok_len": 4.4,
+    "tok_per_line": 57.8,
+    "compression": 0.0015
+   },
+   "UnigramLM": {
+    "vocab_util": 97.2,
+    "ttr": 0.0108,
+    "renyi1": 9.9,
+    "renyi25": 5.91,
+    "avg_rank": 1290.8,
+    "tok_len": 4.0,
+    "tok_per_line": 64.1,
+    "compression": 0.0014
+   },
+   "Det": {
+    "vocab_util": 98.8,
+    "ttr": 0.0123,
+    "renyi1": 10.9,
+    "renyi25": 6.83,
+    "avg_rank": 1833.8,
+    "tok_len": 4.46,
+    "tok_per_line": 57.0,
+    "compression": 0.0015
+   },
+   "Bias": {
+    "vocab_util": 98.8,
+    "ttr": 0.012,
+    "renyi1": 10.95,
+    "renyi25": 6.88,
+    "avg_rank": 1860.9,
+    "tok_len": 4.36,
+    "tok_per_line": 58.3,
+    "compression": 0.0015
+   },
+   "Int": {
+    "vocab_util": 98.8,
+    "ttr": 0.0082,
+    "renyi1": 10.18,
+    "renyi25": 6.99,
+    "avg_rank": 1033.6,
+    "tok_len": 4.03,
+    "tok_per_line": 63.6,
+    "compression": 0.0014
+   }
+  },
+  "32": {
+   "BPE": {
+    "vocab_util": 92.1,
+    "ttr": 0.024,
+    "renyi1": 11.04,
+    "renyi25": 6.73,
+    "avg_rank": 2516.7,
+    "tok_len": 4.67,
+    "tok_per_line": 54.5,
+    "compression": 0.0016
+   },
+   "Freq": {
+    "vocab_util": 87.7,
+    "ttr": 0.0214,
+    "renyi1": 10.55,
+    "renyi25": 6.83,
+    "avg_rank": 1814.5,
+    "tok_len": 4.42,
+    "tok_per_line": 57.9,
+    "compression": 0.0015
+   },
+   "PathPiece": {
+    "vocab_util": 92.0,
+    "ttr": 0.0241,
+    "renyi1": 11.06,
+    "renyi25": 6.72,
+    "avg_rank": 2613.9,
+    "tok_len": 4.69,
+    "tok_per_line": 54.3,
+    "compression": 0.0016
+   },
+   "UnigramLM": {
+    "vocab_util": 86.4,
+    "ttr": 0.0203,
+    "renyi1": 10.11,
+    "renyi25": 5.87,
+    "avg_rank": 1826.9,
+    "tok_len": 4.23,
+    "tok_per_line": 60.6,
+    "compression": 0.0014
+   },
+   "Det": {
+    "vocab_util": 92.4,
+    "ttr": 0.0244,
+    "renyi1": 11.03,
+    "renyi25": 6.7,
+    "avg_rank": 2586.1,
+    "tok_len": 4.72,
+    "tok_per_line": 53.9,
+    "compression": 0.0016
+   },
+   "Bias": {
+    "vocab_util": 92.6,
+    "ttr": 0.0242,
+    "renyi1": 11.06,
+    "renyi25": 6.72,
+    "avg_rank": 2609.1,
+    "tok_len": 4.68,
+    "tok_per_line": 54.4,
+    "compression": 0.0016
+   },
+   "Int": {
+    "vocab_util": 93.4,
+    "ttr": 0.0195,
+    "renyi1": 10.82,
+    "renyi25": 6.79,
+    "avg_rank": 1975.1,
+    "tok_len": 4.55,
+    "tok_per_line": 56.0,
+    "compression": 0.0015
+   }
+  },
+  "64": {
+   "BPE": {
+    "vocab_util": 70.7,
+    "ttr": 0.0384,
+    "renyi1": 11.07,
+    "renyi25": 6.64,
+    "avg_rank": 3138.0,
+    "tok_len": 4.85,
+    "tok_per_line": 52.4,
+    "compression": 0.0017
+   },
+   "Freq": {
+    "vocab_util": 64.9,
+    "ttr": 0.0344,
+    "renyi1": 10.9,
+    "renyi25": 6.69,
+    "avg_rank": 2608.1,
+    "tok_len": 4.76,
+    "tok_per_line": 53.5,
+    "compression": 0.0016
+   },
+   "PathPiece": {
+    "vocab_util": 71.5,
+    "ttr": 0.0389,
+    "renyi1": 11.07,
+    "renyi25": 6.63,
+    "avg_rank": 3234.6,
+    "tok_len": 4.87,
+    "tok_per_line": 52.3,
+    "compression": 0.0017
+   },
+   "UnigramLM": {
+    "vocab_util": 62.1,
+    "ttr": 0.0301,
+    "renyi1": 10.17,
+    "renyi25": 5.82,
+    "avg_rank": 2213.0,
+    "tok_len": 4.35,
+    "tok_per_line": 58.9,
+    "compression": 0.0015
+   },
+   "Det": {
+    "vocab_util": 71.2,
+    "ttr": 0.0389,
+    "renyi1": 11.05,
+    "renyi25": 6.62,
+    "avg_rank": 3210.4,
+    "tok_len": 4.88,
+    "tok_per_line": 52.1,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 71.5,
+    "ttr": 0.0388,
+    "renyi1": 11.07,
+    "renyi25": 6.63,
+    "avg_rank": 3226.2,
+    "tok_len": 4.85,
+    "tok_per_line": 52.4,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 73.8,
+    "ttr": 0.0336,
+    "renyi1": 10.98,
+    "renyi25": 6.66,
+    "avg_rank": 2760.2,
+    "tok_len": 4.8,
+    "tok_per_line": 53.0,
+    "compression": 0.0016
+   }
+  },
+  "128": {
+   "BPE": {
+    "vocab_util": 43.3,
+    "ttr": 0.0481,
+    "renyi1": 11.05,
+    "renyi25": 6.59,
+    "avg_rank": 3504.5,
+    "tok_len": 4.96,
+    "tok_per_line": 51.3,
+    "compression": 0.0017
+   },
+   "Freq": {
+    "vocab_util": 40.3,
+    "ttr": 0.0444,
+    "renyi1": 11.0,
+    "renyi25": 6.6,
+    "avg_rank": 3179.5,
+    "tok_len": 4.93,
+    "tok_per_line": 51.6,
+    "compression": 0.0017
+   },
+   "PathPiece": {
+    "vocab_util": 44.1,
+    "ttr": 0.0491,
+    "renyi1": 11.04,
+    "renyi25": 6.58,
+    "avg_rank": 3576.0,
+    "tok_len": 4.97,
+    "tok_per_line": 51.2,
+    "compression": 0.0017
+   },
+   "UnigramLM": {
+    "vocab_util": 35.8,
+    "ttr": 0.0351,
+    "renyi1": 10.19,
+    "renyi25": 5.8,
+    "avg_rank": 2382.2,
+    "tok_len": 4.4,
+    "tok_per_line": 58.2,
+    "compression": 0.0015
+   },
+   "Det": {
+    "vocab_util": 43.8,
+    "ttr": 0.0489,
+    "renyi1": 11.03,
+    "renyi25": 6.58,
+    "avg_rank": 3550.8,
+    "tok_len": 4.98,
+    "tok_per_line": 51.1,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 44.0,
+    "ttr": 0.049,
+    "renyi1": 11.04,
+    "renyi25": 6.58,
+    "avg_rank": 3566.7,
+    "tok_len": 4.97,
+    "tok_per_line": 51.2,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 45.8,
+    "ttr": 0.0463,
+    "renyi1": 11.03,
+    "renyi25": 6.58,
+    "avg_rank": 3410.6,
+    "tok_len": 4.96,
+    "tok_per_line": 51.3,
+    "compression": 0.0017
+   }
+  },
+  "256": {
+   "BPE": {
+    "vocab_util": 23.3,
+    "ttr": 0.0525,
+    "renyi1": 11.02,
+    "renyi25": 6.56,
+    "avg_rank": 3635.4,
+    "tok_len": 5.02,
+    "tok_per_line": 50.7,
+    "compression": 0.0017
+   },
+   "Freq": {
+    "vocab_util": 22.3,
+    "ttr": 0.0501,
+    "renyi1": 11.0,
+    "renyi25": 6.57,
+    "avg_rank": 3472.9,
+    "tok_len": 5.0,
+    "tok_per_line": 50.8,
+    "compression": 0.0017
+   },
+   "PathPiece": {
+    "vocab_util": 23.7,
+    "ttr": 0.0534,
+    "renyi1": 11.01,
+    "renyi25": 6.55,
+    "avg_rank": 3672.2,
+    "tok_len": 5.02,
+    "tok_per_line": 50.6,
+    "compression": 0.0017
+   },
+   "UnigramLM": {
+    "vocab_util": 18.6,
+    "ttr": 0.0367,
+    "renyi1": 10.19,
+    "renyi25": 5.79,
+    "avg_rank": 2432.6,
+    "tok_len": 4.42,
+    "tok_per_line": 57.9,
+    "compression": 0.0015
+   },
+   "Det": {
+    "vocab_util": 23.6,
+    "ttr": 0.0532,
+    "renyi1": 11.01,
+    "renyi25": 6.55,
+    "avg_rank": 3660.9,
+    "tok_len": 5.03,
+    "tok_per_line": 50.6,
+    "compression": 0.0017
+   },
+   "Bias": {
+    "vocab_util": 23.7,
+    "ttr": 0.0534,
+    "renyi1": 11.01,
+    "renyi25": 6.55,
+    "avg_rank": 3671.1,
+    "tok_len": 5.02,
+    "tok_per_line": 50.6,
+    "compression": 0.0017
+   },
+   "Int": {
+    "vocab_util": 25.2,
+    "ttr": 0.0514,
+    "renyi1": 11.0,
+    "renyi25": 6.56,
+    "avg_rank": 3563.0,
+    "tok_len": 5.01,
+    "tok_per_line": 50.7,
+    "compression": 0.0017
+   }
+  }
+ },
+ "lm_en": {
+  "8": {
+   "BPE": {
+    "bpb": {
+     "12": [
+      0.8779,
+      0.0001
+     ],
+     "18": [
+      0.7773,
+      0.0007
+     ],
+     "24": [
+      0.7151,
+      0.00030000000000000003
+     ]
+    },
+    "core": {
+     "12": [
+      0.1198,
+      0.0028000000000000004
+     ],
+     "18": [
+      0.19579999999999997,
+      0.0012
+     ],
+     "24": [
+      0.2602,
+      0.005
+     ]
+    }
+   },
+   "PathPiece": {
+    "bpb": {
+     "12": [
+      0.8779,
+      0.00030000000000000003
+     ],
+     "18": [
+      0.7777,
+      0.0006000000000000001
+     ],
+     "24": [
+      0.7156,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.1213,
+      0.0070999999999999995
+     ],
+     "18": [
+      0.2016,
+      0.0027
+     ],
+     "24": [
+      0.2622,
+      0.0048
+     ]
+    }
+   },
+   "UnigramLM": {
+    "bpb": {
+     "12": [
+      0.8814,
+      0.0002
+     ],
+     "18": [
+      0.7811,
+      0.0006000000000000001
+     ],
+     "24": [
+      0.7182,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.1079,
+      0.0044
+     ],
+     "18": [
+      0.1718,
+      0.0067
+     ],
+     "24": [
+      0.2329,
+      0.0032
+     ]
+    }
+   },
+   "Det": {
+    "bpb": {
+     "12": [
+      0.8782,
+      0.0004
+     ],
+     "18": [
+      0.7772,
+      0.0001
+     ],
+     "24": [
+      0.716,
+      0.0001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1294,
+      0.003
+     ],
+     "18": [
+      0.1913,
+      0.0038
+     ],
+     "24": [
+      0.2584,
+      0.0054
+     ]
+    }
+   },
+   "Bias": {
+    "bpb": {
+     "12": [
+      0.8812,
+      0.0001
+     ],
+     "18": [
+      0.7795,
+      0.00030000000000000003
+     ],
+     "24": [
+      0.7172,
+      0.0004
+     ]
+    },
+    "core": {
+     "12": [
+      0.1318,
+      0.0014000000000000002
+     ],
+     "18": [
+      0.1909,
+      0.0019
+     ],
+     "24": [
+      0.25239999999999996,
+      0.0076
+     ]
+    }
+   }
+  },
+  "16": {
+   "BPE": {
+    "bpb": {
+     "12": [
+      0.8642,
+      0.0001
+     ],
+     "18": [
+      0.7692,
+      0.0001
+     ],
+     "24": [
+      0.7106,
+      0.0006000000000000001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1454,
+      0.0044
+     ],
+     "18": [
+      0.21059999999999998,
+      0.0033
+     ],
+     "24": [
+      0.2666,
+      0.0008
+     ]
+    }
+   },
+   "PathPiece": {
+    "bpb": {
+     "12": [
+      0.8641,
+      0.0002
+     ],
+     "18": [
+      0.7697,
+      0.0004
+     ],
+     "24": [
+      0.7108,
+      0.0004
+     ]
+    },
+    "core": {
+     "12": [
+      0.1343,
+      0.0018
+     ],
+     "18": [
+      0.209,
+      0.0049
+     ],
+     "24": [
+      0.2646,
+      0.0046
+     ]
+    }
+   },
+   "UnigramLM": {
+    "bpb": {
+     "12": [
+      0.866,
+      0.0002
+     ],
+     "18": [
+      0.7706,
+      0.0002
+     ],
+     "24": [
+      0.7117,
+      0.0
+     ]
+    },
+    "core": {
+     "12": [
+      0.1331,
+      0.0011
+     ],
+     "18": [
+      0.1985,
+      0.0038
+     ],
+     "24": [
+      0.2557,
+      0.0017000000000000001
+     ]
+    }
+   },
+   "Det": {
+    "bpb": {
+     "12": [
+      0.8645,
+      0.0002
+     ],
+     "18": [
+      0.7689,
+      0.0001
+     ],
+     "24": [
+      0.7107,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.13720000000000002,
+      0.0044
+     ],
+     "18": [
+      0.2102,
+      0.0041
+     ],
+     "24": [
+      0.26,
+      0.0026
+     ]
+    }
+   },
+   "Bias": {
+    "bpb": {
+     "12": [
+      0.8655,
+      0.0
+     ],
+     "18": [
+      0.7703,
+      0.0002
+     ],
+     "24": [
+      0.7114,
+      0.0004
+     ]
+    },
+    "core": {
+     "12": [
+      0.1435,
+      0.0011
+     ],
+     "18": [
+      0.20989999999999998,
+      0.0027
+     ],
+     "24": [
+      0.2644,
+      0.0018
+     ]
+    }
+   }
+  },
+  "32": {
+   "BPE": {
+    "bpb": {
+     "12": [
+      0.8531,
+      0.0001
+     ],
+     "18": [
+      0.7623,
+      0.0001
+     ],
+     "24": [
+      0.7039,
+      0.0001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1491,
+      0.0028000000000000004
+     ],
+     "18": [
+      0.223,
+      0.002
+     ],
+     "24": [
+      0.28300000000000003,
+      0.0022
+     ]
+    }
+   },
+   "PathPiece": {
+    "bpb": {
+     "12": [
+      0.8526,
+      0.0001
+     ],
+     "18": [
+      0.762,
+      0.0001
+     ],
+     "24": [
+      0.7068,
+      0.001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1491,
+      0.0011
+     ],
+     "18": [
+      0.2184,
+      0.0108
+     ],
+     "24": [
+      0.2706,
+      0.0021
+     ]
+    }
+   },
+   "UnigramLM": {
+    "bpb": {
+     "12": [
+      0.8549,
+      0.0004
+     ],
+     "18": [
+      0.7627,
+      0.0002
+     ],
+     "24": [
+      0.706,
+      0.0001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1423,
+      0.0026
+     ],
+     "18": [
+      0.2022,
+      0.0018
+     ],
+     "24": [
+      0.262,
+      0.005600000000000001
+     ]
+    }
+   },
+   "Det": {
+    "bpb": {
+     "12": [
+      0.8525,
+      0.00030000000000000003
+     ],
+     "18": [
+      0.7606,
+      0.00030000000000000003
+     ],
+     "24": [
+      0.705,
+      0.0008
+     ]
+    },
+    "core": {
+     "12": [
+      0.15130000000000002,
+      0.0034000000000000002
+     ],
+     "18": [
+      0.2191,
+      0.0006
+     ],
+     "24": [
+      0.2805,
+      0.0011
+     ]
+    }
+   },
+   "Bias": {
+    "bpb": {
+     "12": [
+      0.8531,
+      0.0002
+     ],
+     "18": [
+      0.7614,
+      0.00030000000000000003
+     ],
+     "24": [
+      0.7051,
+      0.0001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1481,
+      0.005
+     ],
+     "18": [
+      0.22089999999999999,
+      0.0009
+     ],
+     "24": [
+      0.2778,
+      0.0070999999999999995
+     ]
+    }
+   }
+  },
+  "64": {
+   "BPE": {
+    "bpb": {
+     "12": [
+      0.8455,
+      0.00030000000000000003
+     ],
+     "18": [
+      0.7565,
+      0.0002
+     ],
+     "24": [
+      0.6995,
+      0.00030000000000000003
+     ]
+    },
+    "core": {
+     "12": [
+      0.16449999999999998,
+      0.0042
+     ],
+     "18": [
+      0.22760000000000002,
+      0.0053
+     ],
+     "24": [
+      0.2898,
+      0.0011
+     ]
+    }
+   },
+   "PathPiece": {
+    "bpb": {
+     "12": [
+      0.8443,
+      0.0
+     ],
+     "18": [
+      0.7558,
+      0.0002
+     ],
+     "24": [
+      0.7008,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.1566,
+      0.0033
+     ],
+     "18": [
+      0.23079999999999998,
+      0.0041
+     ],
+     "24": [
+      0.2887,
+      0.0029
+     ]
+    }
+   },
+   "UnigramLM": {
+    "bpb": {
+     "12": [
+      0.8479,
+      0.0004
+     ],
+     "18": [
+      0.7572,
+      0.00030000000000000003
+     ],
+     "24": [
+      0.7023,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.1436,
+      0.0011
+     ],
+     "18": [
+      0.2118,
+      0.0027
+     ],
+     "24": [
+      0.26280000000000003,
+      0.0024
+     ]
+    }
+   },
+   "Det": {
+    "bpb": {
+     "12": [
+      0.8438,
+      0.0002
+     ],
+     "18": [
+      0.7553,
+      0.0001
+     ],
+     "24": [
+      0.6985,
+      0.0
+     ]
+    },
+    "core": {
+     "12": [
+      0.165,
+      0.0033
+     ],
+     "18": [
+      0.2259,
+      0.0014000000000000002
+     ],
+     "24": [
+      0.28600000000000003,
+      0.0036
+     ]
+    }
+   },
+   "Bias": {
+    "bpb": {
+     "12": [
+      0.8452,
+      0.0001
+     ],
+     "18": [
+      0.7558,
+      0.0002
+     ],
+     "24": [
+      0.7005,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.16390000000000002,
+      0.0042
+     ],
+     "18": [
+      0.2285,
+      0.0035000000000000005
+     ],
+     "24": [
+      0.2839,
+      0.002
+     ]
+    }
+   }
+  },
+  "128": {
+   "BPE": {
+    "bpb": {
+     "12": [
+      0.8416,
+      0.0004
+     ],
+     "18": [
+      0.7525,
+      0.0001
+     ],
+     "24": [
+      0.6964,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.1623,
+      0.0033
+     ],
+     "18": [
+      0.2329,
+      0.0026
+     ],
+     "24": [
+      0.2938,
+      0.0022
+     ]
+    }
+   },
+   "PathPiece": {
+    "bpb": {
+     "12": [
+      0.84,
+      0.0006000000000000001
+     ],
+     "18": [
+      0.7517,
+      0.0001
+     ],
+     "24": [
+      0.6982,
+      0.0009000000000000001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1597,
+      0.003
+     ],
+     "18": [
+      0.2298,
+      0.0042
+     ],
+     "24": [
+      0.2868,
+      0.0017000000000000001
+     ]
+    }
+   },
+   "UnigramLM": {
+    "bpb": {
+     "12": [
+      0.8453,
+      0.0001
+     ],
+     "18": [
+      0.7557,
+      0.0009000000000000001
+     ],
+     "24": [
+      0.7038,
+      0.0019
+     ]
+    },
+    "core": {
+     "12": [
+      0.1516,
+      0.0049
+     ],
+     "18": [
+      0.22210000000000002,
+      0.0019
+     ],
+     "24": [
+      0.265,
+      0.0016
+     ]
+    }
+   },
+   "Det": {
+    "bpb": {
+     "12": [
+      0.8403,
+      0.00030000000000000003
+     ],
+     "18": [
+      0.7513,
+      0.0005
+     ],
+     "24": [
+      0.6951,
+      0.0001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1703,
+      0.0045000000000000005
+     ],
+     "18": [
+      0.2298,
+      0.0022
+     ],
+     "24": [
+      0.2877,
+      0.0074
+     ]
+    }
+   },
+   "Bias": {
+    "bpb": {
+     "12": [
+      0.8393,
+      0.0004
+     ],
+     "18": [
+      0.7515,
+      0.00030000000000000003
+     ],
+     "24": [
+      0.697,
+      0.0005
+     ]
+    },
+    "core": {
+     "12": [
+      0.1558,
+      0.005
+     ],
+     "18": [
+      0.2281,
+      0.005600000000000001
+     ],
+     "24": [
+      0.2896,
+      0.0031
+     ]
+    }
+   }
+  },
+  "256": {
+   "BPE": {
+    "bpb": {
+     "12": [
+      0.8411,
+      0.0
+     ],
+     "18": [
+      0.7528,
+      0.0002
+     ],
+     "24": [
+      0.6953,
+      0.0002
+     ]
+    },
+    "core": {
+     "12": [
+      0.16260000000000002,
+      0.0027
+     ],
+     "18": [
+      0.2304,
+      0.0063
+     ],
+     "24": [
+      0.2893,
+      0.0027
+     ]
+    }
+   },
+   "PathPiece": {
+    "bpb": {
+     "12": [
+      0.8397,
+      0.0002
+     ],
+     "18": [
+      0.7514,
+      0.0001
+     ],
+     "24": [
+      0.701,
+      0.0036000000000000003
+     ]
+    },
+    "core": {
+     "12": [
+      0.1534,
+      0.0033
+     ],
+     "18": [
+      0.22870000000000001,
+      0.0006
+     ],
+     "24": [
+      0.2808,
+      0.0046
+     ]
+    }
+   },
+   "UnigramLM": {
+    "bpb": {
+     "12": [
+      0.8467,
+      0.0002
+     ],
+     "18": [
+      0.7572,
+      0.0013000000000000002
+     ],
+     "24": [
+      0.6994,
+      0.0006000000000000001
+     ]
+    },
+    "core": {
+     "12": [
+      0.1418,
+      0.0044
+     ],
+     "18": [
+      0.2125,
+      0.0009
+     ],
+     "24": [
+      0.2732,
+      0.0029
+     ]
+    }
+   },
+   "Det": {
+    "bpb": {
+     "12": [
+      0.8398,
+      0.0002
+     ],
+     "18": [
+      0.7517,
+      0.00030000000000000003
+     ],
+     "24": [
+      0.6946,
+      0.0
+     ]
+    },
+    "core": {
+     "12": [
+      0.1578,
+      0.0038
+     ],
+     "18": [
+      0.2198,
+      0.0047
+     ],
+     "24": [
+      0.29410000000000003,
+      0.0016
+     ]
+    }
+   },
+   "Bias": {
+    "bpb": {
+     "12": [
+      0.8402,
+      0.0004
+     ],
+     "18": [
+      0.7517,
+      0.0005
+     ],
+     "24": [
+      0.6957,
+      0.0006000000000000001
+     ]
+    },
+    "core": {
+     "12": [
+      0.16269999999999998,
+      0.0046
+     ],
+     "18": [
+      0.2327,
+      0.0028000000000000004
+     ],
+     "24": [
+      0.2926,
+      0.0045000000000000005
+     ]
+    }
+   }
+  }
+ }
+}
