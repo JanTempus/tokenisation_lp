@@ -8,6 +8,7 @@ from huggingface_hub import hf_hub_download, list_repo_files
 
 
 DATASET_ID = os.environ.get("DATASET_ID", "karpathy/climbmix-400b-shuffle")
+PARQUET_PREFIX = os.environ.get("PARQUET_PREFIX", "")
 NUM_SHARDS = int(os.environ.get("NUM_SHARDS", "7"))
 NUM_PROC = int(os.environ.get("NUM_PROC", "64"))
 ROW_FRACTION = float(os.environ.get("CLIMBMIX_ROW_FRACTION", "1"))
@@ -29,8 +30,14 @@ def main():
     shards = sorted(
         filename
         for filename in list_repo_files(DATASET_ID, repo_type="dataset")
-        if filename.endswith(".parquet")
+        if filename.startswith(PARQUET_PREFIX) and filename.endswith(".parquet")
     )[:NUM_SHARDS]
+    if len(shards) != NUM_SHARDS:
+        raise ValueError(
+            f"Found {len(shards)} parquet shards under '{PARQUET_PREFIX}' in "
+            f"{DATASET_ID}, expected {NUM_SHARDS}"
+        )
+    print(f"Using shards: {shards}")
 
     local_shards = [
         hf_hub_download(
